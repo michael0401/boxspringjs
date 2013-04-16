@@ -20,6 +20,10 @@
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
 /*global bx: true, _: true, emit: true, toJSON: true */
 
+if (typeof bx === 'undefined') {
+	bx = {};
+}
+
 (function(Local) {
 	"use strict";
 	
@@ -83,8 +87,6 @@
 				});			
 			});
 		}());
-		
-		
 		
 		// initialize the SYS variable with 'services'
 		var start = function (url) {
