@@ -188,6 +188,13 @@
 				'date-dateIn-4',
 				'date-docId-test',
 				'todays-date-test',
+				'date-set-get-1',
+				'date-set-get-2',
+				'date-gt-1',
+				'date-lt-1',
+				'date-eq-1',
+				'date-in-range-1',
+				'date-in-range-2',
 				'm2n-n2m-methods-1',
 				'm2n-n2m-methods-2',
 				'm2n-n2m-methods-3',
@@ -199,7 +206,23 @@
 				'findall-test',
 				'find-names-test',
 				'reverse-lookup',
-				'systemdb-queue'
+				'systemdb-queue',
+				're-group-a1',
+				're-group-a2',
+				're-group-a3',
+				're-group-a4',
+				're-group-a5',
+				'options-test-1',
+				'options-test-2',
+				'options-test-3',
+				'options-test-4',
+				'options-test-5',
+				'options-test-6',				
+				'options-test-7',
+				'coerce-test-1',				
+				'clean-test-1',
+				'clean-test-2'
+
 			], function (x) { return x; })
 			, obj = {
 				'var1': {
@@ -221,19 +244,17 @@
 			, sample = function () {
 					q.finish();
 			}
-			, today = Date().toString().split(' ').slice(1).join(' ');
-
+			, today = bx.date();
+			
 			t.assert('arrayMap', _.difference(_.arrayMap(['a', 'b'], function(item) {
 				return item;
 			}), ['a', 'b']).length, 0); 
 
 			t.assert('blank-date-test', 
 				_.difference(bx.date().key(), 
-					bx.date({'format': 'mm dd yyyy', 'dateIn': today })
+					bx.date()
 						.key()).length, 0);
 
-//console.log(bx.date().key(), bx.date({'format': 'mm dd yyyy', 'dateIn': today }).key(), today);
-//return;
 			[1, 2, 3, 4, 5].forEach(function(item) {
 				q.submit(sample, item);			
 			});
@@ -274,7 +295,7 @@
 
 			tmp = [];
 			['var1/var6', 'var1/var2/var3', '/var1/var5', 'var6'].forEach(function(path) {
-				tmp.push(bx.doc(_.clone(obj)).fetch(path));
+				tmp.push(bx.Access(_.clone(obj)).fetch(path));
 			});
 
 			t.assert('hfetch-test', _.arrayIdentical(tmp,
@@ -290,7 +311,8 @@
 			});
 			/*jslint unparam: false */
 			t.assert('walk-test', _.difference(tmp, ['var1','var2','var3','var4','var6','var5']).length,0);
-			t.assert('date-key-test-1', bx.date({'format': 'mm yyyy', 'dateIn': 'January 2000'}).key()[0], 2000);
+			t.assert('date-key-test-1', 
+				_.difference(bx.date({'format': 'mm yyyy', 'dateIn': 'January 2000'}).key('yyyy'),[2000]).length, 0);		
 			// tests the hierarchy path from the walk function used as a selector for the hfetch
 			_.walk(obj, function(v, k, path) {
 				if (path === 'var1/var2/var3') {
@@ -298,8 +320,8 @@
 				}
 			});
 
-			t.assert('date-key-test-2', bx.date({'format': 'mm yyyy', 'dateIn': 'January 2000'}).key()[1], 0);
-			t.assert('date-key-test-3', bx.date({'format': 'mm dd yyyy', 'dateIn': 'February 28, 2011'}).key()[2], 28);
+			t.assert('date-key-test-2', bx.date({'format': 'mm yyyy', 'dateIn': 'January 2000'}).key()[1], 2000);
+			t.assert('date-key-test-3', bx.date({'format': 'mm dd yyyy', 'dateIn': 'February 28, 2011'}).key()[1], 28);
 									
 			tmp = true;
 			bx.date().key().forEach(function(item) {
@@ -309,8 +331,8 @@
 			t.assert('m2n-n2m-methods-1', bx.date().n2m(7), 'aug');
 			t.assert('m2n-n2m-methods-2', bx.date().m2n('August'), 7);
 			t.assert('m2n-n2m-methods-3', 
-				bx.date().m2n(bx.date({'dateIn': today, 'format': 'mm dd yyyy'}).n2m()),
-				bx.date({'dateIn': today, 'format': 'mm dd yyyy'}).key()[1]);
+				bx.date().m2n(bx.date().n2m()),
+				bx.date().key()[2]);
 			t.assert('m2n-n2m-methods-4', bx.date().m2n('DEC'), 11);
 			
 			tmp = 0;
@@ -333,14 +355,43 @@
 			});
 			t.assert('m2n-n2m-test', tmp, 0);
 			// formatting dates
-			t.assert('date-dateIn-1', bx.date({'format': 'mm yyyy', 'dateIn': 'December 2012'}).print(), '12 2012');
-			t.assert('date-dateIn-2', bx.date({'format': 'mm dd yyyy', 'dateIn': 'December 25, 2012'}).print('yyyy/dd/mm'), '2012/25/12');
+			t.assert('date-dateIn-1', bx.date({'format': 'mm yyyy', 'dateIn': 'December 2012'}).print(), '11 2012');
+			t.assert('date-dateIn-2', bx.date({'format': 'mm dd yyyy', 'dateIn': 'December 25, 2012'}).print('yyyy/dd/mm'), '2012/25/11');
 			
-			t.assert('date-dateIn-3', bx.date({'format': 'mm dd yyyy', 'dateIn': 'dec 7, 2012'}).print('mm/dd/yyyy'), '12/7/2012');
-			t.assert('date-dateIn-4', bx.date({'format': 'mm-dd-yyyy', 'dateIn': '2-15-2012'}).print('mm yyyy'), '2 2012');
+			t.assert('date-dateIn-3', bx.date({'format': 'mm dd yyyy', 'dateIn': 'dec 7, 2012'}).print('mm/dd/yyyy'), '11/7/2012');
+			t.assert('date-dateIn-4', bx.date({'format': 'mm-dd-yyyy', 'dateIn': '2-15-2012'}).print('mm yyyy'), '1 2012');
 
 			t.assert('date-docId-test', _.arrayCompare(bx.date({'format': 'mm dd yyyy', 'dateIn': 'december 25, 2012' }).docId().split('-').slice(1), [ '2012', '11', '25']), true);
 
+			today = bx.date({'dateIn': [2012, 6]})
+				.setYear(2010)
+				.setMonth(10)
+				.setDate(15);
+			t.assert('date-set-get-1', 
+				_.difference([ today.getYear(), today.getMonth(), today.getDate(), today.print('mm-dd-yyyy') ], 
+					[2010, 10, 15, '10-15-2010']).length, 0);
+
+			today.setYear(2011)
+				.setTime(today.valueOf());
+			t.assert('date-set-get-2', today.print('mm-yyyy'), '10-2011');
+			t.assert('date-gt-1', 
+				bx.date({ 'dateIn': 'september 18, 2012'})
+					.gt(bx.date({'dateIn': 'december 19, 2011'})), true);
+
+			t.assert('date-lt-1', 
+				bx.date({ 'dateIn': 'september 18, 2012'})
+					.lt(bx.date({'dateIn': 'december 19, 2011'})), false);
+					
+			t.assert('date-eq-1', 
+				bx.date({ 'dateIn': 'september 18, 2012'})
+					.eq(bx.date({'dateIn': 'december 19, 2011'})), false);
+			
+			t.assert('date-in-range-1', 
+				today.inRange(bx.date({'dateIn': [2010]}), bx.date({'dateIn': [ 2013 ]})), true);
+																		
+			t.assert('date-in-range-2', 
+				today.inRange(bx.date({'dateIn': [2012]}), bx.date({'dateIn': [ 2013 ]})), false);
+		
 			// Btree tests
 			tmp = Local.Btree();
 			testList2.forEach(function(tag) {
@@ -378,7 +429,79 @@
 
 			t.assert('reverse-lookup', 
 			_.difference(tmp2, [ 'names-test', 'names-test', 'names-test', 'names-test']).length, 0);
-		
+			
+			/* doc Object tests here */
+			var a2 = _.flatten([ [ '1', 'a' ],
+			  [ '1', 'b' ],
+			  [ '1', 'x' ],
+			  [ '1', 'y' ],
+			  [ '2', 'a' ],
+			  [ '2', 'b' ],
+			  [ '2', 'x' ],
+			  [ '2', 'y' ] ])
+			, a3 = _.flatten([ [ '1', 'a', '00' ],
+			  [ '1', 'a', '11' ],
+			  [ '1', 'b', '00' ],
+			  [ '1', 'b', '11' ],
+			  [ '1', 'x', '00' ],
+			  [ '1', 'x', '11' ],
+			  [ '1', 'y', '00' ],
+			  [ '1', 'y', '11' ],
+			  [ '2', 'a', '00' ],
+			  [ '2', 'a', '11' ],
+			  [ '2', 'b', '00' ],
+			  [ '2', 'b', '11' ],
+			  [ '2', 'x', '00' ],
+			  [ '2', 'x', '11' ],
+			  [ '2', 'y', '00' ],
+			  [ '2', 'y', '11' ] ]);
+
+			t.assert('re-group-a1', _.difference(
+				_.flatten(bx.Access().unGroup([['1', '2']])), 
+				_.flatten([ [ '1' ], [ '2' ] ])).length, 0);	
+			//console.log(_.flatten(bx.Access().unGroup([['1', '2']])), _.flatten([ [ '1' ], [ '2' ] ]));				
+
+			t.assert('re-group-a2', _.difference(_.flatten(bx.Access().unGroup([['1', '2'],['a', 'b', 'x', 'y']])), a2).length, 0);
+			t.assert('re-group-a3', _.difference(_.flatten(bx.Access().unGroup([['1', '2'],['a', 'b', 'x', 'y'],['00', '11']])), a3).length, 0);	
+			t.assert('re-group-a4', _.difference(
+				_.flatten(bx.Access().unGroup(['a', 'b', 'x', 'y'])), 
+				_.flatten([ [ 'a' ], [ 'b' ], [ 'x' ], [ 'y' ] ])).length, 0);
+			//console.log(bx.Access().unGroup([['a', 'b', 'x', 'y']]));
+			t.assert('re-group-a5', _.difference(
+				_.flatten(bx.Access().unGroup([[], ['a', 'b'], []])), 
+				_.flatten([ [ '', 'a', '' ], [ '', 'b', '' ] ])).length, 0);
+				
+			// tests for 'options' helper
+			var x = _.options({'a': 1, 'b': 2}, {'a': 5, 'b': 4, 'c': 3 });
+			t.assert('options-test-1', _.isEqual(x.post(), {'a': 1, 'b': 2, 'c': 3}), true);
+			t.assert('options-test-2', 
+				_.isEqual(x.extend({'d': 4}).post(), {'a':1,'b':2,'c':3,'d':4}), true);
+			t.assert('options-test-3', _.isEqual(x.pick('a', 'b'), {'a': 1, 'b': 2 }), true);
+			t.assert('options-test-4', _.isEqual(x.pick(['a', 'b']), {'a': 1, 'b': 2 }), true);
+			t.assert('options-test-5', 
+				_.isEqual(x.update({'a': 2, 'd': 1}).post(), { a: 2, b: 2, c: 3, d: 1 }), true);
+			t.assert('options-test-6', 
+				_.isEqual(x.restore().post(), {'a': 1, 'b': 2, 'c': 3}), true);
+			t.assert('options-test-7', 
+				_.isEqual(x.defaults().post(), {'a': 5, 'b': 4, 'c': 3 }), true);
+				
+			t.assert('coerce-test-1', 
+				_.isString(_.coerce('string', 0)) &&
+				_.isNumber(_.coerce('number',"1")) &&
+				_.isString(_.coerce('string')) &&
+				_.isNumber(_.coerce('number')) &&
+				_.isDate(_.coerce('date', new Date())) && 
+				_.isDate(_.coerce('date', 'junk')) &&
+				_.isBoolean(_.coerce('boolean', true)) &&
+				_.isBoolean(_.coerce('boolean', 'false')) &&
+				_.coerce('boolean', 'true'), true);
+				
+			t.assert('clean-test-1', 
+				_.difference(_.values(_.clean({'a': 'yes', 'b': undefined, 'c': 'again!', 'd': undefined })),
+					['yes', 'again!']).length, 0);
+			t.assert('clean-test-2', _.difference(
+				_.values(_.clean({'a': 'yes', 'b': undefined, 'c': 'again!', 'd': undefined }, 'yes')),
+				[undefined, undefined, 'again!']).length, 0);	
 		});
 		
 		system.on('/regress/list', function(syslib, onFinish, log) {
@@ -506,7 +629,7 @@
 			, hit = [];
 
 			_.each(sentences, function (doc, index) {
-				corpus.docs[doc] = text.Text(text.Sentence(doc)).id(index);
+				corpus.docs[doc] = text.Text(text.Sentence(doc)).Id(index);
 				corpus.dictionary.merge(corpus.docs[doc]);
 				return;			
 			});
@@ -754,7 +877,7 @@
 						
 			// gets root name by default, then tests getting name with id provided
 			harness.assert('db-persist-test-1', 
-				db.name, bx.db.id('regress').name);
+				db.name, bx.db.Id('regress').name);
 			harness.assert('db-persist-test-2', anotherdb.dbName, 'regress');
 			// tests the defaultView method since not defined
 			harness.assert('db-persist-test-3', anotherdb.index, 'my-view');
@@ -793,7 +916,7 @@
 						update.code, 201, update.request.method + ', ' + update.request.path);
 					db.get('all_docs', function(couch) {
 						harness.assert('all-docs-couch', couch.code, 200, couch.response.reason());
-						db.get('all_docs', { 'server': 'node' }, function(node) {
+						db.get({ 'index': 'all_docs', 'server': 'node' }, function(node) {
 							var found;
 							node.each(function(d) {
 								var found;
@@ -813,7 +936,7 @@
 					var readBack = res.data
 						, designKeys = _.keys(readBack.updates).concat(_.keys(readBack.views));
 					harness.assert('design-read-back', 
-						_.difference(designKeys, [ 'my-commit', 'in-place', 'Index']).length,0,designKeys);
+						_.difference(designKeys, [ 'lib', 'in-place', 'Index']).length,0,designKeys);
 					db.trigger('design-tests');
 				});
 			});		
@@ -824,11 +947,11 @@
 				// a local update handler 'my-commit'. After the last completion, it asserts the test
 				// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
 				// running in node.js and not on the server.
-				db.get(function(r) {
+				db.get({'index': 'Index'}, function(r) {
 					db.get({ 'server': 'node' }, function(n) {
 						harness.assert('view-tests', r.rows.length, n.rows.length);
 						db.design.commit('base_test_suite', 'in-place', { 
-							'random': bx.date().key(true)[3] }, function(commit) {
+							'random': bx.date().template()['time'] }, function(commit) {
 							harness.assert('update-handler', commit.code, 201, commit.reason());
 							db.trigger('bulk-tests');
 						});					
@@ -852,8 +975,8 @@
 				anotherdb.design.update(function(response) {
 					harness.assert('my-design-update', response.code, 201, response.request.path);
 					anotherdb.get('my-view', function (c) {
-						anotherdb.get({'server': 'node'}, function(n) {
-							harness.assert('my-view-test', c.bulk().total_rows, n.total_rows, n.response.request.path);
+						anotherdb.get({'server': 'node'}, function(n) {							
+							harness.assert('my-view-test', c.bulk().rows.length, n.total_rows, n.response.request.path);
 						});
 					});
 				});

@@ -44,6 +44,23 @@
 				return (o && Object.keys(o).length);
 			},
 
+			// What it does: wraps a function in a closure and returns it so the returned function
+			// has access to the arguments of the original function. Useful when firing 'click' events
+			enclose: function(func) {
+				var args = _.toArray(arguments).slice(1);
+				return function (context) {
+					return func.apply(context || null, args);
+				};
+			},
+			
+			args: function (a) {
+				return (_.isArray(a) ? a : _.toArray(arguments));
+			},
+			
+			copy: function (o) {
+				return(_.extend({}, o));
+			},
+			
 			// Purpose: finds the index of a value in an Array
 			arrayFind: function (k, a) {
 				var index
@@ -122,7 +139,7 @@
 			},
 			
 			forceToArray: function (l) {
-				if (typeof l === 'string') {
+				if (typeof l === 'string' || typeof l === 'number') {
 					return [ l ];
 				}
 				if (_.isArray(l)) {
@@ -162,27 +179,41 @@
 				var types = {
 					'string': '',
 					'number': 0,
+					'array': [],
 					'boolean': false
 				};
 				if (_.isDate(value)) {
 					return value;
 				}
-				if (expectedType !== typeof value) {
+				if (expectedType === 'date' && !_.isDate(value)) {
+					return (value && new Date(value)) || new Date(1900,1,1);
+				}
+				if (expectedType && typeof value === 'undefined') {
 					return types[expectedType];
 				}
-				return value;
+				if (expectedType && typeof value !== 'undefined') {
+					if (expectedType === 'string') {
+						return (value && value.toString()) || '';						
+					}
+					if (expectedType === 'number') {
+						return _.isNumber(_.toInt(value)) ? _.toInt(value) : types.number;
+					}
+					if (expectedType === 'array') {
+						return _.isArray(value) ? value : [ value || '' ];
+					}
+					if (expectedType === 'boolean') {
+						if (value === 'true') {
+							return true;
+						}
+						if (value === 'false') {
+							return false;
+						}
+						return _.isBoolean(value) ? value : types.boolean;
+					}
+				}
+				return value || '';
 			},
 			
-			filterUnknown: function(source) {
-				var tofilter = [];
-				
-				_.each(source, function(item, name) { 
-					if (typeof item === 'undefined') { 
-						return tofilter.push(name); } });
-				return(_.exclude(source, tofilter));
-			},
-
-
 			// What it does: extracts the property names to an Array
 			names: function(o) {
 				var result = []
@@ -194,6 +225,14 @@
 					}
 				}
 				return result;
+			},
+			
+			item: function(x) {
+				return x;
+			},
+			
+			reverse: function (a) {
+				return _.reduce(a, function(x, y) { x.unshift(y); return x; }, []);
 			},
 
 			// What it does: extracts the properties from the first object based on the 
@@ -216,6 +255,11 @@
 					} 
 				});
 				return target;
+			},
+			
+			// returns a boxspring.js date object from an array [yyyy, mm, dd]
+			toDate: function(d) {
+				return bx.date({'dateIn': d });
 			},
 
 			// converts a string to a decimal integer
@@ -255,7 +299,7 @@
 			},
 
 			// What it does: given a property, or list of property, return the value of the first hit
-			// note: owner flag suppresses return of #text value and just give the owning object to caller
+			// note: owner flag suppresses return of #text value; give the owning object to caller
 			fetch: function (o, p, owner) {
 				var i
 					, keys = []
@@ -283,7 +327,7 @@
 
 			// What it does: takes item 'p1/p2/../pN' and searches for occurence of pN in pN-1
 			hfetch: function (o, item) {
-				var items = item.split('/')
+				var items = _.compact(item.split('/'))
 					, found = o;
 				if (items.length > 1) {
 					items.forEach(function(tag) {
@@ -402,6 +446,33 @@
 				}
 				return thisurl;
 			},
+			
+			initialCaps: function (str) {
+				return _.map(str.split(/_/g), function(s) {
+					return s.charAt(0).toUpperCase() + s.slice(1);
+				}).join(' ');
+			},
+			
+			// Purpose: html string builder
+			buildHTML: function(tag, html, attrs) {
+				var attr;
+				// you can skip html param
+				if (typeof(html) !== 'string') {
+					attrs = html;
+					html = null;
+				}
+
+				var h = '<' + tag;
+				for (attr in attrs) {
+					if (attrs.hasOwnProperty(attr) && attrs[attr] !== false && attrs[attr] !== undefined) { 
+							h += ' ' + attr + '="' + attrs[attr] + '"';
+					}
+				}
+				h += html ? ">" + html + "</" + tag + ">": "/>";
+				//	console.log('buildHTML:', h);
+				return h;
+			},
+			
 			// Purpose: Iterator for traversing abstract JSON objects
 			walk: function(obj, action, d) {
 				var name
@@ -435,6 +506,59 @@
 						func();
 					}
 				}, ms);
+			},
+			// What it does: removes key/values from items whose value === 'value'. 
+			// Note: undefined is default
+			clean: function(items, value) {
+				return (items && _.reduce(_.map(_.keys(items), function(k, index) { if (items[k] !== value) { 
+							return ([k, items[k]]); }
+						}), function(target, y) { if (y) { target[y[0]] = y[1]; } return target; }, {}));
+			},
+			/*
+			filterUnknown: function(source) {
+				var tofilter = [];
+				
+				_.each(source, function(item, name) { 
+					if (typeof item === 'undefined') { 
+						return tofilter.push(name); } });
+				return(_.exclude(source, tofilter));
+			},
+			*/
+			// Purpose: A uniform 'options' object
+			options: function (o, d) {
+				var orig = _.copy(o)
+				, def = _.copy(d || {})
+				, that = bx.Hash(_.defaults(o || {}, def))
+				, restore = function () {
+					return _.options(orig, def);
+				};
+				that.restore = restore;
+				
+				var defaults = function () {
+					return _.options({}, def);
+				};
+				that.defaults = defaults;
+				
+				var extend = function (source) {
+					return _.options(_.extend(this.post() || {}, source || {}), def);
+				};
+				that.extend = extend;
+				that.clone = extend;
+				
+				var update = function(o) {
+					var local = this;
+					_.each(o, function(v, k) {
+						local.store(k, v);
+					});
+					return this;
+				};
+				that.update = update;
+				
+				var pick = function () {
+					return (_.pick(this.post(), _.args.apply(null, arguments)));
+				};
+				that.pick = pick;
+				return that;
 			}
 		});
 	};
@@ -446,12 +570,7 @@
 		'July', 'August', 'September', 'October', 'November', 'December']
 	*/
 	var date = function(o) {
-		var that = _.extend({}, o || {}, _.defaults(o || {}, {
-			'format': 'dd/mm/yyyy',
-			'now': new Date(),
-			'today': [ '', '', '' ],
-			'separator': ' '
-		}))
+		var that = o || {}
 		, map = {
 			'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
 			'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
@@ -459,16 +578,50 @@
 		, formats = [
 			'dd/mm/yyyy', 'mm/dd/yyyy', 'yyyy/mm/dd', 'yyyy/dd/mm',
 			'dd-mm-yyyy', 'mm-dd-yyyy', 'yyyy-mm-dd', 'yyyy-dd-mm',
-			'mm-yyyy', 'mm yyyy', 'mm/yyyy', 'mm dd yyyy', 'yyyy mm dd' ]
-		, timeNow = (that.now.toString()).split(' ')[4]
-		, template = [];		
-		
+			'mm-yyyy', 'mm yyyy', 'mm/yyyy', 'mm dd yyyy', 'yyyy mm dd', 'day yyyy mm dd' ]
+		, separator
+		, template = function (v) {
+			var obj = v || this.dateValue;
+			
+			return({
+				'yyyy': obj.getFullYear(),
+				'mm': obj.getMonth(),
+				'dd': obj.getDate(),
+				'day': obj.getDay(),
+				'time': obj.toTimeString().split(' ')[0]				
+			});
+		};
+		that.template = template;
+
+//console.log('making date for', that.dateIn);
+		// if no dateIn supplied, use the system date and proper format;
+		if (!that.dateIn)  {
+			that.format = 'day yyyy mm dd';
+			that.dateValue = new Date();
+			that.dateIn = that.dateValue.toString();
+		} else if (_.isArray(that.dateIn)) {
+			that.format = (o && o.format) || 'yyyy mm dd';
+			that.dateValue = new Date(_.map(that.dateIn, function(x) { return _.toInt(x); }));
+			that.dateValue.setMonth(that.dateValue.getMonth()+1);
+		} else if (_.isObject(that.dateIn)) {
+			that.dateValue = that.dateIn;
+			that.format = 'yyyy mm dd';
+		} else {
+			that.dateValue = new Date(that.dateIn);
+			// if no format provided, then date object will think month is zero-based and decrement
+			// application must adapt
+			if (!that.format) {
+				that.dateValue.setMonth(that.dateValue.getMonth()+1);				
+			}
+			that.format = (o && o.format) || 'yyyy mm dd';
+		}
 		// check that application supplied a valid date
 		if (_.arrayFind(that.format, formats) === -1) {
 			throw '[ date ] - unrecognized date format ' + that.format;
-		}		
+		}
+		
 		// get the separator for the date format
-		that.separator = (function (f) {
+		var getSeparator = function (f) {
 			var separator
 				, temp = [];
 			[ '/', '-', ' '].forEach(function(sep) {
@@ -478,80 +631,34 @@
 				}
 			});
 			return separator;				
-		}(that.format));
-		that.format.split(that.separator).forEach(function(item, i) {
-			template[i] = item;
-		});
-		that.template = template;
-		
-		// what it does: returns the 'today' value using the place in template for date 'part' 
-		var getPart = function (part) {
-			if ((_.arrayFind(part, template) !== -1)) {
-				return(_.isArray(that.today) && that.today[_.arrayFind(part, template)]);
-			}
 		};
-		that.getPart = getPart;
-		
-		var hasPart = function (part) {
-			return(typeof getPart(part) !== 'undefined');
+		// get the format separator character
+		separator = getSeparator(that.format);
+
+		// What it does: method to return a date as an array [yyyy, mm, dd ] .concat([ time ])
+		var key = function (f) {
+			var fmt = f || this.format
+			, sepchar = getSeparator(fmt)
+			, local = this;
+						
+			return _.map((fmt || 'yyyy mm dd').split(sepchar), function(part) {
+				return local.template()[part];
+			});
 		};
-		
-		var setPart = function (part, val) {				
-			if (typeof val !== 'undefined' && hasPart(part)) {
-				this.today[_.arrayFind(part, template)] = val;				
-			}
-			return this;
+		that.key = key;
+
+		// What it does: Joins the value of 'today' using deciphered 'separator' to form
+		// the date format string. And, reformats numeric 'mm' to string
+		var print = function (format) {
+			return(this.key(format).join(getSeparator((format || this.format))));
 		};
-		that.setPart = setPart;
+		that.print = print;
 		
-		var valueOf = function () {
-			return this.now.valueOf();
+		var docId = function () {
+			return(this.print('time-yyyy-mm-dd'));
 		};
-		that.valueOf = valueOf;
+		that.docId = docId;
 		
-		var getYear = function () {
-			return this.getPart('yyyy');
-		};
-		that.getYear = getYear;
-		
-		var getMonth = function () {
-			return this.getPart('mm') + 1;
-		};
-		that.getMonth = getMonth;
-		
-		var getDate = function () {
-			return this.getPart('dd');
-		};
-		that.getDate = getDate;
-		
-		var setYear = function (val) {
-			this.setPart('yyyy', _.toInt(val));
-			this.now.setFullYear(_.toInt(val));
-			return this;
-		};
-		that.setYear = setYear;
-		
-		var setMonth = function (val) {
-			this.setPart('mm', _.toInt(val));
-			this.now.setMonth(_.toInt(val));
-			return this;
-		};
-		that.setMonth = setMonth;
-		
-		var setDate = function (val) {
-			this.setPart('dd', _.toInt(val));
-			this.now.setDate(_.toInt(val));
-			return this;
-		};
-		that.setDate = setDate;
-		
-		var setTime = function(v) {
-			this.now = new Date();
-			this.now.setTime(v);
-			return this;
-		};
-		that.setTime = setTime;
-				
 		// What it does: takes month string and returns an ordinal integer value. If none provided,
 		// returns the value of the month for this object
 		var m2n = function (monthStr) {
@@ -559,12 +666,12 @@
 			return _.isString(mon) && (map[mon] || map[mon.substr(0,3)]);
 		};
 		that.m2n = m2n;
-		
+
 		// What it does: takes a number and returns a string month
 		var n2m = function (monthNo) {
 			var month
-				, targetMonth = monthNo || (hasPart('mm') && getPart('mm'));
-			
+				, targetMonth = (monthNo || this.template().mm);
+
 			for (month in map) {
 			//	console.log('finding month in map', map[month], month, typeof month);
 				if (map.hasOwnProperty(month) && (map[month]=== targetMonth)) {
@@ -575,325 +682,620 @@
 			return targetMonth;
 		};
 		that.n2m = n2m;
+
+		var valueOf = function () {
+			return this.dateValue.valueOf();
+		};
+		that.valueOf = valueOf;
 		
-		// if the application provided 'dateIn', use the format to parse it
-		if (that.hasOwnProperty('dateIn') && typeof that.dateIn !== 'undefined') {
-			// if 'dateIn' is a Date() object, convert it to string to get mm dd yyyy
-			// 'Fri Dec 28 2012 00:00:00 GMT-0500 (EST)'
-			if (_.isObject(that.dateIn)) {
-				that.dateIn = that.dateIn.toString().split(' ').slice(1).join(' ');
-			}
-			// initialize 'today' with the date provided by the application using
-			// position in the template
-			that.dateIn.split(that.separator).slice(0,template.length).forEach(function(item, i) {
-				that.today[i] = item.replace(',','');
-				// if 'mm' is a name not a number, convert it to a number
-				if (template[i] === 'mm') {
-					if (_.isNumber(m2n(that.today[i]))) {
-						that.today[i] = m2n(that.today[i]);
-					} else if (_.isNumber(_.toInt(that.today[i]))) {
-						that.today[i] -= 1;
-					}
-				} else {
-					// otherwise, just convert and store as a number
-					that.today[i] = _.toInt(that.today[i]);
-				}
-			});
-			
-			that.now = new Date();
-			if (hasPart('yyyy')) {
-				that.now.setFullYear(getPart('yyyy'));
-			}
-			if (hasPart('mm')) {
-				that.now.setMonth(getPart('mm'));
-			}
-			if (hasPart('dd')) {
-				that.now.setDate(getPart('dd'));
-			}
-		} 
-
-		// initialize 'today' with the date parts from the current date
-		// based on their position in 'template'
-		setPart.call(that, 'yyyy', that.now.getFullYear());
-		setPart.call(that, 'mm', that.now.getMonth());
-		if (template.length === 3) {
-			setPart.call(that, 'dd', that.now.getDate());				
-		} else {
-			['dd'].concat(template);
-			setPart.call(that, 'dd', 1);
-		}		
-
-		// What it does: method to return a date as an array [yyyy, mm, dd ] .concat([ time ])
-		var key = function (includeTime) {
-//			console.log('that.today', this.today, template, this.format);
-			if (includeTime) {
-				return ([ getPart('yyyy'), getPart('mm'), getPart('dd')]
-					.slice(0,template.length).concat([ timeNow ]));
-			}
-			return ([ getPart('yyyy'), getPart('mm'), getPart('dd') ]
-				.slice(0,template.length));
+		var setTime = function(v) {
+			this.dateValue = new Date();
+			this.dateValue.setTime(v);
+			return this;
 		};
-		that.key = key;
+		that.setTime = setTime;
 
-		var docId = function () {
-			return ([ timeNow,
-				this.getPart('yyyy'), 
-				this.getPart('mm'), 
-				this.getPart('dd')].join('-') );
+		// what it does: returns the 'today' value using the place in template for date 'part' 
+		var getPart = function (part) {
+			return this.template()[part];
 		};
-		that.docId = docId;
+		that.getPart = getPart;
+
+		var getYear = function () {
+			return this.getPart('yyyy');
+		};
+		that.getYear = getYear;
+
+		var getMonth = function () {
+			return this.getPart('mm');
+		};
+		that.getMonth = getMonth;
+
+		var getDate = function () {
+			return this.getPart('dd');
+		};
+		that.getDate = getDate;
+
+		var setYear = function (val) {
+			this.dateValue.setFullYear(_.toInt(val));
+			return this;
+		};
+		that.setYear = setYear;
+
+		var setMonth = function (val) {
+			this.dateValue.setMonth(_.toInt(val));
+			return this;
+		};
+		that.setMonth = setMonth;
+
+		var setDate = function (val) {
+			this.dateValue.setDate(_.toInt(val));
+			return this;
+		};
+		that.setDate = setDate;
 		
-		// What it does: Joins the value of 'today' using deciphered 'separator' to form
-		// the date format string. And, reformats numeric 'mm' to string
-		var print = function (format) {
-			var local = this
-				, outputTpl = format ? date({'format': format || this.format }).template : this.template
-				, sepchar = format ? date({'format': format || this.format }).separator : this.separator;
-			return(_.reduce(
-				_.map(outputTpl, function(part, i) {
-					var v = '';
-					if (part === 'mm') {
-						v = local.getMonth();
-					}
-					if (part === 'dd') {
-						v = getPart(part) || 1;
-					} else {
-						v = getPart(part);
-					}
-					return (v + (i<outputTpl.length-1 ? sepchar : ''));
-				}), function (x, y) { return x + y; }));
+		var gt = function (d2) {
+			return this.valueOf() > d2.valueOf();
 		};
-		that.print = print;		
+		that.gt = gt;
+		
+		var lt = function (d2) {
+			return !this.gt(d2);		
+		};
+		that.lt = lt;
+		
+		var le = function (d2) {
+			return ((!this.gt(d2)) || this.eq(d2));		
+		};
+		that.le = le;
+		
+		var ge = function (d2) {
+			return ((this.gt(d2)) || this.eq(d2));		
+		};
+		that.ge = ge;
+		
+		var eq = function (d2) {
+			return this.valueOf() === d2.valueOf();
+		};
+		that.eq = eq;
+		
+		var inRange = function (start, end) {
+			return (this.ge(start) && this.le(end));
+		};
+		that.inRange = inRange;
+//		console.log('made date', that.print());
 		return that;		
 	};
 	Local.date = date;
-
-	// What this does: methods for describing and manipulating the key/columns for a document
-	var doc = function (o) {
-		var that = {}
-			, keys = (o && o.keys) || []
-			, referencekey = (o && o.keys) || []
-			, columns = (o && o.columns) || []
-			, sortColumn
-			, sortDirection
-			, viewInfo = {}
-			, keyOffset = 0
-			, level
-			, builtInColumns = {
-				'year': 'number',
-				'month': 'number',
-				'country': 'string',
-				'city': 'string',
-				'state': 'string',
-				'address': 'string',
-				'count': 'number',
-				'keyword': 'string',
-				'index': 'number',
-				'category': 'string',
-				'locations': 'string',
-				'facility': 'string',
-				'values': 'object' 
-			};
-			
+	
+	var Keys = function (owner) {
+		var that = owner || {};
+		
 		// What it does: setter/getter the keys portion of the supplied columns array
 		var localkeys = function () {
-			if (_.isNumber(level)) {
-				return keys.slice(0,level);				
+			if (this.contains('group_level')) {
+				return this.get('keys').slice(0, this.get('group_level'));				
 			}
-			return keys;
+			return this.get('keys');
 		};
 		that.keys = localkeys;
 		
 		// What it does: setter/getter column portion of the supplied columns array
-		var localcolumns = function (c) {
-			if (c) {
-				columns = c;
-			}
-			return(columns || []);
+		var localcolumns = function () {
+			return(this.get('columns'));
 		};
 		that.columns = localcolumns;
 		
-		// What it does: returns all keys+columns
-		var all = function () {
-			return _.uniq(keys.concat(columns));
-		};
-		that.all = all;
-		
-		var indexInfo = function (index) {
-			if (this && this.hasOwnProperty('view-info') && this.hasOwnProperty(index)) {
-				return(this['view-info']()[this[index]]);
-			}
-		};
-		
-		var setViewInfo = function (v) {
-			if (v && _.isObject(v)) {
-				viewInfo = _.extend(viewInfo || {}, v);
-			}
-			// if this call has the view-info, then initialize the keys/columns
-			keyOffset = viewInfo.keyOffset || 0;
-			keys = viewInfo.keys.slice(keyOffset);
-			referencekey = viewInfo.keys.slice(keyOffset);
-			level = viewInfo.level || keys.length;
-			columns = viewInfo.columns;
-			sortColumn = viewInfo.sortColumn;
-			sortDirection = viewInfo.sortDirection || 'descending';
-			return viewInfo;
-		};
-		that.setViewInfo = setViewInfo;
-		
-		// if this call has the view-info, then initialize the keys/columns
-		if (indexInfo.call(this, 'default-index')) {
-			setViewInfo(indexInfo.call(this, 'default-index'));
-		}
-		
 		var referenceKey = function () {
-			return(referencekey);
+			return(this.get('referenceKey'));
 		};
 		that.referenceKey = referenceKey;
 		
-		var setLevel = function (l) {
-			if (_.isNumber(l)) {
-				level = l;
-			}
-			return (level);
+		// What it does: returns all keys+columns
+		var all = function () {
+			return (this.get('displayColumns') || 
+				_.uniq(localkeys.apply(this)
+					.concat(localcolumns.apply(this)
+					.concat(referenceKey.apply(this)))));
 		};
-		that.setLevel = setLevel;
+		that.all = all;
 		
-		var options = function (o) {
-			if (o && _.has(o, 'aggregate') && _.isNumber(o.aggregate)) {
-				return _.extend({}, o, { 'aggregate': o.aggregate + keyOffset });
-			}
-			return o;
+		var displayColumns = function () {
+			if (this.contains('group_level')) {
+				return this.all().slice(0, this.get('group_level'));
+			} 
+			return this.all();
 		};
-		that.options = options;
+		that.displayColumns = displayColumns;
 		
-		var isReduced = function () {
-			return (this.setLevel() < referenceKey().length);
+		// What it does: returns keys sliced to group_level and summarized keys
+		var summary = function (group_level, items) {
+			return(this.get('keys').slice(0,group_level).concat(items));
 		};
-		that.isReduced = isReduced;
+		//that.summary = summary;
 		
-		var docRef = function() {
-			return (o.doc || o) || {};
+		// What it does: given a keys Array and a group level, returns the key slices and count column
+		var group = function (group_level) {
+			return(summary(group_level, ['Count']));
 		};
-		that.docRef = docRef;
+		that.group = group;
+		
+		/*
+		trial.unGroup(
+			[	trial.conditions(),
+				[ trial.sponsor() ], 
+				trial.year() ], function(keys, index) {
+					emit(keys, trial.values('Index'));
+			});
+		*/
+		var emitGroups = function (args, fn) {
+			var items = args
+			, local = this;
+			/*global log: true */
+			if (!_.isFunction(fn)) { if (log) { log('fatal [ emitGroups ] - no emit function.'); }}
+			if (!_.isArray(args)) { items = [ args ]; }
+			
+			// execute the method to fetch the value for the key; if it doesn't return an array,
+			// coerce it to an array.
+			items = _.map(items, function (key) { return _.coerce('array', local[key]()); });
+			this.unGroup.call(this, items, function(row, i) {				
+				fn(row, i);
+			});
+		};
+		that.emitGroups = emitGroups;
+		
+		// What this does: Used by 'map' functions, opposite of _.flatten, 
+		// takes an array of arrays and returns multi-dimensional array. 
+		// [[1, 2], [a, b]] produces -> [[1a], [1b], [2a], [2b]] 
+		var unGroup = function (v, fn) {
+			var r1 = ''
+			, r2 = ''
+			, i;
+			
+			var zip = function (a, b) {
+				var result = ''
+				, v1 = a.length > 0 ? a : ['']
+				, v2 = b.length > 0 ? b : [''];
 
+				if (_.isArray(v1) && _.isArray(v2)) {
+					_.each(v1, function(a) {
+						_.each(v2, function(b) {
+							result += a + '|' + b + '&';
+						});
+					});
+				}
+				result = result.substr(0,result.length-1).split('&');
+				return result;
+			};
+			
+			if (_.isArray(v) && v.length > 1 && _.isArray(v[0]) && _.isArray(v[1])) {
+				r1 = v[v.length-1];
+				for (i=v.length; i>1; i-=1) {
+					r1 = zip(v[i-2], r1);
+				}
+				r2 = _.map(r1, function(r) {
+					return r.split('|');
+				});					
+			} else if (_.isArray(v) && v.length > 0 && _.isArray(v[0])) {
+				r2 = _.map(v[0], function (x) { return [x]; });
+			} else if (_.isArray(v)) {
+				r2 = _.map(v, function (x) { return [x]; });
+			} else {
+				r2 = [];
+			}
+			if (fn && _.isFunction(fn)) {
+				r2.forEach(function(row, i) {
+					fn(row, i);
+				});
+			}
+			return r2;
+		};
+		that.unGroup = unGroup;
+		return that;
+	};
+	Local.Keys = Keys;
+	
+	var Filter = function (owner) {
+		var that = owner || {};
+		
+		var compare =  function() {
+			return({
+				'array': function(k, v1, value) {
+					if (_.isArray(value)) {
+						return _.reduce(value, function(found, x) { 
+								if (x === v1) { 
+									return found || x; 
+								}
+								return false;
+							}, false);
+					} 
+					if (_.isString(value)) {
+						return (v1 === value);
+					}
+					return false;
+				},
+				'object': function (key, v1, value) {
+					if (_.isArray(value)) {
+						return this.array(key, v1, value);
+					}
+					if (_.isObject(value)) {
+						return this.array(key, v1, _.values(value));
+					} 
+					if (_.isString(value)) {
+						return (v1 === value);
+					}
+					return false;
+				},
+				'date': function (key, date, value) {
+					var len;
+					
+					if (key === 'year' && typeof value === 'number') {
+						value = [ value ];
+					}
+					len = value.length;
+					value = _.toDate(value);
+					if (_.isArray(date)) {
+						return value.eq(_.toDate(date.slice(0, len)));					
+					} 
+					if (_.isObject(date) && date.hasOwnProperty('start')) {
+						if (date.hasOwnProperty('end')) {
+							return (value.inRange(_.toDate(date.start.slice(0,len)), 
+								_.toDate(date.end.slice(0,len))));
+						}
+						return(value.eq(date.start.slice(0,len)));
+					}
+				}	
+			});
+		};
+		
+		var filter = function (keyValues) {
+			var local = this
+			, outerFound = false
+			, found
+			, list = _.isArray(keyValues) ? keyValues : [ keyValues ];
+			// execute until filter returns false or no more filters to run
+			list.forEach(function(items) {
+				found = true;	// must match every key/value for each sub-filter
+				// run this only if we don't have a match yet
+				if (outerFound === false) {
+					_.each(items, function(value, key) {
+						var type = local.hasType(key);
+
+						if (_.isFunction(value)) {
+							found = found && value.call(local, local.key, local.value);
+						} else if (type === 'string') {
+							found = found && local.selectFor(key, value);
+						} else if (type === 'number') {
+							found = found && (value === _.coerce('number', local.select(key)));
+						} else if (type === 'array' || type === 'object') {
+							found = found && compare()[type](key, value, local.select(key));								
+						} else {
+							throw '[ base-utils 958 ] - unsupported type: ' + type;
+						}
+					});					
+				}
+				// must match 'any' key/value pair for each sub-filter
+				outerFound = outerFound || found;
+			});
+			return (outerFound);
+		};
+		that.filter = filter;
+		return that;
+	};
+	Local.Filter = Filter;
+	
+	var Rows = function (owner) {		
+		var buffer = bx.Keys(_.clone(owner || {}))
+		, visible = [];
+
+		// What it does: given a row of data, uses the key/columns to create a hash of key/value pairs
+		var access = function (d) {
+			var store = function(key, value) {
+				buffer.hash.set(key, value);
+				// if this key is in our display list, then save it in the visible list
+				if (_.arrayFound(key, buffer.all())) {
+					visible.push(_.arrayFind(key, buffer.all()));					
+					visible = _.sortBy(_.uniq(visible), _.item);
+				}
+			}
+			, doc = _.clone(d);							
+			// create a new hash for each access; fetch key-values by position
+			buffer.hash = bx.Hash();
+			buffer.keys().forEach(function(val, index) {
+				store(val, (doc && doc.key && doc.key[index]));
+			});
+			// fetch value-values by lookup
+			if (_.isObject(doc.value)) {
+				// only look for column values not found in keys()				
+				_.difference(buffer.columns(), buffer.keys()).forEach(function(val) {
+					if (typeof doc.value[val] !== 'undefined') {
+						store(val, doc.value[val]);
+					}
+				});					
+			} else {
+				// grab the value from doc.value
+				_.difference(buffer.columns(), buffer.referenceKey()).forEach(function(val) {
+					store(val, doc.value);
+				});
+			}
+			this.set('visibleColumns', visible);
+			return this;
+		};
+		buffer.access = access;
+		
+		var columnReset = function () {
+			visible = [];
+			this.set('visibleColumns', []);
+			buffer.hash = bx.Hash();
+			return this;
+		};
+		buffer.columnReset = columnReset;
+		
+		// What it does: returns the index of the column requested, or 'sortColumn', or 0 if not found
+		var column2Index = function (c) {
+			var column = c || this.get('sortColumn')
+			, activeColumns = this.get('displayColumns') || this.get('columns');
+			return	(_.arrayFound(column, activeColumns) ?
+						_.arrayFind(column, activeColumns) : 0);
+		};
+		buffer.column2Index = column2Index;
+		
+		// What it does: returns the name of the column requested, or the 'sortColumn', or undefined
+		var index2Column = function (i) {
+			var index = _.isNumber(i) ? i : column2Index();
+			return this.get('displayColumns')[index] || this.get('columns')[index];
+		};
+		buffer.index2Column = index2Column;
+		
+		var valuesExist = function () {
+			// BEWARE: Hash 'keys' method is over-written by local 'keys' method; use _.keys
+			return _.keys(buffer.hash.post());
+		};
+		buffer.valuesExist = valuesExist;
+		
+		var getSortColumn = function () {
+			if (_.arrayFound(this.get('sortColumn'), this.valuesExist())) {
+				return(_.arrayFind(this.get('sortColumn'), this.valuesExist()));
+			}
+			if (_.arrayFound('total', this.valuesExist())) {
+				return(_.arrayFind('total', this.valuesExist()));					
+			}
+			return 0;
+		};
+		buffer.sortColumn = getSortColumn;
+		
+		// What this does: given a new set of columns, use the keys to determine the 'type'
+		// of the column and sort based on that type
+		var columnSort = function (reverse) {
+			var direction = (reverse) ? -1 : 1
+			, cols = buffer.get('columns');
+
+			buffer.set('columns', _.sortBy(cols, function (x) {
+				if (_.isNumber(x) || _.isNumber(_.toInt(x))) {
+					return (_.toInt(x) * direction);
+				}
+				// else returns the position in the array
+				return (_.arrayFind(x, cols) * direction);
+			}));
+			return this;
+		};
+		buffer.columnSort = columnSort;
+
+		var getKey = function (row) {
+			var local = row || this;
+			return local && local.key;
+		};
+		buffer.getKey = getKey;
+		
+		var getValue = function (row) {
+			var local = row || this;
+			return local && local.value;
+		};
+		buffer.getValue = getValue;
+		
+		// What it does: return the value of 'name' in this row
+		var select = function (name) {
+			var summary = {};
+			if (name === 'summary') {
+				summary = buffer.hash.post();
+				summary.total = buffer.hash.get('summary') && buffer.hash.get('summary').total;
+				return summary;
+			} 
+			if (name === 'total') {
+				return buffer.hash.contains('summary') && buffer.hash.get('summary').total; 
+			}
+			return buffer.hash.get(name);
+		};
+		buffer.select = select;
+
+		// What it does: returns true if value of 'name' equals 'value'
+		var selectFor = function (name, value) {
+			var selected = _.isString(this.select(name)) 
+				? this.select(name).toLowerCase() 
+				: this.select(name)
+			, val = _.isString(value) 
+				? value.toLowerCase()
+				: value;			
+			return (selected === val);
+		};
+		buffer.selectFor = selectFor;
+
+		// initialize the 'visibleColumns' to be all columns
+		buffer.set('visibleColumns', _.map(buffer.columns(), function (x, i) { return i; }));
+		return buffer;
+	};
+	Local.Rows = Rows;
+	
+	// formats a cell value for google.vis
+	/*jslint unparam: true */
+	var Cell = function (target) {
+		var that = target || {}
+		, types = ['string','number','boolean','date','datetime','timeofday','object','array']
+		, builtInColumns = _.options({
+			'year': ['number',1],
+			'month': ['number',1],
+			'country': ['string',2],
+			'city': ['string',2],
+			'state': ['string',2],
+			'address': ['string',4],
+			'count': ['number',1],
+			'sum': ['number',1],
+			'average': ['number',1],
+			'keyword': ['string',1],
+			'index': ['number',1],
+			'values': ['object',2],
+			'row total': ['number',1],
+			'column total': ['number',1],
+			'view': ['string', 1],
+			'summary': ['object', 8] 
+		});
+				
+		// What it does: methods for adding columnTypes to an object.
+		var columnTypes = (function () {
+			var that = {};
+
+			/*global log: true */
+			// What it does: accepts name/type or object of names/types. Extends the types hash
+			var extend = function (name, type, width) {
+				var buffer = {};
+
+				if (typeof name === 'string') {
+					buffer[name] = [type || 'string', width || 2];
+				} else if (typeof name === 'number') {
+					buffer[name] = [type || 'number', width || 1];
+				} else if (typeof name === 'object') {
+					buffer = name;
+				}
+				
+				_.options(buffer).each(function(item, key) {
+					if (_.arrayFound(item[0], types)) {
+						builtInColumns.store(key, item);
+					} else if (bx.COUCH) {
+						log('[ base-utils.js line 932 ] - invalid type: ' + item);
+					} else {
+						bx.logm('invalid-type', 500, '[ columnTypes().extend ] - ' + item);								
+					}
+				});				
+			};
+			that.extend = extend;
+			return that;
+		}());
+		that.columnTypes = columnTypes.extend;
+
+		that.hasType = function (key) {
+			return builtInColumns.lookup(key) && builtInColumns.lookup(key)[0];
+		};
+		
+		that.columnWidth = function (key) {
+			return (builtInColumns.lookup(key) && builtInColumns.lookup(key)[1]) || 1;			
+		};
+		
+		var newCell = function(o) {
+			var owner = this
+			, buf = {}
+			, cell = {
+				'name': o.name,
+				'value': o.value,
+				'type': owner.hasType(o.name),
+				'format': o.format,
+				'properties': o.properties
+			};
+			// for now, only allow number values for 'pivot'; in the future, we will pivot on objects
+			if (this.get('pivot') && typeof o.value === 'object') {
+				cell.value = o.value[this.get('pivot-summary')];
+				cell.type = 'number';
+			}
+			// if there is a formatter function, then call it and return
+			if (this.formats()[cell.name]) {
+				cell.type = 'string';
+				if (_.isString(cell.value)) {
+					cell.format = this.formats()[cell.name](cell.value).toString();
+				} else {
+					cell.format = this.formats()[cell.name](cell.value).toString();					
+					cell.value = _.map(cell.value, _.item).join(',');
+				}
+				return cell;
+			}
+			// call the generic formatter then
+			if (cell.type === 'array') {
+				cell.format = this.formats()['array'](cell.value).toString();
+				cell.value = _.map(cell.value, _.item).join(',');				
+				cell.type = 'string';
+				return cell;					
+			}
+			if (cell.type === 'object'){
+				cell.value = (cell && cell.value && JSON.stringify(cell.value)) || '';
+				cell.type = 'string';
+				return cell;
+			}
+			// otherwise, coerce this value to its type, if you can and return;
+			cell.value = _.coerce(cell.type, cell.value);
+			return cell;
+			// built in array and object processing
+			if (cell.type === 'array') {
+				// the object is re-formated to a list
+				if (cell.value && _.isArray(cell.value) && cell.value.length > 0) {
+					cell.value = bx.Browser().element().unorderedList(cell.value, {})
+						.display().data;						
+				} else {
+					cell.value = '';						
+				}
+				cell.type = 'string';
+				return cell;
+			}
+			if (cell.type === 'object') {
+				// the group_leveld object is reformatted to a table
+				if (cell.value && _.isObject(cell.value)) {
+					// map only the properties with values, to save space:
+					buf = _.reduce(_.map(_.keys(cell.value), function(name, value) {
+						return [ name, cell.value[name] ]; }), function (x, y) {
+							if (y[0] && (_.isNumber(y[1] || _.isString(y[1])))) { 
+								x.push(y); 
+							}
+						return x; 
+					}, []);
+					// format this object using the html table tags				
+					cell.value = bx.Browser().element()
+						.table(buf.slice(0,1), buf.slice(1)).display().data;
+				} else {
+					cell.value = (cell.value && cell.value.toString()) || '';
+				}
+				cell.type = 'string';
+				return cell;
+			}
+			// otherwise, coerce this value to its type, if you can and return;
+			cell.value = _.coerce(cell.type, cell.value);
+			return cell;
+		};
+		that.newCell = newCell;
+		that.newColumn = newCell;
+		return that;	
+	};
+	Local.Cell = Cell;
+	
+	// What this does: methods for describing and manipulating the key/columns for a document
+	var Access = function (query) {
+		// add Rows and Keys (inherited from Rows) methods to this object, and Cell
+		var that = query || {};
+		
+		// if this object doesn't already have Hash, give it one
+		if (!that.hasOwnProperty('hashValues')) {
+			that = _.extend({}, that, bx.Hash());
+		}
+		that = _.extend({}, bx.Rows(that), bx.Cell(), bx.Filter(that));		
+		// store the document
+		that.set('docRef', query);
+		
 		// What it does: used by map functions to assert the validity of the input
 		var assert = function (type) {
-			return((this && this.Id() && this.docRef().type===type) && this);
+			return((this && this.Id() && this.get('docRef').type===type) && this);
 		};
 		that.assert = assert;
 		
 		var Id = function () {
-			return this.docRef()._id;
+			return this.get('docRef')._id;
 		};
 		that.Id = Id;
-		
-		// What this does: given a new set of columns, use the keys to determine the 'type'
-		// of the column and sort based on that type
-		var pivot = function (newColumns, keyIndex, type, reverse) {
-			var direction = (reverse) ? -1 : 1
-				, template = keys[keyIndex || keys.length]
-				, mo = [ 'mm', 'mo', 'month' ]
-				, newColumnTypes = {};
-
-			columns = _.sortBy(newColumns, function (x) {
-				if (_.isNumber(x) || _.isNumber(_.toInt(x))) {
-					return (_.toInt(x) * direction);
-				}
-				if (_.arrayFound(template.toLowerCase(), mo)) {
-					return (bx.date().m2n(x)*direction);
-				}
-				// else returns the position in the array
-				return (_.arrayFind(x, newColumns) * direction);
-			});
-			
-			if (type) {
-				columns.forEach(function(c) {
-					newColumnTypes[c] = type;
-				});
-				this.columnTypes(newColumnTypes).extend();
-			}
-			// sort also changes the index of the last key, so update it
-			return this;
-		};
-		that.pivot = pivot;
-
-		var query = function () {
-			var local = this
-				, valuesExist = [];
-				
-			// What it does: given a row of data, uses the key/columns to
-			// return an object of key/value pairs
-			var get = function (row) {
-				var doc = (row || this)
-					, buffer = {};
-
-				// fetch key-values by position
-				this.keys().forEach(function(val, index) {
-					buffer[val] = (doc && doc.key && doc.key[index+keyOffset]);
-				});
-				// fetch value-values by lookup
-				this.columns().forEach(function(val) {
-					if (typeof doc.value[val] !== 'undefined') {
-						buffer[val] = doc.value[val];					
-					}
-				});
-				valuesExist = _.uniq(valuesExist.concat(_.keys(buffer)));
-				return buffer;
-			};
-			local.get = get;
-			
-			var getKey = function (row) {
-				return row.key.slice(keyOffset);
-			};
-			local.getKey = getKey;
-			
-			var getAbsoluteKey = function (row) {
-				return row.key;
-			};
-			local.getAbsoluteKey = getAbsoluteKey;
-			
-			var getValue = function (row) {
-				return row.value;
-			};
-			local.getValue = getValue;
-			
-			var getSortColumn = function () {
-				if (_.arrayFound(sortColumn, valuesExist)) {
-					return(_.arrayFind(sortColumn, valuesExist));
-				}
-				if (_.arrayFound('total', valuesExist)) {
-					return(_.arrayFind('total', valuesExist));					
-				}
-				return 0;
-			};
-			local.sortColumn = getSortColumn;
-			
-			var sortAscending = function () {
-				return (viewInfo && viewInfo.sortAscending);
-			};
-			local.sortAscending = sortAscending;
-			
-			var isVisible = function (c) {
-				return _.arrayFound(c, valuesExist);
-			};
-			local.isVisible = isVisible;
-			return local;
-		};
-		that.query = query;
-		
-		// What it does: return the value of 'name' in this row
-		var select = function (row, name) {
-			return this.get(row)[name];
-		};
-		that.select = select;
-
-		// What it does: returns true if value of 'name' equals 'value'
-		var selectFor = function (row, name, value) {
-			return (!value || (value === '') ||
-				this.select(row, name).toLowerCase() === value.toLowerCase());
-		};
-		that.selectFor = selectFor;
 
 		// What it does: accesses the source document.
 		// uses an Array or variable length list of properties and returns the first matching property
@@ -903,160 +1305,14 @@
 				, results = [];
 
 			args.forEach(function(item) {
-				results.push(_.hfetch(local.docRef(), item));					
+				results.push(_.hfetch(local.get('docRef'), item));					
 			});
 			return args.length > 0 && results[0];
 		};
-		that.fetch = fetch;
-
-		// What it does: returns keys sliced to group_level and summarized keys
-		var summary = function (group_level, items) {
-			return(keys.slice(0,group_level).concat(items));
-		};
-		that.summary = summary;
-		
-		// What it does: given a keys Array and a group level, returns the key slices and count column
-		var group = function (group_level) {
-			return(summary(group_level, ['Count']));
-		};
-		that.group = group;
-		
-		// What it does: setter/getter for adding columnTypes to this object.
-		var columnTypes = function (moreTypes) {
-			var that = {}
-				, types = ['string','number','boolean','date','datetime','timeofday','object','array'];
-			
-			/*global log: true */
-			var extend = function (t) {
-				var item;
-				
-				if (t && _.isObject(t)) {
-					builtInColumns = _.extend(builtInColumns, t);
-					// see to it that columns are of known 'type'
-					for (item in builtInColumns) {
-						if (builtInColumns.hasOwnProperty(item)) {
-							if (!(_.arrayFound(builtInColumns[item.toLowerCase()], types))) {
-								if (bx.COUCH) {
-									log('[ doc.columnTypes() ] - invalid type: ' + item);
-								} else {
-									bx.logm('invalid-type', 500, '[ doc.columnTypes() ] - ' + item);								
-								}
-							}
-						}
-					}
-				}				
-			};
-			// on creation, caller can supply more types
-			extend(moreTypes);
-			that.extend = extend;
-
-			// What it does: takes a label and a value and checks against columnType to determine its type
-			// then coerces the value into integer or string if required.
-			var check = function (nam, value) {
-				var name = (_.isString(nam) && nam.toLowerCase()) || nam
-					, columnType = builtInColumns[name] || 'string';
-
-				if (!builtInColumns[name]) {
-					if (bx.COUCH) {
-						log('[ base-utils.js - typeCheck() ]: '+name);
-					} else {
-						bx.logm('config-error', 500, '[ base-utils.js - typeCheck() ]: '+name);					
-					}
-				}
-				if (columnType === 'number') {
-					if (_.isNumber(value)) {
-						return (value);
-					} 
-					return (_.isNaN(_.toInt(value)) ? undefined : _.toInt(value));					
-				} 
-				if (columnType === 'date') {
-					if (value && value !== '') {
-						return new Date (value);
-//						return (bx.date({'dateIn': value, 'format': 'mm yyyy'}).print('dd/mm/yyyy'));
-					}
-					return undefined;
-				}
-				if (columnType === 'string') {
-					if (value && !_.isString(value)) {
-						return JSON.stringify(value).toLowerCase();
-					}
-				}
-				return (value);
-			};
-			that.check = check;
-
-			var hasType = function (name) {
-				return builtInColumns[name];
-			};
-			that.hasType = hasType;			
-			return that;
-		};
-		that.columnTypes = columnTypes;
-		
-		// formats a cell value for google.vis
-		/*jslint unparam: true */
-		var newCell = function(o, types) {
-			var owner = this
-			, cell = {
-				'name': o.name,
-				'value': this.columnTypes(types).check(o.name, o && o.value),
-				'type': this.columnTypes(types).hasType(o.name) || 'string',
-				'format': o.format,
-				'properties': o.properties
-			};
-			cell.toType = function () {
-				var buf = {}, buf1 = []
-					, local = this;
-								
-				if (this.type === 'array') {
-					if (this && this.value && _.isArray(this.value) && this.value.length > 0) {
-						this.value = bx.Browser().element().unorderedList(this.value, {})
-							.display().data;						
-					} else {
-						this.value = '';						
-					}
-					this.type = 'string';
-				} else if (this.type === 'object') {
-					// object in the non-reduced view, we just want the value
-					if (!owner.isReduced() && _.isObject(this && this.value)) {
-						_.each(this.value, function(item, index) {
-							if (item !== 0) {
-								if (!_.isString(index)) {
-									throw 'index must be a string!' + index;
-								}
-								local.value = index.toString();
-							}
-						});
-					// the aggregated object is a table
-					} else if (_.keys(this.value).length > 0) {
-						// map the properties with values, to save space:
-						buf = _.map(_.keys(this.value), function(name, value) {
-							return [ name, local.value[name] ];
-						});
-						
-						buf = _.reduce(buf, function (x, y) {
-							if (y[0] && (_.isNumber(y[1] || _.isString(y[1])))) { 
-								x.push(y); 
-							}
-							return x; 
-						}, []);								
-						this.value = bx.Browser().element()
-							.table(buf.slice(0,1), buf.slice(1)).display().data;
-					} else {
-						this.value = '';
-					}
-					this.type = 'string';
-				}
-				this.value = _.coerce(this.type, this.value);
-				return this;
-			};
-			return cell;
-		};
-		that.newCell = newCell;
-		that.newColumn = newCell;
+		that.fetch = fetch;		
 		return that;
 	};
-	Local.doc = doc;
+	Local.Access = Access;
 	
 	Local.Events = function(Obj) {
 		var e = _.extend(Obj || {}, _.clone(Backbone.Events));
@@ -1368,14 +1624,19 @@
 			return this;
 		};
 		that.store = store;
+		that.set = store;
 
-		var lookup = function (n) {
-			var name = n || (this && this.name);
-			
-			return name && (that.hashValues[name] || that.hashValues[stemmer(name)]);
+		var lookup = function (name) {			
+			if (name && typeof that.hashValues[name] !== 'undefined') {
+					return that.hashValues[name];
+			}
+			if (name && typeof that.hashValues[stemmer(name)] !== 'undefined') {
+				return that.hashValues[stemmer(name)];
+			}
 		};
 		that.lookup = lookup;
 		that.find = lookup;
+		that.get = lookup;
 
 		var contains = function (name) {
 			return typeof lookup(name) !== 'undefined';
@@ -1394,12 +1655,14 @@
 
 		var each = function (action) {
 			var local = this
-				, i;
+				, i
+				, j = 0;
 
 			for (i in local.hashValues) {
 				if (local.hashValues.hasOwnProperty(i)) {
 					if (action && typeof action === 'function') {
-						action(local.hashValues[i], i);
+						j += 1;
+						action(local.hashValues[i], i, j);
 					}					
 				}
 			}
@@ -1470,9 +1733,24 @@
 		
 		first.spliceOut = function (s) {
 			var sib = s || this
-				, location = this.firstSibling();
+			, location = this && this.firstSibling();
 			
-			while (location.sibling !== sib) { location = location.sibling; }
+			// if no siblings before or after, remove this from its parent and return;
+			if (!sib.nextSibling() && !sib.previousSibling()) {
+				this.owner.child = undefined;
+				this.owner = undefined;
+				return this;
+			}
+			// if this is the first child, make its sibling the first child of the parent
+			if (this.firstSibling() === this) {
+				this.owner.child = this.sibling;
+				this.owner = undefined;
+				return this.sibling;
+			}
+			// else its the last or in the middle
+			while (location && location.sibling && location.sibling !== sib) { 
+				location = location.sibling; 
+			}
 			location.sibling = sib.sibling;
 			sib.sibling = undefined;
 			sib.owner = undefined;
@@ -1492,12 +1770,13 @@
 			return this;				
 		};
 		
-		var siblings = function (fn) {
-			var next = this.owner.child;
+		var siblings = function (action, it) {
+			var next = (this && this.owner && this.owner.child)
+			, iterator = (_.isFunction(it) && it) || function () { return true; };
 			
 			while (next) {
-				if (_.isFunction(fn)) {
-					fn.call(next, next);						
+				if (_.isFunction(action) && iterator(next) === true) {
+					action.call(next, next);						
 				}
 				next = next.sibling;					
 			}
@@ -1523,7 +1802,23 @@
 		};
 		
 		first.firstSibling = function () {
-			return this.parent().firstChild();
+			return this.parent() && this.parent().firstChild();
+		};
+		
+		first.nextSibling = function () {
+			return this.sibling;
+		};
+		
+		first.previousSibling = function () {
+			var local = this
+			, sib;
+			// find the sibling that points to this
+			this.siblings(function(s) {
+				if (s.sibling === local) {
+					sib = s;
+				}
+			});
+			return sib;
 		};
 		
 		// What it does: fetches the last sibling from the objects children and inserts child at the end.
@@ -1574,6 +1869,12 @@
 		var find = function(id, fn) {
 			var local = this
 				, found;
+			
+			// the empty argument list returns the id of self	
+			if (arguments.length === 0) {
+				return this.id;
+			}
+			
 			this.each(function(item) {
 				if (item.id === id) {
 					if (fn && _.isFunction(fn)) {
@@ -1589,14 +1890,14 @@
 		first.Id = find;
 		return first;
 	};
-	
+
 	// if the hash is not here, then create it.
 	// What it does: Invokes Hash to add a hash and adds 'create' and 'Id' methods to this object.
 	Local.Extend = function (maker) {
 		var that = (maker && maker()) || {};
 		
 		if (!that.hasOwnProperty('hashValues')) {
-			that = _.extend(that, Local.Hash());
+			that = _.extend(that, bx.Hash());
 		}
 		
 		// What it does: creates or updates a named object adds it to the hash
@@ -2166,7 +2467,7 @@
 				}
 				return id;
 			};
-			that.id = objId;
+			that.Id = objId;
 
 			var insert = function (source) {
 				sources.push(source);
@@ -2195,7 +2496,7 @@
 					wordCount: count,
 					uniqWords: uniq,
 					total_docs: this.docs().length,
-					words: that.values
+					words: that.post()
 				});
 			};
 			that.stats = stats;
@@ -2263,9 +2564,9 @@
 				// for each document in the corpus
 				subject.docs().forEach(function(doc) {
 					// don't compare to itself
-					if (doc.id() !== query.id()) {
+					if (doc.Id() !== query.Id()) {
 						// get the intersection of its word vector with the query
-						result.push([ doc.id(), arith.dotProduct(doc.values, query.values, function(x) {
+						result.push([ doc.Id(), arith.dotProduct(doc.post(), query.post(), function(x) {
 							return x.tfidf;
 						})]);
 					}
@@ -2290,7 +2591,7 @@
 
 					if (!docs[tmp.doc]) {
 						docs[tmp.doc] = text();		// create the text object
-						docs[tmp.doc].id(tmp.doc);		// give the text object an id
+						docs[tmp.doc].Id(tmp.doc);		// give the text object an id
 					}
 					docs[tmp.doc].store(tmp.word, tmp.value);
 				});

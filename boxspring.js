@@ -58,32 +58,33 @@
 			var fileIo = bx.boxspring().file()
 				,includes = [
 					{ 'name': 'underscore', 'path': bx.Paths[0]+'/underscore.js', 'src': '' },
-					{ 'name': 'myobject', 'path': bx.Paths[0]+'/myobject.js', 'src': '' },
 					{ 'name': 'base-utils', 'path': bx.Paths[1]+'/base-utils.js', 'src': '' }
 				]
 				,count = _.toArray(includes).length;
 
 			_.each(includes, function(item) {
 				fileIo.get(item.path, function (response) {
-					if (response.code === 200) {
-						_.each(includes, function (lib) {
-							if (response.request.path.indexOf(lib.path) !== -1) {
-								lib.src = response.data;
-								count -= 1;
-							}
+					if (response.code !== 200) {
+						bx.logf('%s: %s\t%s', 'bad-include', response.code,  item.location);										
+					}
+					_.each(includes, function (lib) {
+						if (response.request.path.indexOf(lib.path) !== -1) {
+							lib.src = response.data;
+							count -= 1;
+						}
+					});
+					if (count === 0) {
+						bx.libs = {};
+						_.each(includes, function(lib) {
+							bx.libs[lib.name] = lib.src; 
 						});
-						if (count === 0) {
-							bx.libs = {};
-							_.each(includes, function(lib) {
-								bx.libs[lib.name] = lib.src; });
-							bx.trigger('ready');
-						}						
-					} else {
-						bx.log.logf('%s: %s\t%s', 'bad-include', response.code,  item.location);										
+						bx.trigger('ready');
 					}
 				});			
 			});
 		}());
+		
+		
 		
 		// initialize the SYS variable with 'services'
 		var start = function (url) {
@@ -126,9 +127,13 @@
 	// What it does: Templated data structure for a CouchDB design document
 	Local.defaultDesign = function (owner) {
 		var that = owner || {}
-			, toJSON = function(o) {
-				return(JSON.stringify(o));
-			};
+		, toJSON = function(o) {
+			return(JSON.stringify(o));
+		};
+		
+		if (typeof exports === 'undefined') {
+			var exports = {};
+		}
 
 		var template = function () {
 			return({
@@ -154,10 +159,29 @@
 					}				
 				},
 				'views': {
+					'lib': {
+						'base-utils': exports.fn = function() { _.mixin(bx['base-utils']()); },
+						'underscore': exports.val = ";",
+						'view-info': exports.fn = function() {
+							return({
+								'Index': {
+									'keys': ['year', 'month', 'day', 'time', 'type', '_id', 'size'],
+									'columns': [ 'total', 'count', 'average']
+								}
+							});
+						}
+					},
 					'Index': {
 						'map': function (doc) {
+							var dV
+							, newDv;
+							require('views/lib/base-utils').fn();
+							
 							if (doc && doc._id) {
-								emit(bx.date(doc.last_updated).key(true)
+								dV = doc.last_updated.split(' ');
+								newDv = new Date(dV[3], dV[2], dV[1]);
+								
+								emit(bx.date({ 'dateIn': newDv }).key(true)
 									.concat([(doc && doc.type) || 'mark-for-delete'])
 									.concat([ doc._id ]), JSON.stringify(doc).length);
 							}
@@ -181,10 +205,6 @@
 								reCount +=  val.count;
 							});
 							return ({ 'total': reTotal, 'count': reCount, 'average': avg(reTotal, reCount) });
-						},
-						'cols': function(group_level) {
-							var keys = ['year', 'month', 'day', 'time', 'type', '_id', 'size'];
-							return(_.cols(keys, [ 'total', 'count', 'average']));
 						}
 					}				
 				},
@@ -226,17 +246,9 @@
 			db.url2Id = url2Id;
 
 			var isValidQuery = function (s) {
-				var target = {}
-					, source = s || {};
-				
-				// filter any values that are provided by the application 'undefined'
-				_.keys(source).forEach(function(value) {
-					if (source.hasOwnProperty(value) && typeof source[value] !== 'undefined') {
-						target[value] = source[value];						
-					}
-				});
-
-				var formatKey = function(target, key, exclude) {
+				// remove 'page_size'; this is an application parameter, not a couch parameter
+				var target = _.exclude(_.clean(s), 'page_size')
+				, formatKey = function(target, key, exclude) {
 					if (_.has(target, key) && typeof target[key] !== 'undefined') {
 						target[key] = JSON.stringify(target[key]);
 						target = _.exclude(target, exclude);
@@ -255,114 +267,50 @@
 					}
 				}
 				
-				// reduce has to be true or false, not 'true' or 'false'
-				if (_.has(target, 'reduce')) {
-					if (target.reduce === 'false' || typeof target.reduce === 'undefined') {
-						target.reduce = false;
-					} else if (target.reduce === 'true') {
+				try {
+					// reduce has to be true or false, not 'true' or 'false'
+					if (_.has(target, 'reduce') && typeof target.reduce === 'string') {
+						target.reduce = _.coerce('boolean', target.reduce);
+						throw 'reduce value must be a boolean, converting string to boolean';
+					}
+
+					// Enforces rule: if group_level specified, then reduce must be true
+					if (typeof target.group_level === 'number' && 
+						typeof target.reduce === 'boolean' && 
+						target.reduce === false) {
 						target.reduce = true;
+						throw 'reduce must be true when specifying group_level';
 					}
+					// 'limit' and 'group_level' must be integers
+					['limit', 'group_level'].forEach(function(key) {
+						if (_.has(target, key)) {
+							target[key] = _.toInt(target[key]);
+							if (!_.isNumber(target[key])) {
+								throw key + ' value must be a number';
+							}
+						}
+					});
+					// if reduce=true, then include_docs can't be true
+					if (typeof target.include_docs !== 'undefined'&& 
+						target.include_docs === true && 
+						typeof target.reduce !== undefined && 
+						target.reduce === true) {
+						target = _.exclude(target, 'include_docs');
+						throw 'unable to apply include_docs parameter for reduced views';
+					}					
+				} catch (e) {
+					bx.alert('programmer-error', 500, e);
 				}
-								
-				// What it does: converts group_level specification into proper query format
-				if (target.group_level) {
-					target.reduce = true;
-				} 
-				
-				if (target.hasOwnProperty('group_level') && target.group_level === undefined) {
-					target = _.exclude(target, 'group_level');
-				}
-				
-				// 'limit' and 'group_level' is not undefined and specified as an integer
-				['limit', 'group_level'].forEach(function(key) {
-					if (_.has(target, key) && (target[key] !== undefined)) {
-						target[key] = _.toInt(target[key]);
-					}
-				});
-				
-				// remove 'page_size'; this is an application parameter, not a couch parameter
-				target = _.exclude(target, 'page_size');
-				
-				// if reduce===true, then limit is ignored; 
-				if (target && target.reduce && target.reduce === true) {
-					target = _.exclude(target, 'limit');
-				}
-				
-				// if reduce === false, then group_level is ignored;
-				if (target && target.hasOwnProperty('reduce') && target.reduce === false) {
-					target = _.exclude(target, 'group_level');
-				}
-				
-				// if reduce=true, then include_docs can't be true
-				if (target.include_docs && target.include_docs === true && 
-					target.reduce && target.reduce === true) {
-					target = _.exclude(target, 'include_docs');
-				}
-				//console.log('target', target, source);
 				return target;
 			};
 			db.isValidQuery = isValidQuery;
-			
-			/* Mappings:
-				1. Return the view with pagination: { 'page_size': value }
-					{ 'limit': <page_size:value>, 'reduce': false }
-				2. Return the view summarized: { 'summarize': true }
-					{ 'group': true }
-				3. Return the selected rows: { 'select': <array of keys> }
-					{ 'keys': <select:values> }
-				4. Return the selected rows, summarized: { 'select': <array>, 'summarize': true }
-					{ 'group': true, 'keys': <select:values> }
-				5. Return the view aggregated: { 'aggregate': <aggregate:value> }
-					{ 'reduce': true, 'group_level': <aggregate:value> }
-				6. Return the view starting at the key: { 'list': <list:value>, 'end': <end:value> }
-			*/
-			var translateQuery = function (source) {
-				var target = {}
-					, options = _.filterUnknown(source);
-				
-				var handleSelectList = function(src) {
-					var local = {};	
-					if (_.has(options, 'select')) {
-						local = _.extend(src, { 'keys': options.select, 'group': true });
-					} else if (_.has(options, 'list')) {
-						local = _.extend(src, { 'startkey': options.list });
-//						local = _.extend(src, { 'startkey': options.list, 'group': true });
-						if (options.hasOwnProperty('end')) {
-							local = _.extend(local, { 'endkey': options.end });
-						}
-					} else {
-						local = src;
-					}
-					return local;
-				};
-				
-				if (_.has(options, 'summarize') && !_.has(options, 'aggregate')) {
-					target = { 'group': true };
-				} else if (_.has(options, 'select') || _.has(options, 'list')) {
-					target = handleSelectList({});
-				} else if (_.has(options, 'aggregate') && _.isNumber(options.aggregate)) {
-					target = handleSelectList({ 'reduce': true, 'group_level': options.aggregate });
-				} else {
-					target = handleSelectList({ 'reduce': false });
-				}
-				
-				if (_.has(options, 'page_size') && _.isNumber(options.page_size)) {
-					target = _.extend(target, {'page_size': options.page_size });
-				}
-				
-				if (_.has(target, 'reduce') && (target.reduce === false) && _.has('include_docs')) {
-					target = _.extend(target, { 'include_docs': options.include_docs });
-				}
-				return target;
-			};
-			db.translateQuery = translateQuery;
 
 		// update url: /<database>/_design/<design>/_update/<function>/<docid>	
 		// view url:  /<database>/_deisgn/<design>/_view/<viewname>/
 
 			// NB: path elements must have precending '/'. For example '/_session' or '/anotherdb'
 			// DATABASE names DO NOT have leading '/' 
-			// component object: { server: 'server', db: 'db', view: view, list: list, show: show etc... }
+			// component object: { server: 'server', db: 'db', view: view, startkey: startkey, show: show etc... }
 			var path = (function (thisDB) {
 				var that={}
 					, dbname='/' + (thisDB || dbName);
@@ -855,7 +803,8 @@
 			var designInfo = function () {
 				return({
 					'get': function (k) { return (this && this[k]); },
-					'default-index': (views.lib && views.lib['default-index']) || 'Index',
+					'default-index': (views && views.lib && views.lib['default-index']) || 'Index',
+					'dateFilter': (views && views.lib && views.lib.dateFilter),
 					'views': views,
 					'lib': (views && views.lib),
 					'doc': (views && views.lib && views.lib.doc) || bx.doc,
@@ -909,7 +858,9 @@
 			libSrc = 'var bx = { "COUCH": true };\n';
 			if (views && views.hasOwnProperty('lib')) {
 				_.each(views.lib, function(lib, name) {
-					if (bx.libs.hasOwnProperty(name)) {
+					if (!bx.hasOwnProperty('libs')) {
+						bx.log('warning', 500, 'libraries not loaded');
+					} else if (bx.libs.hasOwnProperty(name)) {
 						libSrc += bx.libs[name] + '\n';						
 					}
 				});
@@ -964,7 +915,6 @@
 				, NAME = (config && config.name) || _.uniqueId('dbname')
 				, ID = (config && config.id) || NAME
 				, auth = bx.auth()
-				, asynch = false
 				, defaults = _.defaults(config || {}, {
 					'name': NAME,
 					'id': ID,
@@ -996,6 +946,7 @@
 				var name = index || this.index
 					, views = this.maker() && this.maker().views
 					, qry = {}
+					, system = { 'asynch': false, 'page_size': 0, 'cache_size': undefined }
 					, req = bx.Events()
 					, db = this
 					// wrap the design document with an 'emit'-er
@@ -1007,8 +958,8 @@
 				}
 				
 				var fetch = function (events, query, server) {
-					var that = {}
-						, tRows = 0;
+					var cache = {}
+					, tRows = 0;
 
 					var nextQuery = function(query, startkey) {
 						// only called with a startkey by 'chunk' on subsequent invokations
@@ -1021,49 +972,65 @@
 						return query;
 					};
 
-					var nextLimit = function(query, page_size) {					
-						if (page_size > 0) {
-							return(_.extend(query, { 'limit': page_size+1 }));
+					var nextLimit = function(query, size) {					
+						if (system.asynch && _.isNumber(size) && size > 0) {
+							return(_.extend(query, { 'limit': system.page_size+1 }));
 						}
 						return query;
 					};
 
 					var chunk = function (e, qry, startkey) {
 						var queryMethod = (name === 'all_docs') ? 'all_docs' : 'view'
-							, query = qry
-							, page_size = _.toInt((query && query.page_size) || 0);
+						, query = qry;
+
+						// remaining cache_size get smaller on each successive fetch
+						system.cache_size = _.isNumber(system.cache_size) 
+							? system.cache_size-1 
+							: undefined;
 
 						query = nextQuery(query, startkey);
-						query = nextLimit(query, page_size);
+						query = nextLimit(query, system.page_size);
 
 						// execute the query and process the response
-						db.design.query(
-							queryMethod, 
-							_.extend(db.design.docId(), {'view': name }),
-							_.exclude(query, 'asynch', 'page_size'),
+						db.design.query(queryMethod, 
+							_.extend(db.design.docId(), {'view': name }), query,
 							function (response) {
+								var stubRow;
 							if (response.code === 200) {
-								if (response.data && response.data.rows) {	
-						response.data.nextkey = response.data.rows[response.data.rows.length-1];
-									response.query = query;
+								if (system.asynch && response.data && _.has(response.data, 'rows')) {	
+									response.data.nextkey = 
+										response.data.rows[response.data.rows.length-1];
+									response.query = query;									
+
 									// trim the rows, because we got page_size+1
-									if ((page_size > 0) && (response.data.rows.length > page_size)) { 
-										response.data.rows = 
-											response.data.rows.slice( 0, response.data.rows.length-1 ); 
+									if ((system.page_size > 0) && 
+										(response.data.rows.length > system.page_size)) { 
+											response.data.rows = 
+											response.data.rows.slice(0,response.data.rows.length-1);
 									}
+									
+									if (!_.has(response.data, 'total_rows')){
+										// reduce fetches don't produce offset/total_rows
+										// for now, there is no paging reduced views from the server;
+										response.data.offset = 0;
+										response.data.total_rows = response.data.rows.length;
+									} 
+									tRows += response.data.rows.length; 
 								}
 								e.trigger('chunk-data', response);
 							} else {
 								e.trigger('view-error', response);
 							}				
-						});					
+						});
 					};
 
 					events.on('chunk-data', function (res) {
-						tRows +=  (res.data.rows.length);
+						var total_rows;
+							
 						// if I've got less than the full index; and asynchronous request
-						if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && (asynch === true)) {
-							chunk(events, query, res.data.nextkey);						
+						if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && 
+							(system.asynch === true) && system.cache_size > 0) {
+							chunk(events, query, res.data.nextkey);	
 						} else {
 							// if we're building the index internally, call it here. the prefetch is 
 							// 'all_docs' with 'include_docs' = true
@@ -1074,10 +1041,16 @@
 								emitter_view.getRows(res.data);
 								tRows = res.data.total_rows;					
 								events.trigger('chunk-finished', res);
-							}					
+							}
 						}
-					});					
-					chunk.call(this, events, query);		
+					});
+					
+					events.on('get-more-data', function (nextkey) {
+						system.cache_size += 1;
+						console.log('get-more-data', events, query, nextkey);
+						chunk(events, query, nextkey);
+					});
+					chunk(events, query);		
 					return that;
 				};
 
@@ -1098,13 +1071,21 @@
 					events.on('chunk-data', function (res) {
 						events.trigger('view-data', res);
 					});
-					fetch.call(this, events, query);
+					fetch(events, query);
 				};
 				req.couch = couch;					
 
-				var query = function (q) {
-					if (q) {
-						qry = _.extend(qry, q);
+				var query = function (queryParams, systemParams) {
+					if (_.isObject (queryParams)) {
+						qry = _.extend(qry, queryParams);
+					}
+					// rule: if reduce=true then page_size=0;
+					if (_.has(qry, 'reduce') && qry.reduce === true) {
+						system.page_size = 0;
+						system.asynch = false;
+					} else if (systemParams.asynch === true) {
+						system.page_size = systemParams.page_size;
+						system.cache_size = systemParams.cache_size;
 					}
 					return qry;
 				};
@@ -1112,40 +1093,9 @@
 
 				var end = function (config) {
 					var server=(config && config.server) || 'couch'
-						, res = bx.Events();
-
-					var log = function (res, limit) {
-						var thislog = res || {}
-							, total_rows
-							, fetched
-							, httpStatus
-							, failed = 0;
-
-						var status = function (response, callback) {
-							var data = (response && response.data) || { 
-								'total_rows': 0, 'offset': 0, 'rows': [] }
-								, rows = data.rows
-								, result;
-
-							total_rows = data.total_rows;
-							fetched = data.offset+(rows.length);
-							httpStatus = (response && response.code) || 0;
-							failed += response.code !== 200 ? 1 : 0;
-							result = {
-								'limit': (limit || 'no-limit'),
-								'code': httpStatus,
-								'processed': fetched,
-								'total_rows': total_rows,
-								'failed': failed 
-							};
-							if (callback && _.isFunction(callback)) {
-								callback(result);
-							}
-							return(result);			
-						};
-						thislog.status = status;
-						return thislog;
-					};
+					, lastResponse
+					, res = bx.Events()
+					, local = this;
 
 					// check to make sure we have a proper map functino
 					if (server === 'node' && views && (views[name] && views[name].map &&
@@ -1156,14 +1106,16 @@
 
 					// Note: Responses from this method are evented. 
 					// This paves the way for future parallel view exec
-					// Also, imbue it with the log function, so the caller can 
+					// old version: imbue it with the log function (now commented), so caller can 
 					// decide to ask for status on long running jobs
-					callback(log((res = bx.Events()),query().limit || 0));
+					// callback(log((res = bx.Events()),query().limit || 0));
+					callback(res);
 
 					// execute the view by calling the requested server function
-					this[server](res, qry);
+					local[server](res, qry);
 
 					res.on('view-data', function (response) {
+						lastResponse = response;
 						if (response.code === 200) { 
 							res.trigger('data', response);										
 						} else {
@@ -1187,69 +1139,75 @@
 			// delivery of data from the server. 
 			// 'asynch: false' (or undefined) executes the callback each time and the 
 			// application has to manage the data
-			var get = function (name, opts, cb) {
+			var get = function (o, callback, callerDataCatcher) {
 				var req
-					, callerOptions = {}
-					, callback
-					, triggered = false
-					, index = (this && this.index) || 'default'
-					, caller;
-
-				if (arguments.length === 1) {
-					callback = name;
-				} else if (arguments.length === 2) {
-					if (_.isString(name)) {
-						index = name;
-						callback = opts;
+				, opts = _.isObject(o) ? _.clean(o) : {}
+				, triggered = false
+				, index = _.isObject(opts) ? opts.index : opts
+				, caller = callerDataCatcher || bx.Query().Result(ID)
+				, translateQuery = function (source) {
+					var target = _.clean(source)
+					, selector
+					, value
+					, validQueries = {
+						'group': {
+							1: ['group', 'reduce', 'descending'],
+							0: ['reduce', 'descending']
+						},
+						'reduce': {
+							1: ['reduce', 'group_level', 'startkey', 'endkey', 
+							'key', 'keys', 'descending'],
+							0: ['reduce', 'limit', 'startkey', 'endkey', 
+							'key', 'keys', 'include_docs', 'descending']
+						}
+					};
+					
+					if (_.has(target, 'group')) {
+						selector = 'group';
 					} else {
-						callerOptions = name;
-						callback = opts;
-					}	
-				} else if (_.isFunction(cb)) {
-					index = name;
-					callerOptions = opts;
-					callback = cb;
-				} else {
-					console.trace();
-					throw 'you must supply a callback function to the get() view function.';
-				}
-								
-				// 'asynch' is an application property; not a property of source db
-				if (callerOptions.hasOwnProperty('asynch') || callerOptions.hasOwnProperty('page_size')) {
-					asynch = (callerOptions.asynch === true || callerOptions.asynch === 'true');
-				}
-				// 'page_size' is an application property, but only allow it for unbounded requests
-				if (callerOptions.hasOwnProperty('select') ||
-					callerOptions.hasOwnProperty('list') ||
-					callerOptions.hasOwnProperty('summarize') ||
-					callerOptions.hasOwnProperty('aggregate')) {
-					asynch = false;
-				} 
+						selector = 'reduce';
+						target.reduce = target.reduce || false;
+					}
+					value = target[selector] ? 1 : 0;
+					try {
+						target = _.pick(target, validQueries[selector][value]);
+					} catch (e) {
+						throw '[translateQuery] - ' + e; 
+					}
+					return target;
+				};
 				
-				if (_.isFunction(this.Result)) {
-					caller = this.Result();					
-				} else {
-					caller = Local.Query().Result(ID);
+				if (arguments.length < 2 || (!_.isFunction(callback))) {
+					console.trace();
+					throw '[ get ] - missing callback to get function';
 				}
-								
+				
 				req = view.call(this, index, function(res) {
 					res.on('data', function (r) {
+						r.events = res;
 						if (callback && _.isFunction(callback)) {
-							if (asynch === false) {
+							if (opts && opts.asynch === false) {
+								// just write data to the calling program. 
+								// asynch===false should not allow limit= requests.
 								callback(caller.data(r));
-							} else if (asynch === true && triggered === false) {
+							} else if ((opts && opts.asynch === true) && triggered === false) {
+								// let the calling program continue, while we continue to write data
 								callback(caller.data(r));
 								triggered = true;								
 							} else {
+								// add data to Result object of the caller
 								caller.data(r);
 							}
 						}
 					});
 				});
-
-				req.query(this.translateQuery(callerOptions));
+				req.query(translateQuery(opts), {
+					'page_size': o && o.query && o.query.get('page_size'),
+					'asynch': (o && o.query && o.query.get('asynch')) || false,
+					'cache_size': o && o.query && o.query.get('cache_size')
+				});
 				req.on('error', function (err, code, param) {
-					boxspring.alert(err, code, param);
+					bx.alert(err, code, param);
 				});
 				req.end();
 			};
@@ -1285,294 +1243,300 @@
 	};
 	
 	// What it does: Query / Result Objects
-	Local.Query = function (Owner) {
-		var browser = bx.Browser()
-			, filterApply = function () { return true; }
-			, query = _.defaults(Owner || {}, {
-				'dbId': 'system', 
-				'context': bx,
-				'selected': bx.Hash() })
-			, optionDefaults = ({
-				'select': undefined,
-				'pivot': false,
-				'page_size': 200,
-				'list': undefined,
-				'end': undefined,
-				'aggregate': undefined,
-				'group': false
-			})
-			, queryOptions = _.defaults((Owner && Owner.options) || {}, optionDefaults);
-				
-			query.tags = _.defaults(query.tags || {}, {	
-				'onDisplay':'#onDisplay', 
-				'onResult':'onResult', 
-				'onMoreData':'onMoreData',
-				'onSelection': 'onSelection',
-				'showTitle': '#showTitle',
-				'showPage': '#showPage',
-				'showTotalPages': '#showTotalPages',
-				'showRow': '#showRow',
-				'showTotalRows': '#showTotalRows'
-			});
+	Local.Query = function (Config) {
+		var dbId = (Config && Config.dbId) || 'system' 
+		, query = _.options(Config || {}, {
+			'dbId': 'system',
+			'context': bx,
+			'selected': bx.Hash(),
+			'pivot': false,
+			'page_size': 100,
+			'asynch': false,
+			'cache_size': 10,
+			'vis': 'table',
+			'db': bx.Id(dbId),
+			'design-info': bx.Id(dbId).design.designInfo(),
+			'index': (Config && Config.index) ||
+			 	bx.Id(dbId).design.designInfo()['default-index'],
+			'default-index': bx.Id(dbId).design.designInfo()['default-index'],
+			'filter': {},
+			'group_level': undefined,
+			'sortAscending': undefined,
+			'descending': false,
+			'reduce': false,
+			'group': undefined
+		})
+		, browser = bx.Browser()
+		, viewInfo
+		, queryOptions =  [
+			'index', 
+			'reduce', 'group',
+			'group_level',
+			'startkey', 'endkey',						
+//			'key', 'keys',	 
+			'limit',
+			'pivot',
+			'descending',
+			'page_size',
+			'asynch',
+			'cache_size',
+			'query' ];
 
-		// set the db, design document views, and design lib helpers
-		query.db = bx.Id(query.dbId);
-		query.designInfo = query.db.design.designInfo();
-		query.index = (query.index || query.designInfo.get('default-index'));
-		query.doc = query.designInfo.doc();
-						
+		query.tags = _.options((Config && Config.tags) || {}, {	
+			'onDisplay':'#onDisplay', 
+			'onResult':'onResult', 
+			'onMoreData':'onMoreData',
+			'onSelection': 'onSelection',
+			'onPagination': 'onPagination',
+			'showTitle': '#showTitle',
+			'showPage': '#showPage',
+			'showTotalPages': '#showTotalPages',
+			'showRow': '#showRow',
+			'showLastRow': '#showLastRow',
+			'showTotalRows': '#showTotalRows'
+		});
+		
+		try {
+			// get the details from the design document and set the parameters for this view
+			viewInfo = query.get('design-info')['view-info']()[query.get('index')];
+			// set the document methods for this view; doc(query) inherits Rows and Keys
+			query = _.extend(query, query.get('design-info') &&
+									query.get('design-info').doc &&
+									query.get('design-info').doc(query));			
+		} catch (e) {
+			bx.alert('caught-error', 600, '[ bx.Query - missing view-info] - ' + e);		
+		}
+
+		var reset = function (o) {
+			var target = _.extend({}, this.source, o);
+
+			this.set('sortColumn', viewInfo.sortColumn);
+			this.set('sortAscending', viewInfo.sortAscending || this.get('descending'));
+			this.set('dateFilter', viewInfo.dateFilter || this.get('design-info')['dateFilter']);
+			this.set('startPage', 0);
+			this.set('limit', undefined);
+			this.set('query', query);
+
+			// I'm using view collation. So, get the keys from viewInfo.keyOrder[view] if 'view' is provided
+			this.set('keys', viewInfo.keys);
+			this.set('referenceKey', viewInfo.keys);
+			if ((Config && Config.view) && 
+				(viewInfo && viewInfo.keyOrder && viewInfo.keyOrder[Config.view])) {
+				this.set('keys', this.get('keys').concat(viewInfo.keyOrder[Config.view]));
+				this.set('referenceKey', this.get('keys'));
+			}
+			// concatenate the keys+columns and remove redundant to finalize the column heads
+			this.set('columns', 
+				_.uniq(this.get('keys').concat((target && target.columns) || (viewInfo && viewInfo.columns))));
+			this.source.columns = _.clone(this.get('columns'));
+			if (o) { this.update(o); }
+			return this;
+		};
+		query.reset = reset;
+		query.source = _.clone(Config);
+		query.reset();
+							
 		// give it some Events
 		query = bx.Events(query);
-		
 		// if we're inthe browser, set pagination using
 		// the built-in onResult tag for updating the next/prev
 		if (bx.BROWSER === true) {
-			browser.bxQuery('onResult').pagination(query);
+			bx.pagination(query, query.tags.post());
 		}
 		// onDisplay is triggered when the first chunk of data is ready from the server
-		query.on(query.tags.onDisplay, function (rows) {
+		query.on(query.tags.get('onDisplay'), function (result) {
 			var onSelectionId = _.uniqueId('onSelection-');
 			// executes the google-vis to render the table to the onDisplay div
 			// onSelection gives a tag to the vis to call when rows are selected
-			console.log('rendering', query.tags.onDisplay);
-			query.trigger(bx.onDisplayStart);
-			browser
-				.renderLib('google', query)
-				.table({
-					'source': rows,
-					'onDisplay': query.tags.onDisplay,
-					'onSelection': onSelectionId,
-					'pageSize': queryOptions.page_size
+			// only trigger if query.display is true
+			if (query.get('display') === true) {
+				var renderOptions = {
+					'query': result.query,
+					'result': result,
+					'tags': result.query.tags,
+					'onSelection': onSelectionId
+				};
+				// install the selection handler
+				query.on(onSelectionId, function (tableData) {
+					// update the hash of filtered items
+					query.trigger(query.tags.get('onSelection'), query.handleSelections(tableData));
 				});
-			query.trigger(bx.onDisplayEnd);
-				
-			// keep feeding the vis with more data
-			query.on('onMoreData', function (data) {
-				browser
-					.renderLib('google', query)
-					.table({
-						'source': queryOptions.pivot ? data.unPaginate().pivot() : data.unPaginate(),
-						'onDisplay': query.tags.onDisplay,
-						'onSelection': onSelectionId,
-						'pageSize': queryOptions.page_size
-					});
-
-			});
-			// install the selection handler
-			query.on(onSelectionId, function (tableData) {
-				// update the hash of filtered items
-				query.handleSelections(tableData);
-				query.trigger(query.tags.onSelection, query.selection(tableData));
-			});
+				// fire the meters, the render, and make sure listeners are evented
+				query.trigger(bx.onDisplayStart);				
+				bx.renderLib('google').display(renderOptions);
+				query.trigger(bx.onDisplayEnd);
+			}
+		});
+		// keep feeding the vis with more data
+		query.on('onMoreData', function (data) {			
+			query.trigger(query.tags.get('onDisplay'), (data.query.get('pivot') === true)
+				? data.unPaginate().pivot() 
+				: data.unPaginate());
 		});
 		// whenever there is an event in this context, trigger the same event in the callers context
-		_.each(query.tags, function(tag) {
-			query.relay(tag, query, query.context);
-		});		
+		query.tags.each(function(value, tag) {
+			query.relay(tag, query, query.get('context'));
+		});	
+		
 		// What it does: maintains a hash of selected keys
 		var handleSelections = function (tableData) {
 			var local = this
-				, reference = tableData.data
-				, keys = tableData.selectedKeys
-				, level = this.aggregate
-				, pageInfo = reference.pageInfo();				
+			, that = {}
+			, pageInfo = tableData.data.result.pageInfo();				
+			
+			that.query = this;
+			that.reference = tableData.data;
+			that.selectedKeys = tableData.selectedKeys;
+			that.rowIndices = tableData.rowIndices;
 
 			// remove any previous selections on this page before starting
 			// hash is as follows: hash[id] = page#
-			if (local.selected) {
-				local.selected.each(function(pageNo, id) {
+			if (local.get('selected')) {
+				local.get('selected').each(function(pageNo, id) {
 					if (pageNo === (pageInfo && pageInfo.page)) {
-						local.selected.remove(id);
+						local.get('selected').remove(id);
 					}
 				});
 			}
-			// install these keys into the hash, associated with this page
-			keys.forEach(function(key) {
-				local.selected.store(key, pageInfo.page);
+			// install these keys into the 'selected' hash, associated with this page
+			that.selectedKeys.forEach(function(key) {
+				local.get('selected').store(key, pageInfo.page);
 			});
-			return this;
-		};
-		query.handleSelections = handleSelections;
-		
-		var selection = function (selected) {
-			var that = {}
-				, owner = this
-				, source = selected.data
-				, rowIndices = selected.rowsIndices
-				, selectedKeys = selected.selectedKeys;
+			
+			that.listEnd = function () {
+				var startkey
+				, endkey;
 				
-			that.keys = function () {
-				return selectedKeys;
-			};
-			that.aggregate = function () {
-				return selectedKeys[0].length;
-			};			
-			that.each = function (func) {
-				var fn = _.isFunction(func) ? func : function () { return ; };
-				
-				rowIndices.forEach(function(row, index) {
-					fn(source.rows[row], (index === source.rows.length-1));
-				});
-			};
-			that.options = function () {
-				var nextOptions = _.clone(optionDefaults)
-					, nextKeys = _.clone(this.keys());
-									
-				var optionsFilter = function (selected) {
-					return function (doc, row, columns) {
-						return _.arrayFound(row, selected);
-					};
-				};
-									
-				// if the selection came from a reduced view, filter using list/end
-				if (this.aggregate() < owner.doc.referenceKey().length) {
-					nextOptions.list = this.keys()[0];
-					nextOptions.end = this.keys()[0].concat({});
-					nextOptions.aggregate = this.aggregate() + 1;					
-				} else {
-					// update the filter function with the rows to include
-					nextOptions.filterfn = optionsFilter(rowIndices);
+				if (this.selectedKeys.length > 0) {
+					startkey = this.selectedKeys[this.selectedKeys.length-1];
+					endkey = this.selectedKeys[this.selectedKeys.length-1].concat({});
 				}
-				return nextOptions;
+				
+				return({
+					'reduce': false,
+					'startkey': _.map(startkey, function(x) { return x.toString(); }),
+					'endkey': _.map(endkey, function(x) { return (_.isObject(x) ? {} : x.toString()); })
+				});			
 			};
 			return that;
 		};
-		query.selection = selection;
+		query.handleSelections = handleSelections;
+
+		if (query.pivot) {
+			throw 'fatal re-defining pivot!';
+		}
 		
-		var filter = function (fn) {
-			if (fn && _.isFunction(fn)) {
-				filterApply = fn;
-			}
+		var pivot = function () {
+			this.get('result').display(this.get('pivot'));
 			return this;
 		};
-		query.filter = filter;
+		query.pivot = pivot;
 
+		// What it does: refreshes the display. if query is a 'pivot', it recalculates the result
+		// but, only if the application does not say 'displayOnly'
 		var refresh = function () {
-			query.trigger(this.tags.onDisplay, this.result);
+			this.trigger(this.tags.get('onDisplay'), this.get('result'));
+			return this;
 		};
 		query.refresh = refresh;
-
-		var options = function(o) {
-			queryOptions = _.defaults(o || {}, queryOptions, optionDefaults);
-			
-			// check for group=true, and update the doc.keys()
-			if (_.isNumber(queryOptions.aggregate) && 
-					(query.doc.referenceKey().length) > queryOptions.aggregate) {
-				queryOptions.group = true;
-				query.doc.setLevel(queryOptions.aggregate);
-			} else {
-				// reset
-				queryOptions.group = false;
-				queryOptions.aggregate = undefined;
-				query.doc.setLevel(query.doc.referenceKey().length);
-			}
-			// format the start/end if we are extracting a 'list'
-			if (queryOptions.list && queryOptions.list.length > 0) {
-				queryOptions.end = queryOptions.list.concat({});
-			}			
-			return this;
-		};
-		query.options = options;
-		
-		query.options.get = function () {
-			return queryOptions;
-		};
-		
-		query.options.getLevel = function () {
-			return query.doc.setLevel();
-		};
-		
-		query.options.get = function () {
-			return query.doc.options(queryOptions);
-		};
 		
 		// What it does: calls the database with the supplied options and executes the call
 		// -back with the wrapped result.
-		var get = function (callback) {
-			var local = this;
+		var sget = function (callback) {
+			var local = this
+			, opts = this.pick(queryOptions);
 
-			// add 'Result' to the db object so the get 'get' can route the results back to this object.
-			this.db.Result = this.Result;
-			this.db.get(this.index, this.options.get(), function(result) {
-				//console.log('got', result.response.request, result);
-				local.result = result;
-				local.result.filterApply = filterApply;
-				query.trigger(query.tags.onResult, result);
+			// 'page_size' disallow for browsing, reduce=false and no group_level
+			if ((this.get('reduce') === false && !this.contains('group_level')) || 
+				(this.get('group') === false)) {
+				this.set('asynch', false);
+				this.set('cache_size', undefined);
+			}
+			// passing 'this.Result()' allows 'get' to route the results back to this object.			
+			this.get('db').get(opts, function(result) {
 				if (callback && _.isFunction(callback)) {
 					// assign the result to this object
 					callback(result);
 				}
-			});
+			}, this.Result());
 			return this;
 		};
-		query.get = get;
+		query.sget = sget;
 		
-		// What it does: calls the server then display with next/prev
-		// What it does: If no result already, fetches data from the server, then renders
-		// optionally pivot the result
+		// What it does: fetches data from the server, then renders optionally pivot the result
+		// NOTE: 'result' is a Result() object
 		var browse = function () {
 			var local = this;
-			
-			local.get(function(result) {
+							
+			local.sget(function(result) {
+				console.log('result:', _.clone(result.rows), result.response.request.url);
 				if (result.code === 200) {
-					// now call down to display with this result
-					local.result.display(local.options.get().pivot);
+					// set result and call down to display with this result
+					local.set('serverResult', result);
+					result.display();
+					local.trigger(local.tags.get('onResult'), result);
 				}
 			});
 			return this;						
 		};
 		query.browse = browse;
+		
+		var fire = function (options) {
+			this.update(options).browse();				
+			return this;
+		};
+		query.fire = fire;
 
 		var Result = function (dbId) {					
-			var local = { 'pages': [] }
+			var Pages = { 'pages': [] }
 				, db = bx.Id(dbId || (query && query.dbId))
-				, current_chunk = 0;
+				, current_chunk = 0
+				, current_page = 0;	// zero-based
 
 			// wraps the response.data object with some helper methods
 			var data = function (response) {
 				var responseData = response.data || response
-					// clone the Query so this object has access to its methods
 					, that = {}
 					, divTag
 					, system;
 
 				// helpers						
 				that.response = response || {};
+				that.query = query;	// owner
 				that.ok = response && response.ok;
 				that.reason = response && response.reason;
 				that.code = response.code;
-				that.query = (response && response.query) || {};
 				that.rows = (responseData && responseData.rows) || [];
 				that.offset = (responseData && responseData.offset) || 0;
 				that.total_rows = (responseData && responseData.total_rows) || that.rows.length;
 				that.rid = _.uniqueId('result-');
-
-				// information describing the columns of this view is held on the design document
-				// gathered by the Query object
-				that.doc = query.doc;
+				that.events = (response && response.events);
+				that.nextkey = (responseData && responseData.nextkey);
+				that.visibleRows = _.map(that.rows, function(v, i) { return that.offset + i; });
+				
+				var wrap = function (r) {
+					return (_.extend(r, this.query.access(r)));
+				};
+				that.wrap = wrap;
 				
 				// helpher to iterate each logical "row" of the result of the query
-				var each = function (func, fn) {
-					var these = this
-						, filter = _.isFunction(fn) ? fn : function () { return true; };
-
-					_.each(these.rows, function (item, i) {
-						if (!these.hasOwnProperty('filterApply')) {
-							// pass the caller the row and true/false if this is the last row
-							func(item, (that.offset+i) === (that.total_rows-1));										
-						} else {
-							
-							if (these.filterApply(item, i, that.cols)) {
-								func(item, (that.offset+i) === (that.total_rows-1));										
-							}
+				var each = function (func) {
+					var local = this
+					, visibleRows = [];
+					
+					_.each(local.rows, function (row, i) {
+						if (local.wrap(row).filter(local.query.get('filter'))) {
+							visibleRows.push(local.offset + i);
+							func(row, (local.offset+i) === (local.total_rows-1));										
 						}
 					});
+					local.visibleRows = visibleRows;
 					return this;
 				};
 				that.each = each;
 
 				var pages = function () {
-					return _.clone(local.pages);
+					return _.clone(Pages.pages);
 				};
 				that.pages = pages;
 
@@ -1580,7 +1544,7 @@
 					if (current_chunk > 0) {
 						// does not create a new 'pages', returns to tha caller the cached
 						// response object from the server
-						return local.pages[current_chunk];						
+						return Pages.pages[current_chunk];						
 					}
 					return this;
 				};
@@ -1601,62 +1565,100 @@
 				that.unPaginate = unPaginate;
 
 				var pageInfo = function () {
+					var local = this;
+					
+					//console.log('pageInfo completed', local.total_rows, local.offset, local.rows.length);
+					
 					return ({ 
-						'completed': (this.total_rows === (this.offset + this.rows.length)),
-						'rows': this.rows,
-						'pages': local.pages.length, 
-						'page': current_chunk + 1 });
+						'completed': (local.total_rows === (local.offset + local.rows.length)),
+						'totalRows': local.total_rows,
+						'visibleRows': local.visibleRows.length,
+						'rows': local.rows,
+						'pageSize': (local.query.get('page_size') || local.total_rows),
+						'cachedPages': Pages.pages.length, 
+						'page': current_page,
+						'next': function() {
+							if ((current_page * this.pageSize) < this.visibleRows) {
+								current_page += 1;								
+							}
+							return this;
+						},
+						'prev': function() {
+							if (current_page > 0) {
+								current_page -= 1;								
+							}
+							return this;
+						},
+						'pages': function() { 
+							return Math.ceil(this.visibleRows / this.pageSize); 
+						},
+						'lastPage': function() { 
+							return Pages.pages.length; 
+						} 
+					});
 				};
 				that.pageInfo = pageInfo;
-
+				
+				var render = function () {
+					// update the startPage
+					this.query.set('startPage', this.pageInfo().page);
+					// default delegates pagination to the rendering object
+					if (query.tags.get('onPagination') === 'onPagination') {
+						query.trigger('onPagination');
+					} else {
+						// send the data to the listener; 
+						query.trigger(query.tags.get('onDisplay'), this.page());
+					}
+				};
 				// What it does: caller supplied or callback from menus to render rows and 
 				// update the browser with spinning wheel and alerts
 				var nextPrev = function (arg) {
-					var these = this
-					, direction = ( (arg && typeof arg === 'string') ? arg : arg && arg.text )
-					, render = function (chunk) {
-						var data = this;
-						if (typeof chunk !== 'undefined') {
-							data = these.page();
-						}
-						// send the data to the listener; 
-						query.trigger(query.tags.onDisplay, data);
-					};
-
+					var direction = ( (arg && typeof arg === 'string') ? arg : arg && arg.text );
+					
+					if (direction) {
+						direction = direction.toLowerCase().split(' ');
+					}
 					query.trigger(bx.onDisplayStart);
 					if (!direction) {
-						render.call(this, this.page());
-					} else if (direction.toLowerCase() === 'next') {
-						current_chunk += (current_chunk < local.pages.length-1) ? 1 : 0;						
-						render.call(this, current_chunk);
-					} else if (direction.toLowerCase() === 'previous') {
-						current_chunk -= (current_chunk > 0) ? 1 : 0;						
-						render.call(this, current_chunk);
+						query.trigger(query.tags.get('onDisplay'), this.page());
+					} else if (_.arrayFound('next', direction)) {
+						current_chunk += (current_chunk < Pages.pages.length-1) ? 1 : 0;
+						this.pageInfo().next();					
+						render.apply(this);
+						// if we haven't cached all the pages, and we have one more page in
+						// cache before we run out, then cache another page from the server 
+						if (!this.pageInfo().completed && 
+							(this.pageInfo().page) === (this.pageInfo().lastPage()-1)) {
+								console.log('triggering get-more-data!', this.pageInfo());
+							this.page().events.trigger('get-more-data', this.page().nextkey);
+						}
+					} else if (_.arrayFound('previous', direction)) {
+						current_chunk -= (current_chunk > 0) ? 1 : 0;
+						this.pageInfo().prev();					
+						render.apply(this);
 					}
 					// trigger format the #loading and #status div area
-					query.trigger(bx.onDisplayEnd);
+					query.trigger(bx.onDisplayEnd);						
 				};
 				that.nextPrev = nextPrev;
 
 				// helper to get the next N rows
-				var display = function (pivot) {
-					var data
-						, nextprev = 'next';
-
+				var display = function () {
+					var pivot = this.query.get('pivot') 
+					, data;
 					// global to this object
 					current_chunk = 0;
-
+					// call pivot, which only runs if this result has been grouped
 					if (pivot && pivot === true) {
-						// call pivot, which only runs if this result has been grouped
 						data = this.pivot();
-						nextprev = undefined;	
+						console.log('pivot data!', data);
 					} else {
 						data = this;
 					}
-
 					// What it does: caller supplies this listener for where to post results
-					nextPrev.call(data, nextprev);
-					return this;
+					this.query.set('result', data);
+					nextPrev.call(data);
+					return data;
 				};
 				that.display = display;
 
@@ -1673,11 +1675,11 @@
 				};
 				that.reverse = reverse;
 
-				// step 3: provide a method to group the table on keys excluding the pivot key
+				// provide a method to group the table on keys excluding the pivot key
 				var group = function (key, rows, doc) {
-
+					var local = this;
 					return _.sortBy(_.uniq(_.map(rows, function(row) { 
-						return doc.query().get(row)[key];
+						return local.query.Row().getKey(row);
 					}), false), function (x) { return x; });
 				};
 				that.group = group;
@@ -1687,113 +1689,144 @@
 				// adds methods to result object to enable 'pivot' on keys
 				// Note: this object relies on a view result that is reduced 'reduce=true' 
 				var pivot = function () {
-					var these = _.clone(this)
-						, columns = []
-						, hash = bx.Hash()
-						, pivotRow = query.options.get(these.rows)['pivot-row']
-						, pivotColumn = query.options.get(these.rows)['pivot-column'];
-
-					// step 0: check the configuration to be sure the pivotRow and Columns
-					// exist in the document definition
-					if (!_.arrayFound(pivotRow, these.doc.query().columns()) ||
-						!_.arrayFound(pivotColumn, these.doc.query().columns())) {
+					var local = this
+					, columns = _.clone(local.query.all())
+					, hash = bx.Hash()
+					, pivotRow = local.query.get('pivot-row')
+					, pivotColumn = local.query.get('pivot-column')
+					, map = []
+					, newPivotResult = function(c, s, a) {
+						var that = {'count': c || 0, 'sum': s || 0, 'average': a || 0 };
+						that.add = function(b) {
+							this.count += b.count;
+							this.sum += b.sum;
+							this.average = (this.sum / this.count);
+							return this;
+						};
+						return that;
+					};
+					
+					// check the configuration to be sure the pivotRow and Columns exist
+					if (!_.arrayFound(pivotRow, columns) ||
+						!_.arrayFound(pivotColumn, local.query.get('referenceKey'))) {
 							bx.alert('bad-pivot', 500, pivotRow + ', ' + pivotColumn);
 							return this;
 					}
-								
+	
 					// step 1: calculate the unique columns [pivot-key-values]
-					columns = _.sortBy(_.uniq(_.map(these.rows, function(row) { 
-						return (these.doc.query().get(row)[pivotColumn]).toString();
+					// start by getting the filtered rows; use them to build the new hash
+					local.each(function(row) { map.push(row); });
+					columns = _.sortBy(_.uniq(_.map(map, /*local.rows,*/ function(row) { 
+						return (local.query.access(row).select(pivotColumn)).toString();
 					}), false), function (x) { return x; });
-
+					// add the row total column to the end
+					columns = columns.concat(['row total']);
+					// reset the access cache
+					local.query.columnReset();
 					// step 2: iterate over all rows, and produce a hash of values
 					// since we're clipping from the key length, the hash will have to 
 					// update, not just store
-					these.rows.forEach(function(row) {						
+					this.each(function(row) {	
 						var newRow = { 
-							'key': [ these.doc.query().get(row)[pivotRow] ],
+							'key': [ local.query.access(row).select(pivotRow) ],
 							'value': {}
 						}
-						, colHdr = (these.doc.query().get(row)[pivotColumn]).toString()
+						, colHdr = (local.query.access(row).select(pivotColumn)).toString()
 						// check for an existing entry at this address
 						, lastValue = hash.find(newRow.key)
-						, pivotValue = these.doc.query().getValue(row)
-						, template = { 
-							'count': 1, 
-							'sum': (_.isNumber(pivotValue) && pivotValue) || 1, 
-							'avg': 0 };
-						
+						, pivotValue = local.query.access(row).getValue(row)
+						, template = newPivotResult(1, (_.isNumber(pivotValue) && pivotValue) || 1);
+
 						if (lastValue) {
 							newRow.value = lastValue.value;
 							if (lastValue.value[colHdr]) {
-								template.count += 1;
+								template.count = lastValue.value[colHdr].count + 1;
 								template.sum += lastValue.value[colHdr].sum;
 							}
-							template.avg = (template.sum / template.count);
+							template.average = (template.sum / template.count);
 						}
-						newRow.value[colHdr] = template;						
-						
-/*						if (lastValue && lastValue.value) {
-							newRow.value = query.designInfo.views[query.index]
-								.reduce(undefined, [newRow.value].concat([lastValue.value]));
-						}*/
-						
+						newRow.value[colHdr] = template;			
 						// store the newRow
 						hash.store(newRow.key, newRow);
 					});
-					
-					// step 1a: update the doc object based on the new column values
-					these.doc.setViewInfo({
-						'keyOffset': 0,
-						'keys': [ 'sponsor' ],
-						'columns': columns
+					// step 1a: update the query object based on the new column values
+					local.query.set('keys', [ pivotRow ]);
+					local.query.set('columns', [ pivotRow ].concat(columns));
+					local.query.set('displayColumns', [ pivotRow ].concat(columns));
+					local.query.set('sortColumn', pivotRow);
+					local.query.set('sortAscending', true);
+					// new column defs for pivot table. first column string, rest numbers
+					local.query.columnTypes(pivotRow, 'string');
+					columns.forEach(function(c) {
+						if (!local.query.hasType(c)) {
+							local.query.columnTypes(c, 'number', 1);							
+						}
 					});
-
+					
 					// new 'each' method; called by rendering function ie., googleVis
-					var each = function(func) {
-						var total_rows = hash.length();
-						hash.each(function(row, current_row) {
-							if (func && _.isFunction(func)) {
-								func(row, (total_rows === current_row));
+					var each = function(fn) {
+						var that = {}
+						, func = _.isFunction(fn) ? fn : function() { return ; }
+
+						that.total_rows = hash.length();
+						that.totals = (function () {
+							var totals = {
+								'cT': {
+									'key': ['column total'],
+									'value': _.reduce(columns, function (x, col) {
+										x[col] = newPivotResult();
+										return x;
+									}, {})
+								}
+							};
+							
+							totals.rowTotal = function (row) {						
+								if (!row.value.hasOwnProperty('row total')) {
+									// sum across the row values
+									row.value['row total'] = _.reduce(row.value, function(x, y, z) {
+										totals.cT.value[z].add(y);
+										return x.add(y);
+									}, newPivotResult());
+									// sum the row total for all the columns
+									this.cT.value['row total'].add(row.value['row total']);
+								}
+								return row;
+							};
+							totals.columnTotal = function () {
+								return _.extend(this.cT, local.wrap(this.cT));
+							};			
+							return totals;
+						}()); 
+
+						hash.each(function(row, key, current_row) {							
+							that.current_row = current_row
+							// extend this row record with 'access'
+							func(that.totals.rowTotal(local.wrap(row)), 
+								that.total_rows === current_row);
+							if (that.total_rows === current_row) {
+								func(that.totals.columnTotal(), true);
 							}
 						});
-
-/*
-						var groups = group(pivotRow, these.rows, these.doc);
-
-						_.each(groups, function (row, total_rows) {
-							var newRow = {
-								'key': row.split(','),
-								'value': {}
-							};
-							_.each(columns, function (column) {
-								var found = hash.find(row);
-//								var found = hash.find((row && (row + ',' + column)) || column);
-								if (found) {
-									try {
-										newRow.value[column] = found.value[column];
-										newRow.value.values = found.value.values;									
-									} catch (e) {
-										throw 'bad pivot value';
-									}
-								}
-							});
-							if (func && _.isFunction(func)) {
-								func(newRow, (total_rows === groups.length-1) );
-							}
-						});*/
+						return that;
 					};
-					these.each = each;
-					these.total_rows = hash.keys().length;
-					return these;
+					local.each = each;
+
+					// update the pageInfo for this result
+					local.total_rows = hash.keys().length;
+					local.offset = 0;
+					local.rows = hash.keys();					
+					return local;
 				};			
 				that.pivot = pivot;
 
-				// What it does: returns the view reduced to its aggregate keys, the 'facets'
-				var facets = function (level) {
-					return _.map(this.rows, function(row) {
-						return row.key.slice(0,level || 1);
-					});	
+				// What it does: returns the view reduced to its group_level keys, the 'facets'
+				var facets = function (name) {
+					var local = this;
+					
+					return _.compact(_.uniq(_.sortBy(_.map(this.rows, function(row) {
+						var s = local.wrap(row).select(name);
+						return (s && s.toString());
+					}), _.item)), true);
 				};
 				that.facets = facets;
 
@@ -1801,7 +1834,7 @@
 					var compare = iterator || function (row) { return -(row.value); };
 
 					// for each pages, sort
-					local.pages.forEach(function(chunk) {
+					Pages.pages.forEach(function(chunk) {
 						chunk.data.rows = _.sortBy(chunk.rows, compare);
 					});
 					return this;
@@ -1819,21 +1852,28 @@
 					return this.rows[0];
 				};
 				that.first = first;
+				
+				var last = function () {
+					return this.rows[this.rows.length-1];
+				};
+				that.last = last;
 
 				// helper to just give the raw Couch response back to the caller
 				var bulk = function () {
 					return responseData;
 				};
 				that.bulk = bulk;
-
-				local.pages.push(that);	// accumulates the rest of the pages for this result, if 'asynch'
-				if (that.offset > 0) {
-					query.trigger('onMoreData', that);					
+				// updates the pages cache
+				Pages.pages.push(that);	
+				// accumulates the rest of the pages for this result, if 'asynch'
+				if (that.query.get('asynch') === true && Pages.pages.length > 1) {
+					that.query.trigger('onMoreData', that);										
 				}
+
 				return that;
 			};
-			local.data = data;
-			return local;
+			Pages.data = data;
+			return Pages;
 		};
 		query.Result = Result;
 		return query;
@@ -1945,6 +1985,9 @@ query.selectKeys = selectKeys;
 								'data': data
 							});
 						}
+					},
+					'error': function() {
+						this.success.apply(this, arguments);
 					}
 				});
 			} else {
@@ -2331,6 +2374,7 @@ query.selectKeys = selectKeys;
 				'bad-view-function': 'map object is not a function',
 				'missing-view': 'missing map function for view',
 				'missing-cols': 'no column declaration with view definition',
+				'bad-input-value': 'expected row- or col-',
 				'bad-pivot': 'pivot column or row not found in table values',
 				'bad-view': 'unable to access view',
 				'bad-CSV-file': 'could not read CSV file ', 
@@ -2358,7 +2402,10 @@ query.selectKeys = selectKeys;
 				'google-only-supported': '',
 				'google-type-error': 'unrecognized type',
 				'config-error': 'no label for columnType check',
-				'pivot-error': ''
+				'application-error': '',
+				'invalid-date': '',
+				'pivot-error': '',
+				'warning': ''
 			};
 			return({
 				'id': id || 'none-provided', 
@@ -2410,7 +2457,7 @@ query.selectKeys = selectKeys;
 			var log = bx.db.create({ 'name': dbname, 'id': 'log-db' })
 				, doc = log.doc(logname).docinfo({ 
 					'type': 'log', 
-					'date-time': bx.date().key(true) 
+					'date-time': bx.date().docId() 
 				})
 				, that = bx.Events();				
 			
@@ -2430,6 +2477,7 @@ query.selectKeys = selectKeys;
 				if (response.ok()) {
 					that.trigger('ready', response);					
 				} else {
+					console.log(response.request);
 					console.trace();
 					throw 'could not create log file - ' + logname + '. Aborting...';					
 				}
