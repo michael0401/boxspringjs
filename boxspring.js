@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global bx: true, _: true, emit: true, toJSON: true */
+/*global bx: true, _: true, emit: true, toJSON: true, window: true */
 
 if (typeof bx === 'undefined') {
 	bx = {};
@@ -57,36 +57,40 @@ if (typeof bx === 'undefined') {
 				console.log(m);
 		});
 
-		// asynchronous load the javascript libraries; so we don't have to deal with this later;
-		(function () {
-			var fileIo = bx.boxspring().file()
-				,includes = [
-					{ 'name': 'underscore', 'path': bx.Paths[0]+'/underscore.js', 'src': '' },
-					{ 'name': 'base-utils', 'path': bx.Paths[1]+'/base-utils.js', 'src': '' }
-				]
-				,count = _.toArray(includes).length;
+		// only run this code when we are in 'node.js'
+		if (typeof window === 'undefined') {
+			// asynchronous load the javascript libraries; so we don't have to deal with this later;
+			(function () {
+				var fileIo = bx.boxspring().file()
+					,includes = [
+						{ 'name': 'underscore', 'path': bx.Paths[0]+'/underscore.js', 'src': '' },
+						{ 'name': 'base-utils', 'path': bx.Paths[1]+'/base-utils.js', 'src': '' }
+					]
+					,count = _.toArray(includes).length;
 
-			_.each(includes, function(item) {
-				fileIo.get(item.path, function (response) {
-					if (response.code !== 200) {
-						bx.logf('%s: %s\t%s', 'bad-include', response.code,  item.location);										
-					}
-					_.each(includes, function (lib) {
-						if (response.request.path.indexOf(lib.path) !== -1) {
-							lib.src = response.data;
-							count -= 1;
+				_.each(includes, function(item) {
+					fileIo.get(item.path, function (response) {
+						if (response.code !== 200) {
+							bx.logf('%s: %s\t%s', 'bad-include', response.code,  item.location);										
 						}
-					});
-					if (count === 0) {
-						bx.libs = {};
-						_.each(includes, function(lib) {
-							bx.libs[lib.name] = lib.src; 
+						_.each(includes, function (lib) {
+							if (response.request.path.indexOf(lib.path) !== -1) {
+								lib.src = response.data;
+								count -= 1;
+							}
 						});
-						bx.trigger('ready');
-					}
-				});			
-			});
-		}());
+						if (count === 0) {
+							bx.libs = {};
+							_.each(includes, function(lib) {
+								bx.libs[lib.name] = lib.src; 
+							});
+							bx.trigger('ready');
+						}
+					});			
+				});
+			}());			
+		}
+
 		
 		// initialize the SYS variable with 'services'
 		var start = function (url) {
@@ -1314,7 +1318,7 @@ if (typeof bx === 'undefined') {
 
 			this.set('sortColumn', viewInfo.sortColumn);
 			this.set('sortAscending', viewInfo.sortAscending || this.get('descending'));
-			this.set('dateFilter', viewInfo.dateFilter || this.get('design-info')['dateFilter']);
+			this.set('dateFilter', viewInfo.dateFilter || this.get('design-info').dateFilter);
 			this.set('startPage', 0);
 			this.set('limit', undefined);
 			this.set('query', query);
@@ -1768,7 +1772,7 @@ if (typeof bx === 'undefined') {
 					// new 'each' method; called by rendering function ie., googleVis
 					var each = function(fn) {
 						var that = {}
-						, func = _.isFunction(fn) ? fn : function() { return ; }
+						, func = _.isFunction(fn) ? fn : function() { return ; };
 
 						that.total_rows = hash.length();
 						that.totals = (function () {
@@ -1801,7 +1805,7 @@ if (typeof bx === 'undefined') {
 						}()); 
 
 						hash.each(function(row, key, current_row) {							
-							that.current_row = current_row
+							that.current_row = current_row;
 							// extend this row record with 'access'
 							func(that.totals.rowTotal(local.wrap(row)), 
 								that.total_rows === current_row);

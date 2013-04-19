@@ -1733,6 +1733,7 @@
 		
 		first.spliceOut = function (s) {
 			var sib = s || this
+			, tmp
 			, location = this && this.firstSibling();
 			
 			// if no siblings before or after, remove this from its parent and return;
@@ -1745,7 +1746,9 @@
 			if (this.firstSibling() === this) {
 				this.owner.child = this.sibling;
 				this.owner = undefined;
-				return this.sibling;
+				tmp = this.sibling;
+				this.sibling = undefined;
+				return tmp;
 			}
 			// else its the last or in the middle
 			while (location && location.sibling && location.sibling !== sib) { 
