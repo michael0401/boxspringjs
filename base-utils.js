@@ -227,10 +227,24 @@
 				return result;
 			},
 			
-			item: function(x) {
+			// used by _.map and _.reduce
+			item: function(x, y) {
+				if (_.args(arguments).length > 1) {
+					if (y) { x.push(y); }
+				}
 				return x;
 			},
 			
+			filterNonAscii: function (s) {
+				return _.reduce(s, function(str, c, i) {
+					if (s.charCodeAt(i) !== 0) {
+						str += c;
+					}
+					return str;
+				},'');
+			},
+			
+			// What it does: reverses the order of items in an array
 			reverse: function (a) {
 				return _.reduce(a, function(x, y) { x.unshift(y); return x; }, []);
 			},
@@ -1722,6 +1736,7 @@
 		};
 		first.parent = parent;
 		
+		// insert an element as a sibling of this element
 		first.spliceIn = function (sib) {
 			if (sib) {
 				sib.sibling = this.sibling;
@@ -1730,7 +1745,7 @@
 			}
 			return sib;
 		};
-		
+		// remove a sibling from a list of siblings
 		first.spliceOut = function (s) {
 			var sib = s || this
 			, tmp
@@ -1738,16 +1753,16 @@
 			
 			// if no siblings before or after, remove this from its parent and return;
 			if (!sib.nextSibling() && !sib.previousSibling()) {
-				this.owner.child = undefined;
-				this.owner = undefined;
-				return this;
+				sib.owner.child = undefined;
+				sib.owner = undefined;
+				return sib;
 			}
 			// if this is the first child, make its sibling the first child of the parent
-			if (this.firstSibling() === this) {
-				this.owner.child = this.sibling;
-				this.owner = undefined;
-				tmp = this.sibling;
-				this.sibling = undefined;
+			if (sib.firstSibling() === this) {
+				sib.owner.child = this.sibling;
+				sib.owner = undefined;
+				tmp = sib.sibling;
+				sib.sibling = undefined;
 				return tmp;
 			}
 			// else its the last or in the middle
@@ -1759,7 +1774,7 @@
 			sib.owner = undefined;
 			return location;
 		};
-		
+		// insert an element as the first child of a parent; previous first child is sibling of new
 		first.insertFirstChild = function (child) {
 			if (child) {
 				if (this && this.child) {
@@ -1853,12 +1868,19 @@
 			return this.owner.insertChild(sibling);
 		};
 		
+		var last = function () {
+			var tmp = this;
+			while (tmp && tmp.firstChild()) { tmp = tmp.firstChild(); }
+			return tmp && tmp.lastSibling();
+		};
+		first.last = last;
+		
 		var walk = function(fn) {			
 			if (!_.isFunction(fn)) {
 				throw 'you must supply a function to the list walk method.';				
 			}
 			// visit this node
-			fn.call(this, this);	
+			fn.call(this, this);
 			if (this && this.child) {
 				// its child
 				walk.call(this.child, fn);
