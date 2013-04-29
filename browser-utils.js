@@ -401,8 +401,8 @@ console.log('Table', cols);
 					//	'width': $(this.query.tags.get('onDisplay')).css('width') || '1200px',
 						'firstRowNumber': vis.result.offset,
 						'page': 'enable',
-						'pageSize': (vis.query.get('pivot') && vis.query.get('page_size') ||
-						 	vis.result.rows.length),
+						'pageSize': ((vis.query.get('pivot') && vis.query.get('page_size')) ||
+							vis.result.rows.length),
 						'startPage': vis.query.get('startPage') || 0,
 						'sort': 'enable',
 						// need to be sure the requested sortColumn exists in the available table
