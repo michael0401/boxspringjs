@@ -564,7 +564,6 @@ if (typeof bx === 'undefined') {
 			};
 
 			var save = function (handler) {
-
 				// updates is the design document with 
 				// update functions to run before posting
 				if (updates) {
