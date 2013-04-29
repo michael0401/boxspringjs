@@ -1248,6 +1248,82 @@ if (typeof bx === 'undefined') {
 		return boxspring;
 	};
 	
+	// if the hash is not here, then create it.
+	// What it does: Invokes Hash to add a hash and adds 'create' and 'Id' methods to this object.
+	Local.Extend = function (maker) {
+		var that = (maker && maker()) || {};
+		
+		if (!that.hasOwnProperty('hashValues')) {
+			that = _.extend(that, bx.Hash());
+		}
+		
+		// What it does: creates or updates a named object adds it to the hash
+		that.create = function (instance) {
+			var selector = _.isString(instance) ? instance  : 
+				(instance && instance.id) || _.uniqueId('instance-');
+
+			// pass descendents id, values and owner. all other properties supplied by 'instance'
+			this.store(selector, maker(_.extend(instance, { 
+				'hashValues': this.hashValues,
+				'selector': selector,
+				'id': this.id,
+				'create': this.create,
+				'owner': this })));
+			return this.lookup(selector);
+		};
+		that.Id = function (name) {
+			return ((name && that.lookup(name)) || (this && this.selector && that.lookup[this.selector]));
+		};
+		return that;
+	};
+	
+	Local.Handler = function(spec) {
+		var that = spec || {}
+			, registry = [];
+
+		that.uniqueId = function(s) {
+			return _.uniqueId('Handler-'+s);
+		};
+
+		that.register = function(tag, fn) {
+			var i = 0;
+			registry.forEach(function(item, index) {
+				if (item.tag === tag) {
+					i = index;
+				}
+			});
+			if (i === 0 || i === registry.length-1) {
+				registry.push({ tag: tag, fn: fn });
+			}
+		};
+		that.on = that.register;
+
+		that.broadcast = function(tag, items) {
+			var flag = 0;
+
+			if (typeof tag !== 'string') {
+				// nothing to broadcast;
+				return;
+			}
+			registry.forEach(function(item, index) {
+				if (item.tag === tag && typeof item.fn === 'function') {
+					item.fn(tag, items);
+					flag = index;
+				}
+			});
+			if (flag === registry.length) {
+				alert('Warning: No listener found for tag - ' + tag);
+			}
+		};
+
+		that.trace = function() {
+			return registry.slice(0);
+		};
+
+		return that;
+	};
+	
+	
 	// What it does: Query / Result Objects
 	Local.Query = function (Config) {
 		var dbId = (Config && Config.dbId) || 'system' 
