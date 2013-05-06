@@ -283,10 +283,10 @@
 			var makeIds = function (id) {
 				return({
 					'page': id,
-					'onDisplay': id+'-onDisplay'.replace(/\W/g, '-'),
-					'$onDisplay': '#'+id+'-onDisplay'.replace(/\W/g, '-'),
-					'tab': id+'-onDisplay-tab'.replace(/\W/g, '-'),
-					'$tab': '#'+id+'-onDisplay-tab'.replace(/\W/g, '-')
+					'onDisplay': id+'-onDisplay',
+					'$onDisplay': '#'+id+'-onDisplay',
+					'tab': id+'-onDisplay-tab',
+					'$tab': '#'+id+'-onDisplay-tab'
 				});
 			};
 			
