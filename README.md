@@ -6,5 +6,5 @@ Coming soon! - Toolkit for developing CouchDB Applications in Node.js and in Web
 This is for test purpose only.
 =====================
 
-This is the change from github web.
+This is the change from local mac again.
 ====================
