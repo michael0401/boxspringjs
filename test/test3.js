@@ -1,6 +1,6 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = _.create(bx.dbUtils, 'regress')
+, boxspringjs = boxspring('regress')
 , ddoc = function () {
 	return {
 		"updates": {
@@ -45,7 +45,7 @@ var test = require('tape')
 		}
 	};
 }
-, anotherdb = _.create(bx.dbUtils, 'regress', {
+, anotherdb = boxspring('regress', {
 	'id': 'anotherdb',
 	'index': 'my-view',
 	'designName': '_design/my-design',
@@ -56,9 +56,10 @@ var test = require('tape')
 (function() {
 	test('row-tests', function (t) {
 		t.plan(17);
+		console.log('Running row-tests: 17');
 
-		anotherdb.db.authorize(bx.auth, function() {
-			anotherdb.design().build().get({}, function(response) {
+		anotherdb.authorize(boxspring.auth, function() {
+			anotherdb.design().get({}, function(response) {
 				var first = response.data.rows[0]
 				, selected
 				, selected1
@@ -102,7 +103,6 @@ var test = require('tape')
 				selected = cell.newCell('_id', first.select('_id')).format.replace('formatted: ', '');
 				t.equal(selected, first.select('_id'));
 				t.equal(cell.newCell('_id', first.select('_id')).type, 'string');
-				
 				// do the same as above for a field that has no formatting
 				selected = cell.newCell('content', first.select('content'));
 				t.equal(selected.name, 'content');
@@ -114,26 +114,26 @@ var test = require('tape')
 	});
 }());
 
-return;
-
 (function () {
 
 	test('boxspringjs-2', function (t) {
 		t.plan(8);
+		console.log('Running boxspringjs-2: 8');
 
-		var design = boxspringjs.design();
+		var design = boxspringjs.authorize(boxspring.auth).design();
 		t.equal(typeof design, 'object');
 		t.equal(typeof design.get, 'function');
 		
 		var anotherdbDesignTests = function () {
-			anotherdb.design().build().ddoc.update(function(response) {
+			anotherdb.authorize(boxspring.auth).design().ddoc.update(function(response) {
 				t.equal(response.code, 201, 'anotherdb-design');
 				anotherdb.design().get({}, function (c) {
-					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, function(n) {							
+					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, 
+					function(n) {							
 						t.equal(c.data.rows.length, n.data.total_rows, 'my-view-respnose');
 					});
 				});
-			});			
+			});				
 		}
 
 
@@ -156,12 +156,13 @@ return;
 			});		
 		};
 
-		boxspringjs.db.authorize(bx.auth, function() {
-				design.build().ddoc.update(function(response) {
+		boxspringjs.authorize(boxspring.auth, function() {
+				design.ddoc.update(function(response) {
 					t.equal(response.code, 201, 'design-saved');
 					design.ddoc.retrieve(function(res) {
 						var readBack = res.data
-						, designKeys = _.keys(readBack.updates).concat(_.keys(readBack.views));
+						, designKeys = _.keys(readBack.updates)
+							.concat(_.keys(readBack.views));
 						t.equal(_.difference(designKeys, 
 							[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
 						designTests();
@@ -174,29 +175,40 @@ return;
 
 (function() {
 	test('rows-tests', function (t) {
-		t.plan(16);
-
-		anotherdb.db.authorize(bx.auth, function() {
-			anotherdb.design().build().get({}, function(response) {
+		t.plan(23);
+		console.log('Running rows-tests: 16');
+		
+		anotherdb.authorize(boxspring.auth, function() {
+			anotherdb.design().get({}, function(response) {
 				t.equal((response.each()).length, response.data.rows.length);
 				t.equal(response.column2Index('doc'), 1);
 				t.equal(response.column2Index('dfdfaf'), 0);
-				t.equal(response.sortColumn(), 'doc');
-				t.equal(_.identical(response.displayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
-				t.equal(_.identical(response.displayColumns(['doc']), ['doc']), true);
+				t.equal(response.getSortColumn(), 'doc');
+				t.equal(_.identical(response.getDisplayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
+				t.equal(_.identical(response.getDisplayColumns(['doc']), ['doc']), true);
 				t.equal(response.index2Column(0), 'doc');
 				t.equal(response.index2Column(1), 'doc');
-				response.displayColumns(['_id', 'doc']);
+				response.getDisplayColumns(['_id', 'doc']);
 				t.equal(response.index2Column(0), '_id');
 				t.equal(response.index2Column(1), 'doc');
+				// reset the visible rows for this next test
+				response.visible.restore();
+				// set them and test them
 				t.equal(_.identical(response
-								.visible.setValues({'_id': true, 'doc': false }), ['_id','doc']), true);
+								.visible.setValues({'_id': true, 'doc': false }), ['_id','doc']), true, 'set-values');
 				t.equal(response.visible.getSortColumn(), 1);
 				response.visible.restore();
-				t.equal(_.identical(response.visible.setValues(), []), true);
-				t.equal(response.visible.getSortColumn(), 0);
-				t.equal(_.identical(response.columnSort().displayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
-				t.equal(_.identical(response.columnSort(true).displayColumns(), [ '_rev', 'more-content', 'content', 'doc', '_id' ]), true);
+				t.equal(_.identical(response.visible.setValues(), []), true, 'set-values-restored');
+				t.equal(response.visible.getSortColumn(), 0, 'visible-sort-column');
+				t.equal(_.identical(response.sortByColumn().getDisplayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
+				t.equal(_.identical(response.sortByColumn(true).getDisplayColumns(), [ '_rev', 'more-content', 'content', 'doc', '_id' ]), true);
+				t.equal(response.offset(), 0);
+				t.equal(response.total_rows(), response.getLength());
+				t.equal(response.facets('_id').length, response.getLength());
+				t.equal(response.facets('content').length, 2);
+				t.equal(response.facets('find-nothing').length, 0);
+				t.equal(response.range().start, response.data.rows[0].key);
+				t.equal(response.range().end, response.last().key);				
 			});
 		});	
 	});

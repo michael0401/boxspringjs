@@ -146,7 +146,7 @@ console.log('Table', cols);
 					data.addColumn(local.googleColumn(label, index));				
 				});	
 				// formats each row in this view
-				this.result.each(function(row) {
+				_.each(this.result.each(), function(row) {
 					local.addRow(row, cols);
 				});
 				return local.style(data);
@@ -162,7 +162,7 @@ console.log('Table', cols);
 				, pivotRow = this.query.get('pivot-row');
 
 				// make a header column; for chart, each row's key is the header for a "series"
-				local.result.each(function(row) {
+				_.each(local.result.each(), function(row) {
 					hdrHolder.push(local.query.access(row).select(pivotRow));
 				});
 				target.push([this.query.get('pivot-column')].concat(_.sortBy(hdrHolder, _.item)));
@@ -173,7 +173,7 @@ console.log('Table', cols);
 					target.push([ col ].concat(rowHolder));
 				});
 				// now process each row and populate the N (x-axis) x M (series) matrix
-				local.result.each(function(row) {
+				_.each(local.result.each(), function(row) {
 					// find 'y's position in the target array
 					var y = _.arrayFind(local.query.access(row).select(pivotRow), target[0]);
 					if (y === -1) { throw 'fatal, could not find item in target'; }
@@ -403,7 +403,7 @@ console.log('Table', cols);
 						'page': 'enable',
 						'pageSize': (vis.query.get('pivot') && vis.query.get('page_size') ||
 						 	vis.result.rows.length),
-						'startPage': vis.query.get('startPage') || 0,
+						'startPage': vis.result.pageInfo().page || 0,
 						'sort': 'enable',
 						// need to be sure the requested sortColumn exists in the available table
 						'sortColumn': _.intersection(sortColumn, visibleColumns).length === 1 

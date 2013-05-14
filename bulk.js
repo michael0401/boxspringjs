@@ -22,13 +22,7 @@
 
 (function(global) {
 	"use strict";
-	var bulk;
-	
-	if (typeof exports !== 'undefined') {
-		bulk = exports;
-	} else {
-		bulk = global.bulk = {};
-	}
+	var bulk = global.bulk = {};
 	
 	// Purpose: routines for bulk saving and removing
 	bulk.construct = function (doclist, owner) {
@@ -49,7 +43,7 @@
 				});
 			return(response);
 		};
-		this.query('bulk', { 
+		this.queryHTTP('bulk', { 
 			'body': docsObj,
 			'headers': this.headers }, this.options, function (response) {
 			if (callback && typeof callback === 'function') { 
@@ -80,7 +74,7 @@
 		// does no checking for update conflicts. saving or removing docs without their _rev will fail
 		(function (handler) {
 			var doclist=_.clone(local.docs.docs)
-				, Queue= bx.Queue();
+				, Queue= global.Queue();
 
 			// Create a Queue to hold the slices of our list of docs
 			var doclistSlice = function (data) {
@@ -167,4 +161,4 @@
 	};
 	bulk.fullCommit = fullCommit;
 	
-}(this));
+}(boxspring));

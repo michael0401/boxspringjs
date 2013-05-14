@@ -22,13 +22,7 @@
 
 (function(global) {
 	"use strict";
-	var doc;
-	
-	if (typeof exports !== 'undefined') {
-		doc = exports;
-	} else {
-		doc = global.doc = {};
-	}
+	var doc = global.doc = {};
 	
 	// helper function as multiple codes can be Ok
 	var responseOk=function (r) { 
@@ -75,7 +69,7 @@
 	var save = function (handler) {
 		var local = this;
 		
-		this.query('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
+		this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
 			'body': local.updated_docinfo }), {}, function (response) {
 			local.sync(response, handler);
 		});
@@ -85,7 +79,7 @@
 
 	var retrieve = function (handler) {
 		var local = this;
-		this.query('doc_retrieve', this.docId(), {}, function (response) {
+		this.queryHTTP('doc_retrieve', this.docId(), {}, function (response) {
 			local.sync(response, handler);
 		});
 		return this;
@@ -94,7 +88,8 @@
 
 	var head = function (handler) {
 		var local = this;
-		this.query('doc_head', _.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
+
+		this.queryHTTP('doc_head', _.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
 		function (response) {
 			//console.log('head:', responseOk(response), response.header);
 			if (responseOk(response)) {
@@ -121,7 +116,7 @@
 			});
 		} else {
 			// head main job is to get the _rev; we're updating with the content from .docinfo()			
-			head.call(local, function () {
+			head.call(local, function () {				
 				save.call(local, data);
 			});					
 		}
@@ -132,7 +127,7 @@
 	var remove = function (handler) {
 		var local = this;
 		head.call(this, function () {				
-			local.query('doc_remove', local.docId(), local.docRev(), function (rmRes) {
+			local.queryHTTP('doc_remove', local.docId(), local.docRev(), function (rmRes) {
 				handler(rmRes);
 			});				
 		});
@@ -160,4 +155,4 @@
 		return(this.updated_docinfo);
 	};
 	doc.docinfo = docinfo;
-}(this));
+}(boxspring));

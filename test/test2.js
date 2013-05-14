@@ -1,6 +1,6 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = _.create(bx.dbUtils, 'regress')
+, boxspringjs = boxspring('regress')
 , doc1 = boxspringjs.doc('first').docinfo({content: 'aw'})
 , doc2 = boxspringjs.doc('second').docinfo({content: 'shucks'})
 ;
@@ -24,11 +24,11 @@ var test = require('tape')
 		}
 		
 		
-		boxspringjs.db.authorize(bx.auth, function() {
+		boxspringjs.authorize(boxspring.auth, function() {
 			var bulk = boxspringjs.bulk([ doc1.docinfo(), doc2.docinfo() ]);
 			t.equal(typeof bulk, 'object');
 			t.equal(typeof bulk.save, 'function');
-			t.equal(typeof bulk.query, 'function');
+			t.equal(typeof bulk.queryHTTP, 'function');
 			// bulk tests
 			bulk.save(function(result) {
 				t.equal(result.code, 201, 'bulk-save');

@@ -22,21 +22,22 @@
 
 (function(global) {
 	"use strict";
-	var db;
-		
-	if (typeof exports !== 'undefined') {
-		db = exports;
-	} else {
-		db = global.db = {};
-	}
+	var db = global.db = {};
 	
 	var isValidQuery = function (s) {
+		var validCouchProperties = [
+		'reduce', 'limit', 
+		'startkey', 'endkey', 
+		'group_level', 'group', 
+		'key', 'keys',
+		'rev' ];
+		
 		// remove 'page_size'; this is an application parameter, not a couch parameter
-		var target = _.omit(_.clean(s), 'page_size')
+		var target = _.pick(_.clean(s), validCouchProperties)
 		, formatKey = function(target, key, exclude) {
 			if (_.has(target, key) && typeof target[key] !== 'undefined') {
 				target[key] = JSON.stringify(target[key]);
-				target = _.exclude(target, exclude);
+				target = _.omit(target, exclude);
 			}
 			return(target);
 		};
@@ -84,7 +85,7 @@
 				throw 'unable to apply include_docs parameter for reduced views';
 			}					
 		} catch (e) {
-			bx.alert('programmer-error', 500, e);
+			throw new Error('[ db isValidQuery] - ' + JSON.stringify(s));
 		}
 		return target;
 	};
@@ -97,7 +98,7 @@
 	// view url:  /<database>/_deisgn/<design>/_view/<viewname>/
 	var path = function (thisDB) {
 		var that={}
-			, dbname='/' + (thisDB || name);
+			, dbname='/' + thisDB;
 
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
@@ -135,39 +136,52 @@
 		return that;
 	};
 			
-	db.construct = function (name) {
+	db.construct = function (config) {
 		var user = {};
-		this.name = name || _.uniqueId('db-'); 
-		this.path = path(this.name);
+			
+		_.extend(this, _.defaults(config || {}, {
+			'name': config && config.name,
+			'id': _.uniqueId('db-'),
+			'index': 'Index',
+			'designName': '_design/default'
+		}));
+
+		// create the database;
+		this.path = path(this.name);		
 		this.db_exists = false;
-		this.HTTP = bx.fileUtils.HTTP(bx.auth.authorize.server, {}).get;
+		this.HTTP = boxspring.fileUtils.HTTP(boxspring.auth.authorize.server, {}).get;
 							
 		// make it visible privately to this object
 		var authorize = function (auth, callback) {
-			var userId=(auth && auth.authorize && auth.authorize.credentials) || { 'name': '', 'password': '' };
+			var local = this
+			, userId=(auth && auth.authorize && auth.authorize.credentials) || { 
+				'name': '', 'password': '' 
+			};
 
 			user.name = userId.name;
 			user.password = userId.password;
 			user.data = { name: userId.name, password: userId.password };			
-			db.HTTP = bx.fileUtils.HTTP(auth.authorize.server, user).get;
-			db.HTTP({ 
+			this.HTTP = boxspring.fileUtils.HTTP(auth.authorize.server, user).get;
+			this.HTTP({ 
 				'path':'/_session', 
 				'method': 'POST', 
 				'body': user.data, 
-				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}}, function (result) {
+				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
+				}, function (result) {
 					if (result.code !== 200) {
 						throw new Error('[ db ] login-failed - ' + result.reason() + ', ' + result.path);
 					} else {
 						if (_.isFunction(callback)) {
-							callback.call(db, result);
+							callback.call(this, result);
 						}
 					}
 				});
+			return this;
 		}
-		db.authorize = authorize;
+		this.authorize = authorize;
 	};
 		
-	var query = function (service, options, query, callback) {
+	var queryHTTP = function (service, options, query, callback) {
 		var viewOrUpdate = options.view || options.update || ''
 		, target = options.target
 		, body = options.body || {}
@@ -178,23 +192,26 @@
 			callback = options;
 		}								
 		// db.get: url + query, request
+	//	console.log('path', this.path, this);
 		var queryObj = {
-			'path': db.path.url(service, id, viewOrUpdate, target) + _.formatQuery(isValidQuery(query)),
-			'method': db.path.method(service),
+			'path': this.path.url(service, id, viewOrUpdate, target) +
+			 	_.formatQuery(isValidQuery(query || {})),
+			'method': this.path.method(service),
 			'body': body,
 			'headers': headers
 		};
-		
-		db.HTTP(queryObj, function (res) {
+		//console.log('doHTTP');
+		this.HTTP(queryObj, function (res) {
+			//console.log('didHTTP');
 			if ((callback && typeof callback) === 'function') {
 				callback(res);
 			}
 		});
 	};
-	db.query = query;
+	db.queryHTTP = queryHTTP;
 
 	var dbQuery = function (name, handler) {
-		query(name, {}, {}, function (result) {
+		this.queryHTTP(name, {}, {}, function (result) {
 			if (handler && typeof handler === 'function') {
 				handler(result);					
 			}
@@ -204,25 +221,25 @@
 	db.dbQuery = dbQuery;
 
 	var heartbeat = function (handler) {	
-		dbQuery('heartbeat', handler);
+		this.dbQuery('heartbeat', handler);
 		return this;
 	};
 	db.heartbeat = heartbeat;
 
 	var session = function (handler) {
-		dbQuery('session', handler);
+		this.dbQuery('session', handler);
 		return this;
 	};
 	db.session = session;
 
 	var all_dbs = function (handler) {
-		dbQuery('all_dbs', handler);
+		this.dbQuery('all_dbs', handler);
 		return this;
 	};
 	db.all_dbs = all_dbs;
 
 	var all_docs = function (handler) {
-		dbQuery('all_docs', handler);
+		this.dbQuery('all_docs', handler);
 		return this;
 	};
 	db.all_docs = all_docs;
@@ -236,7 +253,7 @@
 	db.exists = exists;
 
 	var db_info = function (handler) {
-		query('db_info', function (result) {
+		this.queryHTTP('db_info', function (result) {
 			exists.call(db, result);
 			handler.call(db, result);
 		});
@@ -244,10 +261,12 @@
 	};
 	db.db_info = db_info;
 
-	var save = function (handler) {			
+	var save = function (handler) {
+		var local = this;
+					
 		db_info(function (response) {					
 			if (!exists(response)) {
-				query('db_save', function () { // save it, then call the handler with the db_info
+				local.queryHTTP('db_save', function () { // save it, then call the handler with the db_info
 					db_info(handler);
 				});					
 			} else {
@@ -259,9 +278,11 @@
 	db.save = save;
 
 	var remove = function (handler) {
+		var local = this;
+		
 		db_info(function (response) {									
 			if ((response.code === 200 || response.code === 201 || response.code === 304)) {
-				query('db_remove', function () {
+				local.queryHTTP('db_remove', function () {
 					db_info(handler);
 				});					
 			} else {
@@ -271,5 +292,5 @@
 		return this;
 	};
 	db.remove = remove;
-		
-}(this));
+	
+})(boxspring);

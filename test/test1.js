@@ -1,6 +1,6 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = _.create(bx.dbUtils, 'regress')
+, boxspringjs = boxspring('regress')
 , ddoc = function () {
 	return {
 		"updates": {
@@ -22,7 +22,7 @@ var test = require('tape')
 		}
 	};
 }
-, anotherdb = _.create(bx.dbUtils, 'regress', {
+, anotherdb = boxspring('regress', {
 	'id': 'anotherdb',
 	'index': 'my-view',
 	'designName': 'my-design',
@@ -35,45 +35,46 @@ var test = require('tape')
 // Documentation: https://npmjs.org/package/tape
 test('boxspringjs-1', function (t) {
 
-	t.plan(19);
-	boxspringjs.db.authorize(bx.auth, function() {
+	t.plan(18);
+	boxspringjs.authorize(boxspring.auth, function() {
 
-		boxspringjs.db.heartbeat(function(data) {
+		boxspringjs.heartbeat(function(data) {
 			t.equal(data.code, 200, 'heartbeat');
 		});
 
-		boxspringjs.db.session(function(data) {
+		boxspringjs.session(function(data) {
 			t.equal(data.code, 200, 'session');
 		});
 
-		boxspringjs.db.db_info(function(data) {
+		boxspringjs.db_info(function(data) {
 			t.equal(data.code, 200, 'db_info');
 		});
 
-		boxspringjs.db.all_dbs(function(data) {
+		boxspringjs.all_dbs(function(data) {
 			t.equal(data.code, 200, 'all_dbs');
 
 			// gets root name by default, then tests getting name with id provided
-			t.equal(anotherdb.name, boxspringjs.Id('anotherdb').name, 'anotherdb-name');
+		//	t.equal(anotherdb.name, boxspringjs.Id('anotherdb').name, 'anotherdb-name');
 			t.equal(anotherdb.name, 'regress', 'regress-name');
 			// tests the defaultView method since not defined
 			t.equal(anotherdb.index, 'my-view', 'my-view');
 			// not explicitly defined 'default'
+			//console.log('anotherdb.index', anotherdb.index, 'boxspringjs.designName', boxspringjs.designName);
 			t.equal(boxspringjs.designName, '_design/default', 'default');
 			// makes sure we return a .doc object		
 			t.equal(typeof boxspringjs.doc, 'function', 'function');
 
 			// update saves an existing doc
 			newdoc.update(function(result) {
-				t.equal(result.code, 201, 'update');
+				t.equal(result.code, 201, 'update');				
 				newdoc.retrieve(function(result) {
 					t.equal(result.code, 200, 'retrieve');
 					newdoc.docinfo({ 'more-content': 'abcdefg'}).update(function(result) {
 						t.equal(result.code, 201, 'more-content');
 						newdoc.head(function(head) {
-							t.equal(200, head.code, 'head');
+							t.equal(head.code, 200, 'head');
 							newdoc.remove(function(result) {
-								t.equal(200, result.code, 'remove');								
+								t.equal(result.code, 200, 'remove');
 							});								
 						});
 					});
@@ -116,49 +117,3 @@ test('boxspringjs-1', function (t) {
 	});
 
 });
-
-
-/*
-
-
-
-
-
-
-
-		
-
-
-		db.on('design-tests', function () {
-
-		});
-		
-		db.on('bulk-tests', function() {
-			// bulk tests
-			bulk.save(function(result) {
-				t.equal('bulk-save', result.code, 201, result);
-				bulk.remove(function(data) {
-					//console.log(result);
-					t.equal('bulk-remove', data.data[0].ok, result.data[0].ok, data);
-					db.trigger('my-design-tests');						
-				});
-			});
-		});
-					
-		db.on('my-design-tests', function () {
-			anotherdb.design.update(function(response) {
-				t.equal('my-design-update', response.code, 201, response.request.path);
-				anotherdb.get('my-view', function (c) {
-					anotherdb.get({'server': 'node'}, function(n) {							
-						t.equal('my-view-test', c.bulk().rows.length, n.total_rows, n.response.request.path);
-					});
-				});
-			});
-		});			
-	});
-	return that;
-};
-
-
-
-*/

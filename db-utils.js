@@ -22,57 +22,29 @@
 
 (function(global) {
 	"use strict";
-	var dbUtils;
+	var dbWrapper = global.dbWrapper = {};
 	
-	if (typeof exports !== 'undefined') {
-		dbUtils = exports;
-	} else {
-		dbUtils = global.dbUtils = {};
-	}
-	
-	dbUtils.construct = function (name, config) {
-		// create the database;
-		_.extend(this, _.defaults(config || {}, {
-			'name': name,
-			'id': _.uniqueId('db-'),
-			'designName': '_design/default',
-			'maker': bx.defaultDesign,
-			'index' : 'Index',
-			'server': 'couch',
-			'platform': 'couch',
-			'vis': 'google'
-		}));
-		this.db = _.create(bx.db, name);
-		
-		// What it does: Extends the db object with methods for bulk save/remove. 
-		// Over-writes db save/remove methods;
-		var bulk = function (docList) {
-			return this.db.extend(_.create(bx.bulk, docList || [], this));
-		};
-		this.bulk = bulk;
-
-		var doc = function (id) {
-			return this.db.extend(_.create(bx.doc, id));
-		};
-		this.doc = doc;
-
-		// What it does: Returns a design document for the named design; sets up linkages to the 
-		// definitions for map/reduce, document access methods, and key/column definitions;
-		var design = function(ddocId, maker, index) {		
-			return this.db.extend(_.create(bx.design, 
-				this.doc(ddocId || this.designName || '_design/default'), 
-				maker || this.maker,
-				index || this.index));
-		};
-		this.design = design;
-		this.hash = dbUtils.hash;
-		this.hash.set(this.id, this);
-		// all created db's use the same hash
-		var Id = function (id) {
-			return this.hash.get(id);
-		};
-		this.Id = Id;
+	// What it does: Extends the db object with methods for bulk save/remove. 
+	// Over-writes db save/remove methods;
+	var bulk = function (docList) {
+		return _.extend(this, global.bulk.create(docList || [], this));
 	};
-	// Provide for lookup by id;
-	dbUtils.hash = bx.Lookup.Hash();	
-}(this));	
+	dbWrapper.bulk = bulk;
+
+	var doc = function (id) {
+		return _.extend(this, global.doc.create(id));
+	};
+	dbWrapper.doc = doc;
+
+	// What it does: Returns a design document for the named design; sets up linkages to the 
+	// definitions for map/reduce, document access methods, and key/column definitions;
+	var design = function(ddocId, maker, index) {		
+		return _.extend(dbWrapper.db, global.design.create( 
+			this.doc(ddocId || this.designName || '_design/default'), 
+			maker || this.maker,
+			index || this.index));
+	};
+	dbWrapper.design = design;
+	global.dbWrapper = dbWrapper;
+
+}(boxspring));

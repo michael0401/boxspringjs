@@ -22,20 +22,14 @@
 
 (function(global) {
 	"use strict";
-	var cell;
-	
-	if (typeof exports !== 'undefined') {
-		cell = exports;
-	} else {
-		cell = global.cell = {};
-	}
+	var cell = global.cell = {};
 	
 	// formats a cell value for google.vis
 	/*jslint unparam: true */
 	cell.construct = function (ownerTypes, formats) {
 		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array'];
 	
-		this.builtInColumns = bx.Lookup.Hash({
+		this.builtInColumns = global.Lookup.Hash({
 			'year': ['number',1],
 			'month': ['number',1],
 			'country': ['string',2],
@@ -155,4 +149,4 @@
 	cell.newCell = newCell;
 	cell.newColumn = newCell;
 
-}(this));
+}(boxspring));

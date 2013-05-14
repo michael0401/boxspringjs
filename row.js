@@ -22,17 +22,11 @@
 
 (function(global) {
 	"use strict";
-	var row;
-	
-	if (typeof exports !== 'undefined') {
-		row = exports;
-	} else {
-		row = global.row = {};
-	}
+	var row = global.row = {};
 
 	// Constructor for creating a hash out of the row for accessing and manipulating it
 	row.construct = function (owner, currentRow) {
-		_.extend(this, currentRow, bx.Lookup.Hash());
+		_.extend(this, currentRow, global.Lookup.Hash());
 		this.columns = owner.columns;
 		this.keys = owner.keys;
 		this.visible = owner.visible;
@@ -192,4 +186,4 @@
 		});
 		return (outerFound);
 	};
-}(this));
+}(boxspring));

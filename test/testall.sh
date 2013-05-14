@@ -1,4 +1,6 @@
 #!/bin/bash
+echo Objects
+node objects.js | grep 'not ok'
 echo Test1
 node test1.js | grep 'not ok'
 echo Test2
