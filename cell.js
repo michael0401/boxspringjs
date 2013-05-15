@@ -22,14 +22,13 @@
 
 (function(global) {
 	"use strict";
-	var cell = global.cell = {};
-	
-	// formats a cell value for google.vis
-	/*jslint unparam: true */
-	cell.construct = function (ownerTypes, formats) {
-		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array'];
-	
-		this.builtInColumns = global.Lookup.Hash({
+
+	// formats a cell value based on type information
+	var cell = function (ownerTypes, formats) {
+		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array']
+		, that = {};
+		
+		that.builtInColumns = global.Lookup.Hash({
 			'year': ['number',1],
 			'month': ['number',1],
 			'country': ['string',2],
@@ -47,10 +46,35 @@
 			'view': ['string', 1],
 			'summary': ['object', 8] 
 		});
-		
+
 		// if there is a format function for cells, then the caller passes it in from the design;
-		this.formats = formats;
-						
+		that.formats = formats;
+		
+		var thisType = function (key) {
+			return key[0];
+		};
+		that.thisType = thisType;
+
+		var thisWidth = function (key) {
+			return key[1];
+		};
+		that.thisWidth = thisWidth;
+
+		var hasType = function (key) {
+			return this.builtInColumns.contains(key) ? true : false;
+		};
+		that.hasType = hasType;
+
+		var getType = function (key) {
+			return(this.thisType(this.builtInColumns.get(key)));
+		};
+		that.getType = getType;
+
+		var columnWidth = function (key) {
+			return (this.builtInColumns.contains(key) && thisWidth(this.builtInColumns.lookup(key))) || 1;			
+		};
+		that.columnWidth = columnWidth;
+		
 		// What it does: accepts name/type or object of names/types. Extends the types hash
 		// by adding columnTypes to an object with optional width.		
 		/*global log: true */
@@ -67,7 +91,7 @@
 			} else if (typeof name === 'object') {
 				buffer = name;
 			}
-			
+
 			// loop each element in the buffer, and update the builtInTypes hash
 			_.each(buffer, function(item, key) {
 				if (_.found(validTypes, local.thisType(item))) {
@@ -78,75 +102,52 @@
 			});
 			return this;	
 		};
-		this.columnTypes = columnTypes;
+		that.columnTypes = columnTypes;
 		// extend the builtInTypes hash with types passsed in by the owner
-		this.columnTypes(ownerTypes);
-	};
-	
-	var thisType = function (key) {
-		return key[0];
-	};
-	cell.thisType = thisType;
-	
-	var thisWidth = function (key) {
-		return key[1];
-	};
-	cell.thisWidth = thisWidth;
+		that.columnTypes(ownerTypes);
 
-	var hasType = function (key) {
-		return this.builtInColumns.contains(key) ? true : false;
-	};
-	cell.hasType = hasType;
-	
-	var getType = function (key) {
-		return(this.thisType(this.builtInColumns.get(key)));
-	};
-	cell.getType = getType;
-	
-	var columnWidth = function (key) {
-		return (this.builtInColumns.contains(key) && thisWidth(this.builtInColumns.lookup(key))) || 1;			
-	};
-	cell.columnWidth = columnWidth;
-	
-	// What it does: Returns a 'cell' object with filled in missing pieces; Accepts either an object
-	// or name, value, type arguments
-	var newCell = function(name, value, type) {
-		var owner = this
-		, o = typeof name === 'object' ? name : {'name': name, 'value': value, 'type': type }
-		, cell = {
-			'name': o.name,
-			'value': o.value,
-			'type': this.getType(o.name),
-			'format': o.format,
-			'properties': o.properties
-		};
-		// if there is a formatter function, then call it and return
-		if (this.formats()[cell.name]) {
-			cell.type = 'string';
-			if (_.isString(cell.value)) {
-				cell.format = this.formats()[cell.name](cell.value).toString();
-			} else {
-				cell.format = this.formats()[cell.name](cell.value).toString();					
-				cell.value = _.map(cell.value, _.item).join(',');
+		// What it does: Returns a 'cell' object with filled in missing pieces; Accepts either an object
+		// or name, value, type arguments
+		var newCell = function(name, value, type) {
+			var owner = this
+			, o = typeof name === 'object' ? name : {'name': name, 'value': value, 'type': type }
+			, cell = {
+				'name': o.name,
+				'value': o.value,
+				'type': this.getType(o.name),
+				'format': o.format,
+				'properties': o.properties
+			};
+			// if there is a formatter function, then call it and return
+			if (this.formats()[cell.name]) {
+				cell.type = 'string';
+				if (_.isString(cell.value)) {
+					cell.format = this.formats()[cell.name](cell.value).toString();
+				} else {
+					cell.format = this.formats()[cell.name](cell.value).toString();					
+					cell.value = _.map(cell.value, _.item).join(',');
+				}
+				return cell;
 			}
+			// generic formatter then
+			if (cell.type === 'array') {
+				cell.value = _.map(cell.value, _.item).join(',');				
+				cell.type = 'string';
+				return cell;					
+			}
+			if (cell.type === 'object'){
+				cell.value = (cell && cell.value && JSON.stringify(cell.value)) || '';
+				cell.type = 'string';
+				return cell;
+			}
+			// otherwise, coerce this value to its type, if you can and return;
+			cell.value = _.coerce(cell.type, cell.value);
 			return cell;
-		}
-		// generic formatter then
-		if (cell.type === 'array') {
-			cell.value = _.map(cell.value, _.item).join(',');				
-			cell.type = 'string';
-			return cell;					
-		}
-		if (cell.type === 'object'){
-			cell.value = (cell && cell.value && JSON.stringify(cell.value)) || '';
-			cell.type = 'string';
-			return cell;
-		}
-		// otherwise, coerce this value to its type, if you can and return;
-		cell.value = _.coerce(cell.type, cell.value);
-		return cell;
+		};
+		that.newCell = newCell;
+		that.newColumn = newCell;
+		return that;
 	};
-	cell.newCell = newCell;
-	cell.newColumn = newCell;
+	global.cell = cell;
 
 }(boxspring));

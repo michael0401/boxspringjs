@@ -23,6 +23,7 @@
 (function(global) {
 	"use strict";
 
+
 	// From Eloquent Javascript
 	// Returns an object using the supplied object as its prototype
 	var duplicate = function(object) {
@@ -30,17 +31,40 @@
 		OneShotConstructor.prototype = object;
 		return new OneShotConstructor();
 	};
-	
+
 	var forEachIn = function (object, action) {
 		var property;
-		
+
 		for (property in object) {
 			if (Object.prototype.hasOwnProperty.call(object, property)) {
 				action(property, object[property]);
 			}
 		}
 	};
+
+	var Boxspring = function () {
+		return this;
+	};
+
+	var boxspring = function () {
+		return boxspring.db.apply(new Boxspring(), arguments);
+	};
+		
+	// Current version.
+	boxspring.VERSION = '0.0.1';
 	
+	if (typeof exports !== 'undefined') {
+		if (typeof module !== 'undefined' && module.exports) {
+	      exports = module.exports = boxspring;
+	    }
+		exports.boxspring = boxspring;
+	} else {
+		global.boxspring = boxspring;
+	}
+
+}).call(this);
+
+/*	
 	// throw an error if someone else is defining Object.create
 	if (typeof Object.prototype.create === 'undefined') {
 		// Adapted From Eloquent Javascript 
@@ -66,8 +90,10 @@
 	} else {
 		throw 'Fatal - someone else is defining Object.create';
 	}
+*/
 	
-	var boxspring = function(name, config) {
+	/*
+	var tmp = function(name, config) {
 		// create the db
 		var db = duplicate(boxspring.db)
 			.create(_.extend({'name': (name || _.uniqueId('db-')) }, config));
@@ -96,17 +122,4 @@
 		db.design = design;
 		return db;
 	};
-
-	// Current version.
-	boxspring.VERSION = '0.0.1';
-	
-	if (typeof exports !== 'undefined') {
-		if (typeof module !== 'undefined' && module.exports) {
-	      exports = module.exports = boxspring;
-	    }
-		exports.boxspring = boxspring;
-	} else {
-		global.boxspring = boxspring;
-	}
-
-}).call(this);
+	*/

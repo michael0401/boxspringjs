@@ -22,143 +22,146 @@
 
 (function(global) {
 	"use strict";
-	var bulk = global.bulk = {};
-	
 	// Purpose: routines for bulk saving and removing
-	bulk.construct = function (doclist, owner) {
-		this.docs = { 'docs': doclist };
-		this.Max = undefined;
-		this.headers = { 'X-Couch-Full-Commit': false };
-		this.options = { 'batch': 'ok' };
-		this.db = owner;
-	};
-	
-	var exec = function (docsObj, callback) {
-		var conflicts = function (response) { // some posts may fail, captures Ok and NotOk posts
-				response.conflicts = false;
-				(response && response.data).forEach(function(doc) {
-					if (doc.error === 'conflict') {
-						response.conflicts = true;
-					}
-				});
-			return(response);
-		};
-		this.queryHTTP('bulk', { 
-			'body': docsObj,
-			'headers': this.headers }, this.options, function (response) {
-			if (callback && typeof callback === 'function') { 
-				if (response.ok()) {
-					callback(conflicts(response));					
-				} else {
-					throw new Error('[ bulk exec ] failed - '+response.code+' '+ response.reason());
-				}
-			} 
-		});			
-	};
-	bulk.exec = exec;
+	var bulk = function (doclist) {
+		var that;
 		
-	var save = function (handler) {
-		var local = this;
-		// updates is the design document containing update methods		
-		if (this.updates) {
-			var funcs = this.updates().updates;
-			// iterate the update functions to run before posting
-			_.each(this.docs.docs, function (doc) { 
-				_.each(funcs, function (update_method) {
-					update_method(doc);
-				});
-			});				
-		}
-		
-		// What this does: Sends the bulk data out in MAX slices;
-		// does no checking for update conflicts. saving or removing docs without their _rev will fail
-		(function (handler) {
-			var doclist=_.clone(local.docs.docs)
-				, Queue= global.Queue();
+		// extend the bulk object with the owner db object
+		that = _.extend({}, this);
+		that.docs = { 'docs': doclist || [] };
+		that.Max = undefined;
+		that.headers = { 'X-Couch-Full-Commit': false };
+		that.options = { 'batch': 'ok' };
 
-			// Create a Queue to hold the slices of our list of docs
-			var doclistSlice = function (data) {
-				local.exec({ docs: data }, function (response) {
-					handler(response);							
-					Queue.finish();
-				});						
-			};
-			// submit to the queue until there are no more
-			if (local.Max && (doclist.length > local.Max)) {		
-				while (doclist.length > local.Max) {
-					Queue.submit(doclistSlice, doclist.slice(0,local.Max));
-					doclist = doclist.slice(local.Max);
-				}
-			}
-
-			// Submit a final job of remaining docs
-			Queue.submit(doclistSlice, doclist);
-			Queue.run();
-		}(handler));
-		return this;
-	};
-	bulk.save = save;
-	
-	var remove = function (handler) {
-		var local = this
-		, doclist={ docs: [] }
-		, pathType = [ 'path', 'url', 'request']
-		, buffer = []
-		, eachDoc = function (headinfo) {
-			if (headinfo.data !== 'error') {
-				var path = _.fetch(headinfo, 'path', 'url', 'request');
-				buffer = path.split('/');
-				doclist.docs.push({ _id: buffer[buffer.length-1], _rev: headinfo.rev });
-				if (doclist.docs.length === local.docs.docs.length) {
-					// do this when all the _revs have been found
-					local.docs.docs = doclist.docs;
-					local.docs.docs.forEach(function(nextDoc) {
-						nextDoc._deleted = true;
+		var exec = function (docsObj, callback) {
+			var conflicts = function (response) { // some posts may fail, captures Ok and NotOk posts
+					response.conflicts = false;
+					(response && response.data).forEach(function(doc) {
+						if (doc.error === 'conflict') {
+							response.conflicts = true;
+						}
 					});
-					local.exec(local.docs, function (response) {								
-						handler(response);
-					});								
-				}							
-			}
+				return(response);
+			};
+			this.queryHTTP('bulk', { 
+				'body': docsObj,
+				'headers': this.headers }, this.options, function (response) {
+				if (callback && typeof callback === 'function') { 
+					if (response.ok()) {
+						callback(conflicts(response));					
+					} else {
+						throw new Error('[ bulk exec ] failed - '+response.code+' '+ response.reason());
+					}
+				} 
+			});			
 		};
+		that.exec = exec;
 
-		// use the HEAD method to quickly get the _revs for each document
-		this.docs.docs.forEach(function(nextDoc) {
-			local.db.doc(nextDoc._id).head(function(headinfo) {
-				eachDoc(headinfo);
-			});
-		});
-	};
-	bulk.remove = remove;
-	
-	var max =  function (max) {
-		this.Max=_.toInt(max);
-		return this;
-	};
-	bulk.max = max;
-	
-	var push = function (item, handler) {
-		if (item) {
-			this.docs.docs.push(item);
-			if (handler && _.isFunction(handler) && this.docs.docs.length===this.Max) {
-				this.save(handler);
-				this.docs.docs = [];
+		var save = function (handler) {
+			var local = this;
+			// updates is the design document containing update methods		
+			if (this.updates) {
+				var funcs = this.updates().updates;
+				// iterate the update functions to run before posting
+				_.each(this.docs.docs, function (doc) { 
+					_.each(funcs, function (update_method) {
+						update_method(doc);
+					});
+				});				
 			}
-		}
-		return this;
+
+			// What this does: Sends the bulk data out in MAX slices;
+			// does no checking for update conflicts. saving or removing docs without their _rev will fail
+			(function (handler) {
+				var doclist=_.clone(local.docs.docs)
+					, Queue= global.Queue();
+
+				// Create a Queue to hold the slices of our list of docs
+				var doclistSlice = function (data) {
+					local.exec({ docs: data }, function (response) {
+						handler(response);							
+						Queue.finish();
+					});						
+				};
+				// submit to the queue until there are no more
+				if (local.Max && (doclist.length > local.Max)) {		
+					while (doclist.length > local.Max) {
+						Queue.submit(doclistSlice, doclist.slice(0,local.Max));
+						doclist = doclist.slice(local.Max);
+					}
+				}
+
+				// Submit a final job of remaining docs
+				Queue.submit(doclistSlice, doclist);
+				Queue.run();
+			}(handler));
+			return this;
+		};
+		that.save = save;
+
+		var remove = function (handler) {
+			var local = this
+			, doclist={ docs: [] }
+			, pathType = [ 'path', 'url', 'request']
+			, buffer = []
+			, eachDoc = function (headinfo) {
+				if (headinfo.data !== 'error') {
+					var path = _.fetch(headinfo, 'path', 'url', 'request');
+					buffer = path.split('/');
+					doclist.docs.push({ _id: buffer[buffer.length-1], _rev: headinfo.rev });
+					if (doclist.docs.length === local.docs.docs.length) {
+						// do this when all the _revs have been found
+						local.docs.docs = doclist.docs;
+						local.docs.docs.forEach(function(nextDoc) {
+							nextDoc._deleted = true;
+						});
+						local.exec(local.docs, function (response) {								
+							handler(response);
+						});								
+					}							
+				}
+			};
+
+			// use the HEAD method to quickly get the _revs for each document
+			this.docs.docs.forEach(function(nextDoc) {
+				local.doc(nextDoc._id).head(function(headinfo) {
+					eachDoc(headinfo);
+				});
+			});
+		};
+		that.remove = remove;
+
+		var max =  function (max) {
+			this.Max=_.toInt(max);
+			return this;
+		};
+		that.max = max;
+
+		var push = function (item, handler) {
+			if (item) {
+				this.docs.docs.push(item);
+				if (handler && _.isFunction(handler) && this.docs.docs.length===this.Max) {
+					this.save(handler);
+					this.docs.docs = [];
+				}
+			}
+			return this;
+		};
+		that.push = push;
+
+		var getLength = function () {
+			return this.docs.docs.length;
+		};
+		that.getLength = getLength;
+
+		var fullCommit = function (fc) {
+			this.headers = fc;
+			this.options = {};
+			return this;
+		};
+		that.fullCommit = fullCommit;
+		return that;
 	};
-	bulk.push = push;
-	
-	var getLength = function () {
-		return this.docs.docs.length;
-	};
-	bulk.getLength = getLength;
-	
-	var fullCommit = function (fc) {
-		this.headers = fc;
-		this.options = {};
-		return this;
-	};
-	bulk.fullCommit = fullCommit;
+	global.bulk = bulk;
 	
 }(boxspring));

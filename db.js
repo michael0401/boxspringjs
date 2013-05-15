@@ -22,18 +22,15 @@
 
 (function(global) {
 	"use strict";
-	var db = global.db = {};
 	
 	var isValidQuery = function (s) {
-		var validCouchProperties = [
+		var target = {} 
+		, validCouchProperties = [
 		'reduce', 'limit', 
 		'startkey', 'endkey', 
 		'group_level', 'group', 
 		'key', 'keys',
-		'rev' ];
-		
-		// remove 'page_size'; this is an application parameter, not a couch parameter
-		var target = _.pick(_.clean(s), validCouchProperties)
+		'rev' ]
 		, formatKey = function(target, key, exclude) {
 			if (_.has(target, key) && typeof target[key] !== 'undefined') {
 				target[key] = JSON.stringify(target[key]);
@@ -41,6 +38,10 @@
 			}
 			return(target);
 		};
+
+		// remove residual application parameters
+		target = _.extend(_.pick(_.clean(s), validCouchProperties));
+
 		// couchdb needs properly formatted JSON string
 		if (_.has(target, 'key')) {
 			target = formatKey(target, 'key', ['keys', 'endkey', 'startkey']);
@@ -52,7 +53,6 @@
 				target = formatKey(target, 'endkey');
 			}
 		}
-		
 		try {
 			// reduce has to be true or false, not 'true' or 'false'
 			if (_.has(target, 'reduce') && typeof target.reduce === 'string') {
@@ -86,7 +86,7 @@
 			}					
 		} catch (e) {
 			throw new Error('[ db isValidQuery] - ' + JSON.stringify(s));
-		}
+		}				
 		return target;
 	};
 	
@@ -135,34 +135,74 @@
 		that.method = method;
 		return that;
 	};
-			
-	db.construct = function (config) {
-		var user = {};
-			
-		_.extend(this, _.defaults(config || {}, {
-			'name': config && config.name,
-			'id': _.uniqueId('db-'),
+	
+	var db = function (name, config) {
+		var user = {}
+		, that = _.extend({}, global, _.defaults(config || {}, {
+			'name': name,
+			'id': config && config.id || _.uniqueId('db-'),
 			'index': 'Index',
-			'designName': '_design/default'
+			'maker': undefined,
+			'designName': '_design/default',
+			'authorization': (config && config.authorization) || function () {}
 		}));
-
+				
 		// create the database;
-		this.path = path(this.name);		
-		this.db_exists = false;
-		this.HTTP = boxspring.fileUtils.HTTP(boxspring.auth.authorize.server, {}).get;
-							
-		// make it visible privately to this object
-		var authorize = function (auth, callback) {
-			var local = this
-			, userId=(auth && auth.authorize && auth.authorize.credentials) || { 
+		that.path = path(name);		
+		that.db_exists = false;
+		that.HTTP = boxspring.fileUtils.HTTP(boxspring.auth.authorize.server, {}).get;
+
+		var queryHTTP = function (service, options, query, callback) {
+			var viewOrUpdate = options.view || options.update || ''
+			, target = options.target
+			, body = options.body || {}
+			, headers = options.headers || {}
+			, id = options.id || {};
+
+			if (typeof options === 'function') {
+				callback = options;
+			}								
+			// db.get: url + query, request
+			//console.log('path', service, id, viewOrUpdate, target, isValidQuery(query));
+			var queryObj = {
+				'path': this.path.url(service, id, viewOrUpdate, target) +
+				 	_.formatQuery(isValidQuery(query || {})),
+				'method': this.path.method(service),
+				'body': body,
+				'headers': headers
+			};
+			//console.log('doHTTP');
+			this.HTTP(queryObj, function (res) {
+				//console.log('didHTTP');
+				if ((callback && typeof callback) === 'function') {
+					callback(res);
+				}
+			});
+		};
+		that.queryHTTP = queryHTTP;
+
+		var dbQuery = function (name, handler) {
+			this.queryHTTP(name, {}, {}, function (result) {
+				if (handler && typeof handler === 'function') {
+					handler(result);					
+				}
+			});
+			return this;			
+		};
+		that.dbQuery = dbQuery;
+		
+		// execute it on instantiation. caller provides a callback in config.authorization if
+		// application wants to wait for completion before issuing first HTTP request. Otherwise,
+		// all subsequent HTTP calls will use the supplied credentials in global.auth.
+		(function (db, auth) {
+			var userId=(auth && auth.authorize && auth.authorize.credentials) || { 
 				'name': '', 'password': '' 
 			};
-
 			user.name = userId.name;
 			user.password = userId.password;
 			user.data = { name: userId.name, password: userId.password };			
-			this.HTTP = boxspring.fileUtils.HTTP(auth.authorize.server, user).get;
-			this.HTTP({ 
+			db.HTTP = boxspring.fileUtils.HTTP(auth.authorize.server, user).get;
+			db.HTTP({ 
 				'path':'/_session', 
 				'method': 'POST', 
 				'body': user.data, 
@@ -171,126 +211,88 @@
 					if (result.code !== 200) {
 						throw new Error('[ db ] login-failed - ' + result.reason() + ', ' + result.path);
 					} else {
-						if (_.isFunction(callback)) {
-							callback.call(this, result);
-						}
+						db.authorization.call(db, result);
 					}
 				});
 			return this;
-		}
-		this.authorize = authorize;
-	};
+		}(that, global.auth));
 		
-	var queryHTTP = function (service, options, query, callback) {
-		var viewOrUpdate = options.view || options.update || ''
-		, target = options.target
-		, body = options.body || {}
-		, headers = options.headers || {}
-		, id = options.id || {};
-
-		if (typeof options === 'function') {
-			callback = options;
-		}								
-		// db.get: url + query, request
-	//	console.log('path', this.path, this);
-		var queryObj = {
-			'path': this.path.url(service, id, viewOrUpdate, target) +
-			 	_.formatQuery(isValidQuery(query || {})),
-			'method': this.path.method(service),
-			'body': body,
-			'headers': headers
+		var heartbeat = function (handler) {	
+			this.dbQuery('heartbeat', handler);
+			return this;
 		};
-		//console.log('doHTTP');
-		this.HTTP(queryObj, function (res) {
-			//console.log('didHTTP');
-			if ((callback && typeof callback) === 'function') {
-				callback(res);
+		that.heartbeat = heartbeat;
+
+		var session = function (handler) {
+			this.dbQuery('session', handler);
+			return this;
+		};
+		that.session = session;
+
+		var all_dbs = function (handler) {
+			this.dbQuery('all_dbs', handler);
+			return this;
+		};
+		that.all_dbs = all_dbs;
+
+		var all_docs = function (handler) {
+			this.dbQuery('all_docs', handler);
+			return this;
+		};
+		that.all_docs = all_docs;
+
+		var exists = function (response) {
+			if (response && response.data && response.data.hasOwnProperty('db_name')) {
+				this.db_exists = true;
 			}
-		});
-	};
-	db.queryHTTP = queryHTTP;
+			return this.db_exists;
+		};
+		that.exists = exists;
 
-	var dbQuery = function (name, handler) {
-		this.queryHTTP(name, {}, {}, function (result) {
-			if (handler && typeof handler === 'function') {
-				handler(result);					
-			}
-		});
-		return this;			
-	};
-	db.dbQuery = dbQuery;
+		var db_info = function (handler) {
+			var local = this;
+			
+			this.queryHTTP('db_info', function (result) {
+				exists.call(local, result);
+				handler.call(local, result);
+			});
+			return this;
+		};
+		that.db_info = db_info;
 
-	var heartbeat = function (handler) {	
-		this.dbQuery('heartbeat', handler);
-		return this;
-	};
-	db.heartbeat = heartbeat;
+		var save = function (handler) {
+			var local = this;
 
-	var session = function (handler) {
-		this.dbQuery('session', handler);
-		return this;
-	};
-	db.session = session;
+			db_info(function (response) {					
+				if (!exists(response)) {
+					local.queryHTTP('db_save', function () { // save it, then call the handler with the db_info
+						db_info(handler);
+					});					
+				} else {
+					handler(response);
+				}
+			});
+			return this;
+		};
+		that.save = save;
 
-	var all_dbs = function (handler) {
-		this.dbQuery('all_dbs', handler);
-		return this;
-	};
-	db.all_dbs = all_dbs;
+		var remove = function (handler) {
+			var local = this;
 
-	var all_docs = function (handler) {
-		this.dbQuery('all_docs', handler);
-		return this;
+			db_info(function (response) {									
+				if ((response.code === 200 || response.code === 201 || response.code === 304)) {
+					local.queryHTTP('db_remove', function () {
+						db_info(handler);
+					});					
+				} else {
+					handler(response);
+				}
+			});
+			return this;
+		};
+		that.remove = remove;
+		return that;		
 	};
-	db.all_docs = all_docs;
-
-	var exists = function (response) {
-		if (response && response.data && response.data.hasOwnProperty('db_name')) {
-			this.db_exists = true;
-		}
-		return this.db_exists;
-	};
-	db.exists = exists;
-
-	var db_info = function (handler) {
-		this.queryHTTP('db_info', function (result) {
-			exists.call(db, result);
-			handler.call(db, result);
-		});
-		return this;
-	};
-	db.db_info = db_info;
-
-	var save = function (handler) {
-		var local = this;
-					
-		db_info(function (response) {					
-			if (!exists(response)) {
-				local.queryHTTP('db_save', function () { // save it, then call the handler with the db_info
-					db_info(handler);
-				});					
-			} else {
-				handler(response);
-			}
-		});
-		return this;
-	};
-	db.save = save;
-
-	var remove = function (handler) {
-		var local = this;
-		
-		db_info(function (response) {									
-			if ((response.code === 200 || response.code === 201 || response.code === 304)) {
-				local.queryHTTP('db_remove', function () {
-					db_info(handler);
-				});					
-			} else {
-				handler(response);
-			}
-		});
-		return this;
-	};
-	db.remove = remove;
+	global.db = db;
 	
 })(boxspring);

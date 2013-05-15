@@ -22,21 +22,18 @@ var test = require('tape')
 				});
 			});	
 		}
-		
-		
-		boxspringjs.authorize(boxspring.auth, function() {
-			var bulk = boxspringjs.bulk([ doc1.docinfo(), doc2.docinfo() ]);
-			t.equal(typeof bulk, 'object');
-			t.equal(typeof bulk.save, 'function');
-			t.equal(typeof bulk.queryHTTP, 'function');
-			// bulk tests
-			bulk.save(function(result) {
-				t.equal(result.code, 201, 'bulk-save');
-				bulk.remove(function(data) {
-					t.equal(data.data[0].ok, result.data[0].ok, 'bulk-remove');
-					bulkPushTest();
-				});
-			});		
-		});
+		, bulk = boxspringjs.bulk([ doc1.docinfo(), doc2.docinfo() ]);
+
+		t.equal(typeof bulk, 'object');
+		t.equal(typeof bulk.save, 'function');
+		t.equal(typeof bulk.queryHTTP, 'function');
+		// bulk tests
+		bulk.save(function(result) {
+			t.equal(result.code, 201, 'bulk-save');
+			bulk.remove(function(data) {
+				t.equal(data.data[0].ok, result.data[0].ok, 'bulk-remove');
+				bulkPushTest();
+			});
+		});		
 	});	
 }());

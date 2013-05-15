@@ -1,60 +1,28 @@
 require ('../index');
 var test = require('tape')
-
-var Item1 =  {
-	'my-obj': 'yes!', 
-	'construct': function (x) { 
-		this.value = x; 
-	}
-}
-, x = Item1.create(5)
-, Item = {
-	'construct': function () {
-		this.c = 57;
-	},
-	'a': function() {
-		return '5';
-	},
-	'b': 7,
-	'toInt': function (x) {
-		return parseInt(x, 10);
-	}
-}
-, y = Item.create(Item)
 , bx = boxspring('regress', {'id': 'my-db'})
 , bx2 = boxspring('regress', {'id': 'your-db', 'designName': 'your-design' })
 , newdoc = bx.doc('sample-content').docinfo({'content': Date() })
 , newdoc1 = bx.doc('write-file-test').docinfo({'content': Date() })
 ;
 
-
 test('objects', function (t) {
-	t.plan(18);
+	t.plan(14);
 
 	t.equal(bx.id, 'my-db', 'db-options-check1');
 	t.equal(bx2.id, 'your-db', 'db-options-check2');
 	t.equal(newdoc===newdoc1, false, 'doc-check1');
 	t.equal(newdoc.docinfo()._id===newdoc1.docinfo()._id, false, 'doc-check2');
-
-	Item = Item.extend(Item1);
-	t.equal(Item['my-obj', 'yes!']);
-
-	t.equal(x.value, 5);
-	t.equal(y.toInt(y.a())+y.b, 12);
-	t.equal(y.c, 57);	
-	
 	t.equal(typeof boxspring, 'function');
 	t.equal(_.identical([ 'function', 'function', 'function', 'function' ],
-		[typeof boxspring.create, typeof bx.doc, typeof bx.design, typeof bx.bulk]), true, 
+		[typeof boxspring, typeof bx.doc, typeof bx.design, typeof bx.bulk]), true, 
 		'boxspring');
-	
-	
+		
 	var compare = function (expected, name) {
-		t.equal(_.difference(expected, _.keys(boxspring[name])).length, 0, name);
+		t.equal(_.difference(expected, _.keys(boxspring[name]())).length, 0, name);
 	}
 	
-	compare([ 'construct',
-	  'sync',
+	compare([ 'sync',
 	  'docId',
 	  'docRev',
 	  'docHdr',
@@ -67,8 +35,7 @@ test('objects', function (t) {
 	  'exists',
 	  'docinfo' ], 'doc');
 
-	compare([ 'construct',
-	  'queryHTTP',
+	compare([ 'queryHTTP',
 	  'dbQuery',
 	  'heartbeat',
 	  'session',
@@ -79,8 +46,7 @@ test('objects', function (t) {
 	  'save',
 	  'remove' ], 'db'); 
 	
-	compare([ 'construct',
-	  'exec',
+	compare([ 'exec',
 	  'save',
 	  'remove',
 	  'max',
@@ -88,17 +54,15 @@ test('objects', function (t) {
 	  'getLength',
 	  'fullCommit' ],'bulk'); 
 	
-	compare([ 'construct', 'fetch', 'node', 'couch', 'end' ], 'view');
+	compare([ 'fetch', 'node', 'couch', 'end' ], 'view');
 	
-	compare([ 'construct',
-	  'getKey',
+	compare([ 'getKey',
 	  'getValue',
 	  'select',
 	  'selectFor',
 	  'filter' ], 'row'); 
 	
-	compare([ 'construct',
-	  'each',
+	compare([ 'each',
 	  'offset',
 	  'total_rows',
 	  'getLength',
@@ -114,8 +78,7 @@ test('objects', function (t) {
 	  'sortByColumn',
 	  'collection' ], 'rows'); 
 	
-	compare([ 'construct',
-	  'thisType',
+	compare([ 'thisType',
 	  'thisWidth',
 	  'hasType',
 	  'getType',
@@ -123,7 +86,36 @@ test('objects', function (t) {
 	  'newCell',
 	  'newColumn' ], 'cell'); 
 
-	compare([ 'construct', 'onResult', 'server' ], 'query');
+	compare([ 'server' ], 'query');
 	
 });
 
+
+/*
+Item = Item.extend(Item1);
+t.equal(Item['my-obj', 'yes!']);
+
+t.equal(x.value, 5);
+t.equal(y.toInt(y.a())+y.b, 12);
+t.equal(y.c, 57);
+var Item1 = {
+	'my-obj': 'yes!', 
+	'construct': function (x) { 
+		this.value = x; 
+	}
+}
+, Item = {
+	'construct': function () {
+		this.c = 57;
+	},
+	'a': function() {
+		return '5';
+	},
+	'b': 7,
+	'toInt': function (x) {
+		return parseInt(x, 10);
+	}
+}
+, y = boxspring(Item)
+, x = boxspring(Item1)
+*/

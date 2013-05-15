@@ -58,61 +58,61 @@ var test = require('tape')
 		t.plan(17);
 		console.log('Running row-tests: 17');
 
-		anotherdb.authorize(boxspring.auth, function() {
-			anotherdb.design().get({}, function(response) {
-				var first = response.data.rows[0]
-				, selected
-				, selected1
-				, selected2
-				, cell = response.cell;
-				
-				t.equal(_.identical(response.data.rows[0].columns, 
-										['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
-				t.equal(first.select('_id'), first.getKey(0));
-				t.equal(first.getValue()['_id'], first.select('_id'));
-				t.equal(first.getValue()['content'], first.select('content'));
-				t.equal(_.identical(response.visible.setValues(), 
-										[ '_id', 'content', 'more-content', '_rev' ]), true);
-				selected1 = _.reduce(response.each(), function(result, row) {
-					if (row.selectFor('content', 'shucks')) {
-						result.push(row.select('_id'));
-					}
-					return result;
-				}, []);
-				selected2 = _.reduce(response.each(), function(result, row) {
-					if (row.select('content') === 'shucks') {
-						result.push(row.select('_id'));
-					}
-					return result;
-				}, []);
-				t.equal(_.identical(selected1, selected2), true);
-				selected2 = _.reduce(response.each(), function(result, row) {
-					if (row.filter({'content': 'shucks'})) {
-						result.push(row.select('_id'));
-					}
-					return result;
-				}, []);
-				t.equal(_.identical(selected1, selected2), true);				
-				t.equal(cell.getType('_id'), 'string');
-				t.equal(cell.hasType('_id'), true);
-				t.equal(cell.hasType(cell.builtInColumns.get('junk')), false);
-				t.equal(cell.columnWidth(cell.builtInColumns.get('_id')), 1);
-				
-				// format the cell and strip off the 'formatted: ' to make sure the cell formatted
-				// the value and put it in the format field.
-				selected = cell.newCell('_id', first.select('_id')).format.replace('formatted: ', '');
-				t.equal(selected, first.select('_id'));
-				t.equal(cell.newCell('_id', first.select('_id')).type, 'string');
-				// do the same as above for a field that has no formatting
-				selected = cell.newCell('content', first.select('content'));
-				t.equal(selected.name, 'content');
-				t.equal(selected.value, 'shucks');
-				t.equal(selected.type, 'string');
-				t.equal(typeof selected.format, 'undefined');
-			});
-		});	
+		anotherdb.design().get({}, function(response) {
+			var first = response.data.rows[0]
+			, selected
+			, selected1
+			, selected2
+			, cell = response.cell;
+						
+			t.equal(_.identical(response.data.rows[0].columns, 
+									['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
+			t.equal(first.select('_id'), first.getKey(0));
+			t.equal(first.getValue()['_id'], first.select('_id'));
+			t.equal(first.getValue()['content'], first.select('content'));
+			t.equal(_.identical(response.visible.setValues(), 
+									[ '_id', 'content', 'more-content', '_rev' ]), true);
+			selected1 = _.reduce(response.each(), function(result, row) {
+				if (row.selectFor('content', 'shucks')) {
+					result.push(row.select('_id'));
+				}
+				return result;
+			}, []);
+			selected2 = _.reduce(response.each(), function(result, row) {
+				if (row.select('content') === 'shucks') {
+					result.push(row.select('_id'));
+				}
+				return result;
+			}, []);
+			t.equal(_.identical(selected1, selected2), true);
+			selected2 = _.reduce(response.each(), function(result, row) {
+				if (row.filter({'content': 'shucks'})) {
+					result.push(row.select('_id'));
+				}
+				return result;
+			}, []);
+			t.equal(_.identical(selected1, selected2), true);				
+			t.equal(cell.getType('_id'), 'string');
+			t.equal(cell.hasType('_id'), true);
+			t.equal(cell.hasType(cell.builtInColumns.get('junk')), false);
+			t.equal(cell.columnWidth(cell.builtInColumns.get('_id')), 1);
+			
+			// format the cell and strip off the 'formatted: ' to make sure the cell formatted
+			// the value and put it in the format field.
+			selected = cell.newCell('_id', first.select('_id')).format.replace('formatted: ', '');
+			t.equal(selected, first.select('_id'));
+			t.equal(cell.newCell('_id', first.select('_id')).type, 'string');
+			// do the same as above for a field that has no formatting
+			selected = cell.newCell('content', first.select('content'));
+			t.equal(selected.name, 'content');
+			t.equal(selected.value, 'shucks');
+			t.equal(selected.type, 'string');
+			t.equal(typeof selected.format, 'undefined');
+		});
 	});
 }());
+
+return;
 
 (function () {
 

@@ -18,12 +18,11 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, boxspring: true, emit: true, sum: true */
 
 (function(global) {
 	"use strict";
-	var design = global.design = {};
-		
+
 	// What it does: Templated data structure for a CouchDB design document; 
 	// map functions of defaultDesign are capable of also running in Nodejs.
 	var defaultDesign = function () {
@@ -47,7 +46,7 @@
 					if (req && req.query) {
 						for (i in req.query) {
 							if (req.query.hasOwnProperty(i)) {
-								doc[i] = req.query[i];										
+								doc[i] = req.query[i];
 							}
 						}		
 					}
@@ -68,11 +67,10 @@
 						}
 					},
 					'reduce': function(keys, values, rereduce) {
-					  if (rereduce) {
-					  		return sum(values);
-					  } else {
-					  		return values.length;
-					  }
+						if (rereduce) {
+							return sum(values);
+						}
+						return values.length;
 					},
 					'header': {
 						'sortColumn': '_id',
@@ -84,22 +82,28 @@
 			'shows': {},
 			'lists': {}
 		});
-	};	
-
-
-	// What this does: Serializes its map/reduce functions; extends the _design/ document 
-	// A VIEW is a property of a DESIGN document.
-	// addView method extends the 'views' object with the supplied map/reduce functions;
-	/*jslint unparam: true */	
-	design.construct = function (object) {
-		var doc = object && object.doc
-		, custom = object && object.maker
-		, index = object && object.index
-		, emit
-		, libSrc = ''
-		, views;
+	};
+	
+	var design = function (id, custom, index) {		
+		// extend this object with the db methods from the caller
+		var that = _.extend({}, this)
 		
-		this.ddoc = _.extend({}, doc, {
+		// create a document object
+		, doc = this.doc(id || this.designName || _.uniqueId('_design/design-'));
+				
+		// set the view index for this design
+		that.index = arguments.length === 3 ? index : (this.index || 'Index'); 
+		
+		// defaultDesign, custom maker (if supplied), default headers
+		that.custom = custom || this.maker || defaultDesign;
+		that.headers = { 'X-Couch-Full-Commit': false };
+		
+				
+		// What this does: Serializes its map/reduce functions; extends the _design/ document 
+		// A VIEW is a property of a DESIGN document.
+		// addView method extends the 'views' object with the supplied map/reduce functions;
+		/*jslint unparam: true */
+		that.ddoc = _.extend({}, doc, {
 			'owner': this,
 			'ddoc': {
 				'language': 'javascript',
@@ -110,29 +114,32 @@
 				'lists': {}
 			}
 		});
-		
-		this.defaultDesign = defaultDesign;
-		this.custom = custom;
-		this.index = index || 'Index';
-		this.headers = { 'X-Couch-Full-Commit': false }
-				
+
 		// What it does: returns the maker function for this design, either provided by the 
 		// application or defaulted from global.
 		var maker = function () {
 			return((this && this.custom) || defaultDesign);
 		};
-		this.maker = maker;
-		this.views = this.maker()().views;
-		
+		that.maker = maker;
+		that.views = that.maker()().views;
+
+		// system parameters to control the query behavior
+		that.system = boxspring.Lookup.Hash({
+			'asynch': false,
+			'cache_size': 10,
+			'page_size': 100,
+			'delay': 1
+		});
+
 		// What it does: provides the first map view as the default
-		this['default-index'] = _.fetch(views, 'default-index');
-		this.dateFilter = _.fetch(views, 'dateFilter');
-		this.lib = _.fetch(views, 'lib');
-		this.doc = _.fetch(views, 'doc');
-		this.types = this.maker()() && this.maker()().types;
-		this.formats = this.views && this.views.lib && this.views.lib.formats;
-		
-		this.build = function (libs) {
+		this['default-index'] = _.fetch(that.views, 'default-index');
+		that.dateFilter = _.fetch(that.views, 'dateFilter');
+		that.lib = _.fetch(that.views, 'lib');
+		that.doc = _.fetch(that.views, 'doc');
+		that.types = that.maker()() && that.maker()().types;
+		that.formats = that.views && that.views.lib && that.views.lib.formats;
+
+		(function (libs) {
 			var ddoc = this.ddoc
 			, views = this.views
 			, libSrc = 'var bx = { "COUCH": true };\n';
@@ -186,103 +193,104 @@
 			// finally update the design document content using .docinfo() method
 			this.ddoc.docinfo(this.ddoc.ddoc);
 			return this;
+		}.call(that));
+
+		// Purpose: Emulates CouchDB view/emit functions on the "client", to execute map functions
+		var emulate = function (name) {
+			// When running in node.js, calling functions need to find 'emit' in its scope 
+			// On server side, will use couchdb's built-in emit()
+			var emitter = function(viewfunc) {
+				var tree = global.Btree()
+					, map = (viewfunc && viewfunc.map)
+					, reduce = (viewfunc && viewfunc.reduce);
+
+				var emit = function (key, value) {
+					tree.store(JSON.stringify(key), value);
+				};
+				tree.emit = emit;
+				tree.map = map;
+				tree.reduce = reduce;
+				return tree;
+			}
+			, e = emitter((this.maker())().views[name]);
+			emit = e.emit;
+			return(e);
 		};
-		this.build();
-	};
-	
-	// Purpose: Emulates CouchDB view/emit functions on the "client", to execute map functions
-	var emulate = function (name) {
-		// When running in node.js, calling functions need to find 'emit' in its scope 
-		// On server side, will use couchdb's built-in emit()
-		var emitter = function(viewfunc) {
-			var tree = global.Btree()
-				, map = (viewfunc && viewfunc.map)
-				, reduce = (viewfunc && viewfunc.reduce);
+		that.emulate = emulate;
 
-			var emit = function (key, value) {
-				tree.store(JSON.stringify(key), value);
-			};
-			tree.emit = emit;
-			tree.map = map;
-			tree.reduce = reduce;
-			return tree;
-		}
-		, e = emitter((this.maker())().views[name])
-		emit = e.emit;
-		return(e);
-	};
-	design.emulate = emulate;
-	
-	// this update takes advantage of CouchDB 'updates' handlers. The design document function 
-	// specified in 'updateName' will execute on the server, saving the round-trip to the 
-	// client a enforcing consistent attributing of the documents on the server for a corpus.
-	
-	var full = function (fc) {
-		this.headers['X-Couch-Full-Commit'] = fc;
-		return this;
-	};
-	design.full = full;
-	
-	var commit = function (targetId, updateName, newProperties, handler) {
-		var properties = _.extend({}, { 'batch': 'ok' }, newProperties);
-		this.ddoc.queryHTTP('update', _.extend(this.ddoc.docId(), {
-			'update': updateName, 
-			'target': targetId,
-			'headers': this.headers }), properties, handler);
-		return this;			
-	};
-	design.commit = commit;
-	
-	// Purpose: wrapper for evented .view function. 
-	// Default behavior 'asynch: true'  to execute callback only on the first 
-	// delivery of data from the server. 
-	// 'asynch: false' (or undefined) executes the callback each time and the 
-	// application has to manage the data
-	
-	var get = function (options, callback, callerDataCatcher) {
-		var local = this 
-		, triggered = false
-		, system = options && options.system
-		// caller can provide an object to wrap the data as an argument to the callback;
-		// _.item just returns the the item passed in
-		, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) ? callerDataCatcher : callback
-		, view = global.view.create(this, _.extend({'index': this.index }, options), 
-																this.ddoc.docId().id, this.ddoc.views)
-			/* this.emulate(options.nam.index || 'default') */
-		view.on('error', function (err, code, param) {				
-			throw new Error(err, code, param);
-		});
-		
-		view.end('couch', function(res) {
-			res.on('data', function (r) {
-				// create a result object instrumented with row helpers and design document info
-				var result = global.rows.create(r, local.ddoc.ddoc, local);
-				result.events = res;
-				if (callback && _.isFunction(callback)) {
-					if (system && system.asynch === false) {
-						// just write data to the calling program. 
-						// asynch===false should not allow limit= requests.
-						callback(caller(result));
-					} else if ((system && system.asynch === true) && triggered === false) {
-						// let the calling program continue, while we continue to write data
-						callback(caller(result));
-						triggered = true;								
-					} else {
-						// add data to Result object of the caller
-						//console.log('getting more data', result.offset());
-						caller(result);
+		// this update takes advantage of CouchDB 'updates' handlers. The design document function 
+		// specified in 'updateName' will execute on the server, saving the round-trip to the 
+		// client a enforcing consistent attributing of the documents on the server for a corpus.
+
+		var full = function (fc) {
+			this.headers['X-Couch-Full-Commit'] = fc;
+			return this;
+		};
+		that.full = full;
+
+		var commit = function (targetId, updateName, newProperties, handler) {
+			var properties = _.extend({}, { 'batch': 'ok' }, newProperties);
+			this.ddoc.queryHTTP('update', _.extend(this.ddoc.docId(), {
+				'update': updateName, 
+				'target': targetId,
+				'headers': this.headers }), properties, handler);
+			return this;			
+		};
+		that.commit = commit;
+
+		// Purpose: wrapper for evented .view function. 
+		// Default behavior 'asynch: true'  to execute callback only on the first 
+		// delivery of data from the server. 
+		// 'asynch: false' (or undefined) executes the callback each time and the 
+		// application has to manage the data
+
+		var get = function (options, callback, callerDataCatcher) {
+			var local = this 
+			, triggered = false
+			, system = this.system.post()
+			// caller can provide an object to wrap the data as an argument to the callback;
+			// _.item just returns the the item passed in
+			, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) ? 
+				callerDataCatcher : _.item
+			, view = global.view(this, _.extend({'index': this.index, 'system': system }, options), 
+																this.ddoc.docId().id, this.ddoc.views);
+				/* this.emulate(options.nam.index || 'default') */
+			view.on('error', function (err, code, param) {				
+				throw new Error(err, code, param);
+			});
+
+			view.end('couch', function(res) {
+				res.on('data', function (r) {
+					// create a result object instrumented with row helpers and design document info
+					var result = global.rows(r, local.ddoc.ddoc, local);					
+					if (callback && _.isFunction(callback)) {
+						if (system && system.asynch === false) {
+							// just write wrapped data to the calling program. 
+							//console.log('view got data!', r.code, 'calling', typeof callback);
+
+							callback(caller(result));
+						} else if ((system && system.asynch === true) && triggered === false) {
+							// let the calling program continue, while we continue to write data
+							callback(caller(result));
+							triggered = true;								
+						} else {
+							// add data to Result object of the caller
+							//console.log('getting more data', result.offset());
+							caller(result);
+						}
 					}
-				}
-			});			
-		});
-		return this;
-	};
-	design.get = get;
-	
-	var query = function(options, tags) {
-		var query = global.query.create(this, options, tags);
-		return query;
-	};
-	design.query = query;
+				});			
+			});
+			return this;
+		};
+		that.get = get;
 
+		var query = function(options) {
+			return global.query(this, options);	
+		};
+		that.query = query;	
+		return that;	
+	};
+	global.design = design;
+	
 }(boxspring));
