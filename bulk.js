@@ -45,15 +45,10 @@
 			};
 			this.queryHTTP('bulk', { 
 				'body': docsObj,
-				'headers': this.headers }, this.options, function (response) {
-				if (callback && typeof callback === 'function') { 
-					if (response.ok()) {
-						callback(conflicts(response));					
-					} else {
-						throw new Error('[ bulk exec ] failed - '+response.code+' '+ response.reason());
-					}
-				} 
-			});			
+				'headers': this.headers 
+				}, this.options, function (err, response) {
+					callback(err, response);
+				});
 		};
 		that.exec = exec;
 
@@ -78,8 +73,8 @@
 
 				// Create a Queue to hold the slices of our list of docs
 				var doclistSlice = function (data) {
-					local.exec({ docs: data }, function (response) {
-						handler(response);							
+					local.exec({ docs: data }, function (err, response) {
+						handler(err, response);	
 						Queue.finish();
 					});						
 				};
@@ -115,8 +110,8 @@
 						local.docs.docs.forEach(function(nextDoc) {
 							nextDoc._deleted = true;
 						});
-						local.exec(local.docs, function (response) {								
-							handler(response);
+						local.exec(local.docs, function (err, response) {								
+							handler(err, response);
 						});								
 					}							
 				}
@@ -124,7 +119,10 @@
 
 			// use the HEAD method to quickly get the _revs for each document
 			this.docs.docs.forEach(function(nextDoc) {
-				local.doc(nextDoc._id).head(function(headinfo) {
+				local.doc(nextDoc._id).head(function(err, headinfo) {
+					if (err) {
+						return console.log(err);
+					}
 					eachDoc(headinfo);
 				});
 			});

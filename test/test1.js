@@ -36,23 +36,23 @@ test('boxspringjs-1', function (t) {
 		'index': 'my-view',
 		'designName': 'my-design',
 		'maker': ddoc,
-		'authorization': function(result) {
+		'authorization': function(err, result) {
 			
 			t.equal(result.code, 200, 'login');
 			
-			boxspringjs.heartbeat(function(data) {
+			boxspringjs.heartbeat(function(err, data) {
 				t.equal(data.code, 200, 'heartbeat');
 			});
 
-			boxspringjs.session(function(data) {
+			boxspringjs.session(function(err, data) {
 				t.equal(data.code, 200, 'session');
 			});
 
-			boxspringjs.db_info(function(data) {
+			boxspringjs.db_info(function(err, data) {
 				t.equal(data.code, 200, 'db_info');
 			});
 
-			boxspringjs.all_dbs(function(data) {
+			boxspringjs.all_dbs(function(err, data) {
 				t.equal(data.code, 200, 'all_dbs');
 
 				// gets root name by default, then tests getting name with id provided
@@ -67,15 +67,16 @@ test('boxspringjs-1', function (t) {
 				t.equal(typeof boxspringjs.doc, 'function', 'function');
 
 				// update saves an existing doc
-				newdoc.update(function(result) {
+				newdoc.update(function(err, result) {
 					t.equal(result.code, 201, 'update');				
-					newdoc.retrieve(function(result) {
+					newdoc.retrieve(function(err, result) {
 						t.equal(result.code, 200, 'retrieve');
-						newdoc.docinfo({ 'more-content': 'abcdefg'}).update(function(result) {
+						newdoc.docinfo({ 'more-content': 'abcdefg'})
+							.update(function(err, result) {
 							t.equal(result.code, 201, 'more-content');
-							newdoc.head(function(head) {
+							newdoc.head(function(err, head) {
 								t.equal(head.code, 200, 'head');
-								newdoc.remove(function(result) {
+								newdoc.remove(function(err, result) {
 									t.equal(result.code, 200, 'remove');
 								});								
 							});
@@ -84,25 +85,27 @@ test('boxspringjs-1', function (t) {
 				});
 
 				boxspringjs.doc('docabc')
-					.update({ 'extended-content': Date() }, function(response) {
+					.update({ 'extended-content': Date() }, function(err, response) {
 						t.equal(response.code, 201, 'extended-content');
 				});
 
 				// save and expect to fail
-				newdoc1.save(function(response) {
+				newdoc1.save(function(err, response) {
 					t.equal(response.code, 409, 'save-fail');
 					//console.log('save response:', newdoc1.docRev(), response.header.etag);
 					// update should work
-					newdoc1.update(function(update) {
+					newdoc1.update(function(err, update) {
 						//console.log('update response', newdoc1.docRev(), update.header.etag, update.code);
 						t.equal(update.code, 201, 'newdoc1 update');
 						// get all docs using map views on the server (default)
-						boxspringjs.design().get({ 'index': 'all_docs' }, function(couch) {
+						boxspringjs
+							.design().get({ 'index': 'all_docs' }, function(err, couch) {
 							t.equal(couch.code, 200, 'all_docs');
 
 							// get all docs using map views FUTURE running in node
-							boxspringjs.design()
-								.get({ 'index': 'all_docs', 'server': 'node' }, function(node) {
+							boxspringjs
+								.design().get({ 'index': 'all_docs', 'server': 'node' }, 
+								function(err, node) {
 								var found;
 								_.each(node.data.rows, function(d) {
 									var found;

@@ -15,9 +15,9 @@ var test = require('tape')
 				.push(doc1)
 				.push(doc2);
 			t.equal(bulk.getLength(), 2, 'bulk-getLength');
-			bulk.save(function(result) {
+			bulk.save(function(err, result) {
 				t.equal(result.code, 201, 'bulk-push-save');
-				bulk.remove(function(data) {
+				bulk.remove(function(err, data) {
 					t.equal(data.data[0].ok, result.data[0].ok, 'bulk-push-remove');
 				});
 			});	
@@ -28,9 +28,9 @@ var test = require('tape')
 		t.equal(typeof bulk.save, 'function');
 		t.equal(typeof bulk.queryHTTP, 'function');
 		// bulk tests
-		bulk.save(function(result) {
+		bulk.save(function(err, result) {
 			t.equal(result.code, 201, 'bulk-save');
-			bulk.remove(function(data) {
+			bulk.remove(function(err, data) {
 				t.equal(data.data[0].ok, result.data[0].ok, 'bulk-remove');
 				bulkPushTest();
 			});

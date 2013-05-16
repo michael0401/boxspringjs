@@ -31,19 +31,17 @@
 		// inherit from the caller object, in this case a db object
 		_.extend(that, this);
 		
-		// helper function as multiple codes can be Ok
-		var responseOk=function (r) { 
-				return ((r.code === 200) || (r.code === 201) || (r.code === 304)); 
-		};
+		var responseOk = this.responseOk;
 
-		// Purpose: internal function to make sure docinfo is upto date after retrive/head calls
-		var sync = function (response, handler) {
+		// Purpose: internal function to keep docinfo up-to-date
+		var sync = function (err, response, handler) {
+			
 			// if a doc, then update all fields
 			if (response && response.data && responseOk(response)) {
 				this.updated_docinfo = _.extend(this.updated_docinfo, response.data);
 			}
 			if (handler && typeof handler === 'function') {
-				handler(response);						
+				handler(err, response);						
 			}
 
 			return(response);			
@@ -73,8 +71,8 @@
 			var local = this;
 
 			this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
-				'body': local.updated_docinfo }), {}, function (response) {
-				local.sync(response, handler);
+				'body': local.updated_docinfo }), {}, function (err, response) {
+				local.sync(err, response, handler);
 			});
 			return this;
 		};
@@ -82,8 +80,8 @@
 
 		var retrieve = function (handler) {
 			var local = this;
-			this.queryHTTP('doc_retrieve', this.docId(), {}, function (response) {
-				local.sync(response, handler);
+			this.queryHTTP('doc_retrieve', this.docId(), {}, function (err, response) {
+				local.sync(err, response, handler);
 			});
 			return this;
 		};
@@ -92,15 +90,16 @@
 		var head = function (handler) {
 			var local = this;
 
-			this.queryHTTP('doc_head', _.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
-			function (response) {
-				//console.log('head:', responseOk(response), response.header);
-				if (responseOk(response)) {
-					_.extend(local.updated_docinfo, { '_rev': response.rev });
-				}
-				if (handler && typeof handler === 'function') {
-					handler(response);						
-				}
+			this.queryHTTP('doc_head', 
+				_.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
+				function (err, response) {
+					//console.log('head:', responseOk(response), response.header);
+					if (responseOk(response)) {
+						_.extend(local.updated_docinfo, { '_rev': response.rev });
+					}
+					if (handler && typeof handler === 'function') {
+						handler(err, response);						
+					}
 			});
 			return this;
 		};
@@ -112,15 +111,24 @@
 			var local = this;
 
 			if (!_.isFunction(data)) {
-				// if we have data to add, get it from server, add it to docinfo() and update it.
-				retrieve.call(local, function() {
+				// if we have new data, get it from server, 
+				// add it to docinfo() and update it.
+				retrieve.call(local, function(err) {
+					if (err) {
+						handler(err);
+					}
 					local.docinfo(data);
 					save.call(local, handler);
 				});
 			} else {
-				// head main job is to get the _rev; we're updating with the content from .docinfo()			
-				head.call(local, function () {				
-					save.call(local, data);
+				handler = data;
+				// head main job is to get the _rev; 
+				// we're updating with the content from .docinfo()			
+				head.call(local, function (err) {
+					if (err) {
+						handler(err);
+					}				
+					save.call(local, handler);
 				});					
 			}
 			return this;
@@ -129,9 +137,13 @@
 
 		var remove = function (handler) {
 			var local = this;
-			head.call(this, function () {				
-				local.queryHTTP('doc_remove', local.docId(), local.docRev(), function (rmRes) {
-					handler(rmRes);
+			head.call(this, function (err) {
+				if (err) {
+					handler(err);
+				}				
+				local.queryHTTP('doc_remove', local.docId(), local.docRev(), 
+				function (err, response) {
+					handler(err, response);
 				});				
 			});
 			return this;

@@ -58,7 +58,7 @@ var test = require('tape')
 		t.plan(17);
 		console.log('Running row-tests: 17');
 
-		anotherdb.design().get({}, function(response) {
+		anotherdb.design().get({}, function(err, response) {
 			var first = response.data.rows[0]
 			, selected
 			, selected1
@@ -112,28 +112,26 @@ var test = require('tape')
 	});
 }());
 
-return;
-
 (function () {
 
 	test('boxspringjs-2', function (t) {
 		t.plan(8);
 		console.log('Running boxspringjs-2: 8');
 
-		var design = boxspringjs.authorize(boxspring.auth).design();
+		var design = boxspringjs.design();
 		t.equal(typeof design, 'object');
 		t.equal(typeof design.get, 'function');
 		
 		var anotherdbDesignTests = function () {
-			anotherdb.authorize(boxspring.auth).design().ddoc.update(function(response) {
+			anotherdb.design().ddoc.update(function(err, response) {
 				t.equal(response.code, 201, 'anotherdb-design');
-				anotherdb.design().get({}, function (c) {
+				anotherdb.design().get({}, function (err, c) {
 					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, 
-					function(n) {							
+					function(e, n) {	
 						t.equal(c.data.rows.length, n.data.total_rows, 'my-view-respnose');
 					});
 				});
-			});				
+			});
 		}
 
 
@@ -143,12 +141,12 @@ return;
 			// a local update handler 'my-commit'. After the last completion, it asserts the test
 			// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
 			// running in node.js and not on the server.
-			design.get({'index': 'Index'}, function(r) {
+			design.get({'index': 'Index'}, function(e, r) {
 
-				design.get({ 'index': 'Index' }, function(n) {
+				design.get({ 'index': 'Index' }, function(e, n) {
 					t.equal(r.data.rows.length, n.data.rows.length, 'view-tests');
 					design.commit('base_test_suite', 'in-place', { 'random': Date.now() }, 
-					function(commit) {
+					function(e, commit) {
 						t.equal(commit.code, 201, 'update-handler');
 						anotherdbDesignTests();
 					});					
@@ -156,20 +154,17 @@ return;
 			});		
 		};
 
-		boxspringjs.authorize(boxspring.auth, function() {
-				design.ddoc.update(function(response) {
-					t.equal(response.code, 201, 'design-saved');
-					design.ddoc.retrieve(function(res) {
-						var readBack = res.data
-						, designKeys = _.keys(readBack.updates)
-							.concat(_.keys(readBack.views));
-						t.equal(_.difference(designKeys, 
-							[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
-						designTests();
-					});
-				});		
-		});
-
+		design.ddoc.update(function(err, response) {
+			t.equal(response.code, 201, 'design-saved');
+			design.ddoc.retrieve(function(err, res) {
+				var readBack = res.data
+				, designKeys = _.keys(readBack.updates)
+					.concat(_.keys(readBack.views));
+				t.equal(_.difference(designKeys, 
+					[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
+				designTests();
+			});
+		});		
 	});	
 }());
 
@@ -178,39 +173,37 @@ return;
 		t.plan(23);
 		console.log('Running rows-tests: 16');
 		
-		anotherdb.authorize(boxspring.auth, function() {
-			anotherdb.design().get({}, function(response) {
-				t.equal((response.each()).length, response.data.rows.length);
-				t.equal(response.column2Index('doc'), 1);
-				t.equal(response.column2Index('dfdfaf'), 0);
-				t.equal(response.getSortColumn(), 'doc');
-				t.equal(_.identical(response.getDisplayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
-				t.equal(_.identical(response.getDisplayColumns(['doc']), ['doc']), true);
-				t.equal(response.index2Column(0), 'doc');
-				t.equal(response.index2Column(1), 'doc');
-				response.getDisplayColumns(['_id', 'doc']);
-				t.equal(response.index2Column(0), '_id');
-				t.equal(response.index2Column(1), 'doc');
-				// reset the visible rows for this next test
-				response.visible.restore();
-				// set them and test them
-				t.equal(_.identical(response
-								.visible.setValues({'_id': true, 'doc': false }), ['_id','doc']), true, 'set-values');
-				t.equal(response.visible.getSortColumn(), 1);
-				response.visible.restore();
-				t.equal(_.identical(response.visible.setValues(), []), true, 'set-values-restored');
-				t.equal(response.visible.getSortColumn(), 0, 'visible-sort-column');
-				t.equal(_.identical(response.sortByColumn().getDisplayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
-				t.equal(_.identical(response.sortByColumn(true).getDisplayColumns(), [ '_rev', 'more-content', 'content', 'doc', '_id' ]), true);
-				t.equal(response.offset(), 0);
-				t.equal(response.total_rows(), response.getLength());
-				t.equal(response.facets('_id').length, response.getLength());
-				t.equal(response.facets('content').length, 2);
-				t.equal(response.facets('find-nothing').length, 0);
-				t.equal(response.range().start, response.data.rows[0].key);
-				t.equal(response.range().end, response.last().key);				
-			});
-		});	
+		anotherdb.design().get({}, function(err, response) {
+			t.equal((response.each()).length, response.data.rows.length);
+			t.equal(response.column2Index('doc'), 1);
+			t.equal(response.column2Index('dfdfaf'), 0);
+			t.equal(response.getSortColumn(), 'doc');
+			t.equal(_.identical(response.getDisplayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
+			t.equal(_.identical(response.getDisplayColumns(['doc']), ['doc']), true);
+			t.equal(response.index2Column(0), 'doc');
+			t.equal(response.index2Column(1), 'doc');
+			response.getDisplayColumns(['_id', 'doc']);
+			t.equal(response.index2Column(0), '_id');
+			t.equal(response.index2Column(1), 'doc');
+			// reset the visible rows for this next test
+			response.visible.restore();
+			// set them and test them
+			t.equal(_.identical(response
+							.visible.setValues({'_id': true, 'doc': false }), ['_id','doc']), true, 'set-values');
+			t.equal(response.visible.getSortColumn(), 1);
+			response.visible.restore();
+			t.equal(_.identical(response.visible.setValues(), []), true, 'set-values-restored');
+			t.equal(response.visible.getSortColumn(), 0, 'visible-sort-column');
+			t.equal(_.identical(response.sortByColumn().getDisplayColumns(), ['_id', 'doc', 'content', 'more-content', '_rev' ]), true);
+			t.equal(_.identical(response.sortByColumn(true).getDisplayColumns(), [ '_rev', 'more-content', 'content', 'doc', '_id' ]), true);
+			t.equal(response.offset(), 0);
+			t.equal(response.total_rows(), response.getLength());
+			t.equal(response.facets('_id').length, response.getLength());
+			t.equal(response.facets('content').length, 2);
+			t.equal(response.facets('find-nothing').length, 0);
+			t.equal(response.range().start, response.data.rows[0].key);
+			t.equal(response.range().end, response.last().key);				
+		});
 	});
 }());
 

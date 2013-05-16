@@ -252,30 +252,30 @@
 			// _.item just returns the the item passed in
 			, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) ? 
 				callerDataCatcher : _.item
-			, view = global.view(this, _.extend({'index': this.index, 'system': system }, options), 
-																this.ddoc.docId().id, this.ddoc.views);
-				/* this.emulate(options.nam.index || 'default') */
-			view.on('error', function (err, code, param) {				
-				throw new Error(err, code, param);
+			, view = global.view(this, 
+				_.extend({'index': this.index, 'system': system }, options), 
+										this.ddoc.docId().id, this.ddoc.views);
+
+			view.on('error', function (err) {				
+				throw err;
 			});
 
 			view.end('couch', function(res) {
 				res.on('data', function (r) {
-					// create a result object instrumented with row helpers and design document info
+					// create a result object instrumented with row helpers 
+					// and design document info
 					var result = global.rows(r, local.ddoc.ddoc, local);					
 					if (callback && _.isFunction(callback)) {
 						if (system && system.asynch === false) {
 							// just write wrapped data to the calling program. 
-							//console.log('view got data!', r.code, 'calling', typeof callback);
-
-							callback(caller(result));
-						} else if ((system && system.asynch === true) && triggered === false) {
-							// let the calling program continue, while we continue to write data
-							callback(caller(result));
+							callback(null, caller(result));
+						} else if ((system && system.asynch === true) && 
+							triggered === false) {
+							// let calling program continue, continuously receive data
+							callback(null, caller(result));
 							triggered = true;								
 						} else {
 							// add data to Result object of the caller
-							//console.log('getting more data', result.offset());
 							caller(result);
 						}
 					}

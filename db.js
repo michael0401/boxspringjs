@@ -172,19 +172,19 @@
 				'headers': headers
 			};
 			//console.log('doHTTP');
-			this.HTTP(queryObj, function (res) {
+			this.HTTP(queryObj, function (err, res) {
 				//console.log('didHTTP');
 				if ((callback && typeof callback) === 'function') {
-					callback(res);
+					callback(err, res);
 				}
 			});
 		};
 		that.queryHTTP = queryHTTP;
 
 		var dbQuery = function (name, handler) {
-			this.queryHTTP(name, {}, {}, function (result) {
+			this.queryHTTP(name, {}, {}, function (err, result) {
 				if (handler && typeof handler === 'function') {
-					handler(result);					
+					handler(err, result);					
 				}
 			});
 			return this;			
@@ -207,15 +207,20 @@
 				'method': 'POST', 
 				'body': user.data, 
 				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
-				}, function (result) {
-					if (result.code !== 200) {
-						throw new Error('[ db ] login-failed - ' + result.reason() + ', ' + result.path);
-					} else {
-						db.authorization.call(db, result);
+				}, function (err, result) {
+					if (err) {
+						db.authorization(err);
 					}
+					db.authorization.call(db, err, result);
 				});
 			return this;
 		}(that, global.auth));
+		
+		// helper function as multiple codes can be Ok
+		var responseOk=function (r) { 
+				return ((r.code === 200) || (r.code === 201) || (r.code === 304)); 
+		};
+		that.responseOk = responseOk;
 		
 		var heartbeat = function (handler) {	
 			this.dbQuery('heartbeat', handler);
@@ -252,9 +257,9 @@
 		var db_info = function (handler) {
 			var local = this;
 			
-			this.queryHTTP('db_info', function (result) {
+			this.queryHTTP('db_info', function (err, result) {
 				exists.call(local, result);
-				handler.call(local, result);
+				handler.call(local, err, result);
 			});
 			return this;
 		};
@@ -263,13 +268,17 @@
 		var save = function (handler) {
 			var local = this;
 
-			db_info(function (response) {					
-				if (!exists(response)) {
-					local.queryHTTP('db_save', function () { // save it, then call the handler with the db_info
-						db_info(handler);
+			db_info.call(local, function (err, response) {
+				if (!err && !exists(response)) {
+					local.queryHTTP('db_save', function (err) { 
+						// save it, then call the handler with the db_info
+						if (err) {
+							handler(err);
+						}
+						db_info.call(local, handler);
 					});					
 				} else {
-					handler(response);
+					handler(err, response);
 				}
 			});
 			return this;
@@ -279,14 +288,17 @@
 		var remove = function (handler) {
 			var local = this;
 
-			db_info(function (response) {									
-				if ((response.code === 200 || response.code === 201 || response.code === 304)) {
-					local.queryHTTP('db_remove', function () {
-						db_info(handler);
-					});					
-				} else {
-					handler(response);
+			db_info(function (err, response) {
+				if (err || !responseOk(response)) {
+					handler(err);
 				}
+							
+				local.queryHTTP('db_remove', function (err) {
+					if (err) {
+						handler(err);
+					}
+					db_info.call(local, handler);
+				});
 			});
 			return this;
 		};

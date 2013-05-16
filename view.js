@@ -138,9 +138,12 @@
 
 				db.queryHTTP(queryMethod, 
 					_.extend({ 'id': design }, {'view': index }), query,
-					function (response) {
-					//console.log('got response!', response.code, response.request);
-					if (response.code === 200) {
+					function (err, response) {
+						
+					if (err) {
+						events.trigger('view-error', err);
+					} else {
+						//console.log('got response!', response.code, response.request);
 						//console.log('db.query after', design, index, query);
 						if (system.asynch && response.data && _.has(response.data, 'rows')) {	
 							response.data.nextkey = 
@@ -165,19 +168,16 @@
 							tRows += response.data.rows.length; 
 						}
 						events.trigger('chunk-data', response);
-					} else {
-						events.trigger('view-error', response);
-					}				
+					}
 				});
 			};
 
 			events.on('chunk-data', function (res) {
 				// if I've got less than the full index; and asynchronous request
-				//console.log('chunk-data', res.data.rows.length, tRows, res.data.total_rows, system);
-
 				if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && 
 					(system.asynch === true) && system.cache_size > 0) {
-						// pause the asynchronous read, so we don't flood the browser and the net
+						// pause the asynchronous read, 
+						// so we don't flood the browser and the net
 						_.wait((system && system.delay) || 1/10, function() {
 							chunk(res.data.nextkey);						
 						});
@@ -218,7 +218,7 @@
 		var couch = function () {
 			var events = this;
 
-			events.on('chunk-data', function (res) {						
+			events.on('chunk-data', function (res) {										
 				events.trigger('view-data', res);
 			});
 			this.fetch(this);
@@ -243,8 +243,8 @@
 				}
 			});
 
-			this.on('view-error', function (response) {	
-				requestEvents.trigger('error', 'bad-view', local.index, response.reason());
+			this.on('view-error', function (err) {	
+				requestEvents.trigger('error', err);
 			});
 			return this;					
 		};

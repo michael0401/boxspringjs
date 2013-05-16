@@ -192,16 +192,12 @@
 				local.trigger('more-data', response);
 			});
 
-			db.get(_.pick(this, queryParameters), function(result) {
-				//console.log('query got!');
-				if (result.code === 200) {
-					//console.log('moving to fire!');
-					
-					// set result and call down to nextPrev with this result and no argument
-					local.trigger('result', result);
-				} else {
-					throw new Error('[ query ] get request failed - '+ result.code);
-				}			
+			db.get(_.pick(this, queryParameters), function(err, result) {
+				if (err) {
+					console.log(err);
+				}	
+				// set result and call down to nextPrev with this result and no argument
+				local.trigger('result', result);		
 			}, result.call(this));
 			return this;						
 		};
