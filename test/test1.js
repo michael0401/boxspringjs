@@ -23,15 +23,17 @@ var test = require('tape')
 }
 
 
+var boxspringjs = boxspring('regress')
+, newdoc = boxspringjs.doc('sample-content').docinfo({'content': Date() })
+, newdoc1 = boxspringjs.doc('write-file-test').docinfo({'content': Date() });
+
+
 // Documentation: https://npmjs.org/package/tape
 test('boxspringjs-1', function (t) {
 
-	t.plan(19);
+	t.plan(9);
 	
-	var boxspringjs = boxspring('regress')
-	, newdoc = boxspringjs.doc('sample-content').docinfo({'content': Date() })
-	, newdoc1 = boxspringjs.doc('write-file-test').docinfo({'content': Date() })
-	, anotherdb = boxspring('regress', {
+	var anotherdb = boxspring('regress', {
 		'id': 'anotherdb',
 		'index': 'my-view',
 		'designName': 'my-design',
@@ -56,69 +58,88 @@ test('boxspringjs-1', function (t) {
 				t.equal(data.code, 200, 'all_dbs');
 
 				// gets root name by default, then tests getting name with id provided
-			//	t.equal(anotherdb.name, boxspringjs.Id('anotherdb').name, 'anotherdb-name');
 				t.equal(anotherdb.name, 'regress', 'regress-name');
 				// tests the defaultView method since not defined
 				t.equal(anotherdb.index, 'my-view', 'my-view');
 				// not explicitly defined 'default'
-				//console.log('anotherdb.index', anotherdb.index, 'boxspringjs.designName', boxspringjs.designName);
 				t.equal(boxspringjs.designName, '_design/default', 'default');
 				// makes sure we return a .doc object		
 				t.equal(typeof boxspringjs.doc, 'function', 'function');
-
-				// update saves an existing doc
-				newdoc.update(function(err, result) {
-					t.equal(result.code, 201, 'update');				
-					newdoc.retrieve(function(err, result) {
-						t.equal(result.code, 200, 'retrieve');
-						newdoc.docinfo({ 'more-content': 'abcdefg'})
-							.update(function(err, result) {
-							t.equal(result.code, 201, 'more-content');
-							newdoc.head(function(err, head) {
-								t.equal(head.code, 200, 'head');
-								newdoc.remove(function(err, result) {
-									t.equal(result.code, 200, 'remove');
-								});								
-							});
-						});
-					});
-				});
-
-				boxspringjs.doc('docabc')
-					.update({ 'extended-content': Date() }, function(err, response) {
-						t.equal(response.code, 201, 'extended-content');
-				});
-
-				// save and expect to fail
-				newdoc1.save(function(err, response) {
-					t.equal(response.code, 409, 'save-fail');
-					//console.log('save response:', newdoc1.docRev(), response.header.etag);
-					// update should work
-					newdoc1.update(function(err, update) {
-						//console.log('update response', newdoc1.docRev(), update.header.etag, update.code);
-						t.equal(update.code, 201, 'newdoc1 update');
-						// get all docs using map views on the server (default)
-						boxspringjs
-							.design().get({ 'index': 'all_docs' }, function(err, couch) {
-							t.equal(couch.code, 200, 'all_docs');
-
-							// get all docs using map views FUTURE running in node
-							boxspringjs
-								.design().get({ 'index': 'all_docs', 'server': 'node' }, 
-								function(err, node) {
-								var found;
-								_.each(node.data.rows, function(d) {
-									var found;
-									_.each(couch.data.rows, function(c) {
-										found = (c.id === d.id && d.id);
-									});
-								});
-								t.equal(typeof found, 'undefined', 'get-compared');
-							});
-						});
-					});
-				});
 			});
 		}
 	});
 });
+
+
+
+test('boxspringjs-2', function (t) {
+
+	t.plan(6);
+
+	// update saves an existing doc
+	newdoc.update(function(err, result) {
+		t.equal(err, null, 'update');		
+		newdoc.retrieve(function(err, result) {
+			t.equal(err, null, 'retrieve');
+			newdoc.docinfo({ 'more-content': 'abcdefg'})
+				.update(function(err, result) {
+				t.equal(err, null, 'more-content');
+				newdoc.head(function(err, head) {
+					t.equal(err, null, 'head');
+					newdoc.remove(function(err, result) {
+						t.equal(err, null, 'remove');
+					});								
+				});
+			});
+		});
+	});
+		
+	// create a document, extend its content, update it, confirm it
+	boxspringjs.doc('docabc').docinfo({ 'extended-content': Date() })
+		.update(function(err, response) {
+			t.equal(response.code, 201, 'extended-content');
+	});	
+	
+});
+
+
+test('boxspringjs-3', function (t) {
+
+	t.plan(4);
+
+	// save and expect to fail
+	newdoc1.save(function(err, response) {
+		t.equal(response.code, 409, 'save-fail');
+		// update should work
+		newdoc1.update(function(err, update) {
+			//console.log('update response', newdoc1.docRev(), update.header.etag, update.code);
+			t.equal(update.code, 201, 'newdoc1 update');
+			// get all docs using map views on the server (default)
+			boxspringjs
+				.design().get({ 'index': 'all_docs' }, function(err, couch) {
+				t.equal(couch.code, 200, 'all_docs');
+
+				// get all docs using map views FUTURE running in node
+				boxspringjs
+					.design().get({ 'index': 'all_docs', 'server': 'node' }, 
+					function(err, node) {
+					var found;
+					_.each(node.data.rows, function(d) {
+						var found;
+						_.each(couch.data.rows, function(c) {
+							found = (c.id === d.id && d.id);
+						});
+					});
+					t.equal(typeof found, 'undefined', 'get-compared');
+				});
+			});
+		});
+	});
+});
+	
+
+
+
+
+
+

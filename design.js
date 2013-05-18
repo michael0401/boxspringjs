@@ -124,11 +124,11 @@
 		that.views = that.maker()().views;
 
 		// system parameters to control the query behavior
-		that.system = boxspring.Lookup.Hash({
+		that.system = UTIL.hash({
 			'asynch': false,
-			'cache_size': 10,
-			'page_size': 100,
-			'delay': 1
+			'cache_size': undefined, //10,
+			'page_size': undefined, //100,
+			'delay': 0.5
 		});
 
 		// What it does: provides the first map view as the default
@@ -161,10 +161,10 @@
 				if (name === 'lib') {
 					ddoc.ddoc.views.lib = {};
 					_.each(views, function (value, key) {
-						var fn = global.Serialize(value)
+						var fn = _.Serialize(value)
 							, prePend = fn.indexOf('function') !== -1 ? 'exports.fn = ' : 'exports.val = ';
 						ddoc.ddoc.views.lib[key] = {};
-						ddoc.ddoc.views.lib[key] = prePend + global.Serialize(value); 
+						ddoc.ddoc.views.lib[key] = prePend + _.Serialize(value); 
 					});
 				} else {
 					if (!mapFunc) {
@@ -172,8 +172,8 @@
 					}
 					ddoc.ddoc.views[name] = {};
 					_.extend(ddoc.ddoc.views[name], {
-						'map': libSrc + global.Serialize(mapFunc), 
-						'reduce': (reduceFunc && global.Serialize(reduceFunc)) || '_count',
+						'map': libSrc + _.Serialize(mapFunc), 
+						'reduce': (reduceFunc && _.Serialize(reduceFunc)) || '_count',
 						'header':  header || { 'keys': [], 'columns': [] }
 					});					
 				}
@@ -182,7 +182,7 @@
 			// 'updates' methods
 			_.each((this.maker())().updates, function (updates, name) { 
 				ddoc.ddoc.updates[name] = {};
-				ddoc.ddoc.updates[name] = global.Serialize(updates);
+				ddoc.ddoc.updates[name] = _.Serialize(updates);
 			});
 
 			// add the 'types' structure, if it exists
@@ -286,7 +286,7 @@
 		that.get = get;
 
 		var query = function(options) {
-			return global.query(this, options);	
+			return boxspring.query.call(this, options);	
 		};
 		that.query = query;	
 		return that;	

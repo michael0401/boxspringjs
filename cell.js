@@ -28,7 +28,7 @@
 		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array']
 		, that = {};
 		
-		that.builtInColumns = global.Lookup.Hash({
+		that.builtInColumns = UTIL.hash({
 			'year': ['number',1],
 			'month': ['number',1],
 			'country': ['string',2],

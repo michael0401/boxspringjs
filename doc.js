@@ -31,20 +31,14 @@
 		// inherit from the caller object, in this case a db object
 		_.extend(that, this);
 		
-		var responseOk = this.responseOk;
-
 		// Purpose: internal function to keep docinfo up-to-date
-		var sync = function (err, response, handler) {
+		var sync = function (err, response) {
 			
 			// if a doc, then update all fields
-			if (response && response.data && responseOk(response)) {
+			if (!err) {
 				this.updated_docinfo = _.extend(this.updated_docinfo, response.data);
 			}
-			if (handler && typeof handler === 'function') {
-				handler(err, response);						
-			}
-
-			return(response);			
+			return(response);
 		};
 		that.sync = sync;
 
@@ -53,6 +47,20 @@
 			return({ 'id': this.updated_docinfo._id });
 		};
 		that.docId = docId;
+		
+		
+		// What it does: helper to convert a URL into a valid docId
+		var url2Id = function (host, reverse) {
+
+			if (reverse && typeof host === 'string') {
+				return(host.replace(/-/g, '.'));
+			}
+			if (host.indexOf('http://') === -1) {				
+				return(_.urlParse('http://' + host).host.replace(/\./g, '-'));
+			}
+			return(_.urlParse(host).host.replace(/\./g, '-'));
+		};
+		that.url2Id = url2Id;
 
 		var docRev = function () {
 			return(this.updated_docinfo._rev ? { 'rev': this.updated_docinfo._rev } : {});
@@ -69,10 +77,9 @@
 		// Arguments: { docinfo: document object, oncompletion: string or function }
 		var save = function (handler) {
 			var local = this;
-
 			this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
 				'body': local.updated_docinfo }), {}, function (err, response) {
-				local.sync(err, response, handler);
+				handler(err, local.sync(err, response));
 			});
 			return this;
 		};
@@ -81,7 +88,7 @@
 		var retrieve = function (handler) {
 			var local = this;
 			this.queryHTTP('doc_retrieve', this.docId(), {}, function (err, response) {
-				local.sync(err, response, handler);
+				handler(err, local.sync(err, response));
 			});
 			return this;
 		};
@@ -94,9 +101,10 @@
 				_.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
 				function (err, response) {
 					//console.log('head:', responseOk(response), response.header);
-					if (responseOk(response)) {
-						_.extend(local.updated_docinfo, { '_rev': response.rev });
-					}
+					if (!err) {
+						_.extend(local.updated_docinfo, { '_rev': local.getRev(response) });
+					} 
+					
 					if (handler && typeof handler === 'function') {
 						handler(err, response);						
 					}
@@ -107,30 +115,13 @@
 
 		// if data is provided, add it to the current document over-writing 
 		// existing key-values; otherwise just save the current state of the doc in memory
-		var update = function (data, handler) {
+		var update = function (handler) {
 			var local = this;
-
-			if (!_.isFunction(data)) {
-				// if we have new data, get it from server, 
-				// add it to docinfo() and update it.
-				retrieve.call(local, function(err) {
-					if (err) {
-						handler(err);
-					}
-					local.docinfo(data);
-					save.call(local, handler);
-				});
-			} else {
-				handler = data;
-				// head main job is to get the _rev; 
-				// we're updating with the content from .docinfo()			
-				head.call(local, function (err) {
-					if (err) {
-						handler(err);
-					}				
-					save.call(local, handler);
-				});					
-			}
+			
+			retrieve.call(this, function(err) {
+				// when updating, we might get an error if the doc doesn't exist
+				save.call(local, handler);
+			});
 			return this;
 		};
 		that.update = update;

@@ -150,7 +150,7 @@
 		// create the database;
 		that.path = path(name);		
 		that.db_exists = false;
-		that.HTTP = boxspring.fileUtils.HTTP(boxspring.auth.authorize.server, {}).get;
+		that.HTTP = UTIL.fileio.HTTP(boxspring.authorize.server, {}).get;
 
 		var queryHTTP = function (service, options, query, callback) {
 			var viewOrUpdate = options.view || options.update || ''
@@ -170,7 +170,7 @@
 				'method': this.path.method(service),
 				'body': body,
 				'headers': headers
-			};
+			};			
 			//console.log('doHTTP');
 			this.HTTP(queryObj, function (err, res) {
 				//console.log('didHTTP');
@@ -182,26 +182,34 @@
 		that.queryHTTP = queryHTTP;
 
 		var dbQuery = function (name, handler) {
-			this.queryHTTP(name, {}, {}, function (err, result) {
+			this.queryHTTP(name, {}, {}, function (err, response) {
 				if (handler && typeof handler === 'function') {
-					handler(err, result);					
+					handler(err, response);
 				}
 			});
 			return this;			
 		};
 		that.dbQuery = dbQuery;
 		
+		// Purpose: helper to get the 'rev' code from documents. used by doc and bulk requests
+		var getRev = function (o) {				
+			if (o && o.header && o.header.etag) {
+				return o.header.etag.replace(/\"/g, '').replace(/\r/g,'') 
+			}
+		};
+		that.getRev = getRev;
+		
 		// execute it on instantiation. caller provides a callback in config.authorization if
 		// application wants to wait for completion before issuing first HTTP request. Otherwise,
 		// all subsequent HTTP calls will use the supplied credentials in global.auth.
-		(function (db, auth) {
-			var userId=(auth && auth.authorize && auth.authorize.credentials) || { 
+		(function (db, authorize) {
+			var userId=(authorize && authorize.credentials) || { 
 				'name': '', 'password': '' 
 			};
 			user.name = userId.name;
 			user.password = userId.password;
 			user.data = { name: userId.name, password: userId.password };			
-			db.HTTP = boxspring.fileUtils.HTTP(auth.authorize.server, user).get;
+			db.HTTP = UTIL.fileio.HTTP(authorize.server, user).get;
 			db.HTTP({ 
 				'path':'/_session', 
 				'method': 'POST', 
@@ -214,7 +222,7 @@
 					db.authorization.call(db, err, result);
 				});
 			return this;
-		}(that, global.auth));
+		}(that, global.authorize));
 		
 		// helper function as multiple codes can be Ok
 		var responseOk=function (r) { 
@@ -303,6 +311,11 @@
 			return this;
 		};
 		that.remove = remove;
+		
+		var events = function(Obj) {
+			return _.extend(Obj || {}, _.clone(Backbone.Events));
+		};
+		that.events = events;
 		return that;		
 	};
 	global.db = db;

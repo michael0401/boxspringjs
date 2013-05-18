@@ -12,8 +12,8 @@ var test = require('tape')
 		
 		var bulkPushTest = function () {
 			var bulk = boxspringjs.bulk()
-				.push(doc1)
-				.push(doc2);
+				.push(doc1.docinfo())
+				.push(doc2.docinfo());
 			t.equal(bulk.getLength(), 2, 'bulk-getLength');
 			bulk.save(function(err, result) {
 				t.equal(result.code, 201, 'bulk-push-save');

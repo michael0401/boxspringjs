@@ -24,8 +24,9 @@
 	"use strict";
 		
 	// What it does: Query / Result Objects
-	var query = function (db, options) {
-		var queryParameters = ['reduce',
+	var query = function (options) {
+		var db = this 
+		, queryParameters = ['reduce',
 							'limit',
 							'startkey',
 							'endkey',
@@ -35,7 +36,10 @@
 							'keys']
 							
 		// give this object some events			
-		, that = _.extend(this, global.Events());
+		, that = _.extend({}, this, boxspring().events());
+		
+		// create a query id for this, mostly for debugging 
+		that.qid = _.uniqueId('query-');
 		
 		// extend it with these options.	
 		that = _.extend(that, _.defaults(options || {}, {
@@ -54,18 +58,21 @@
 			'vis': 'table'
 		}));
 
-		that.system = (db && db.system);
-
+		// if system control parameters (page_size, cache_size, ...) were passed in,
+		// update them 
+		if (options && options.system) {
+			db.system.update(options.system);
+		}
+		
 		var result = function () {					
-			var owner = this 
-			, queryPages = { 'pages': [] }
+			var queryPages = { 'pages': [] }
 			, current_chunk = 0
 			, current_page = 0;	// zero-based
 
 			// wraps the response.data object with some helper methods
 			var data = function (response) {
 				// helpers						
-				response.query = owner;	// owner
+				response.query = that;	// owner
 				response.rid = _.uniqueId('result-');
 
 				var pages = function () {
@@ -103,7 +110,7 @@
 					return ({ 
 						'completed': (local.total_rows() === (local.offset() + local.getLength())),
 						'totalRows': local.total_rows(),
-						'pageSize': (db.system.page_size || this.totalRows),
+						'pageSize': (db.system.get('page_size') || this.totalRows),
 						'cachedPages': queryPages.pages.length, 
 						'page': current_page         ,
 						'next': function() {
@@ -166,9 +173,10 @@
 				queryPages.pages.push(response);	
 				// accumulates the rest of the pages for this result, if 'asynch'
 				//console.log('result', response.offset(), response.query.get('system'));
-				if (db.system.asynch === true && 
+				// when asynch=true, relay the data to the listener
+				if (db.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
-					response.query.trigger('result-more-data', response);										
+					response.query.trigger('more-data', response);										
 				}
 				return response;
 			};
@@ -181,24 +189,13 @@
 		var get = function () {	
 			var local = this;
 
-			// clear any events for this object
-			//this.off();
-
-			// when asynch=true, relay the data to the listener
-			// NOTE: during testing when trigger 'more-data' from the result object, 
-			// this object has expired so there seems to be no on listening?
-			// include this listener here and relaying to the app seems to fix it. 
-			this.on('result-more-data', function(response) {
-				local.trigger('more-data', response);
-			});
-
 			db.get(_.pick(this, queryParameters), function(err, result) {
 				if (err) {
 					console.log(err);
 				}	
 				// set result and call down to nextPrev with this result and no argument
 				local.trigger('result', result);		
-			}, result.call(this));
+			}, result());
 			return this;						
 		};
 		that.server = get;

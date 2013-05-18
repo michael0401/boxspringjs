@@ -57,8 +57,8 @@
 		return target;
 	};
 	
-	var view = function (db, options, design, views, emitter) {		
-		var that = _.extend({}, global.Events());
+	var view = function (db, options, design, views, emitter) {	
+		var that = _.extend({}, boxspring().events());
 			
 		that.db = db;
 		that.design = design;
@@ -66,16 +66,7 @@
 		that.views = views;
 		that.emitter = emitter;
 		that.query = translateQuery(_.omit(options, 'system'));
-
-		// system parameter passed in via the set/get connected to the calling query object
-		that.system = _.defaults((options && options.system) || {}, {
-			'asynch': false, 
-			'page_size': 0, 
-			'cache_size': undefined });
-
-		that.on('get-more-data', function() {
-			console.log('construct: get-more-data');
-		});
+		that.system = that.db.system.post();
 
 		var setQuery = function (queryParams, systemParams) {
 			if (_.isObject (queryParams)) {
@@ -87,7 +78,7 @@
 				this.system.asynch = false;
 			} else if (systemParams.asynch === true) {
 				this.system.page_size = systemParams.page_size;
-				this.system.cache_size = systemParams.cache_size;
+				this.system.cache_size = systemParams.cache_size || Number.MAX_VALUE;
 			}
 			return this.query;
 		};
@@ -173,9 +164,10 @@
 			};
 
 			events.on('chunk-data', function (res) {
+				//console.log('chunk-data', system);
 				// if I've got less than the full index; and asynchronous request
 				if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && 
-					(system.asynch === true) && system.cache_size > 0) {
+					(system.asynch === true && system.cache_size)) {
 						// pause the asynchronous read, 
 						// so we don't flood the browser and the net
 						_.wait((system && system.delay) || 1/10, function() {
@@ -226,7 +218,7 @@
 		that.couch = couch;
 		
 		var end = function (server, eventHandler) {
-			var res = global.Events()
+			var res = this.db.events()
 			, requestEvents = this
 			, local = this;
 

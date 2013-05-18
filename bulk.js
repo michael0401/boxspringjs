@@ -69,7 +69,7 @@
 			// does no checking for update conflicts. saving or removing docs without their _rev will fail
 			(function (handler) {
 				var doclist=_.clone(local.docs.docs)
-					, Queue= global.Queue();
+					, Queue= UTIL.queue();
 
 				// Create a Queue to hold the slices of our list of docs
 				var doclistSlice = function (data) {
@@ -103,7 +103,11 @@
 				if (headinfo.data !== 'error') {
 					var path = _.fetch(headinfo, 'path', 'url', 'request');
 					buffer = path.split('/');
-					doclist.docs.push({ _id: buffer[buffer.length-1], _rev: headinfo.rev });
+					doclist.docs.push({ 
+						'_id': buffer[buffer.length-1], 
+						'_rev': local.getRev(headinfo) 
+					});
+					
 					if (doclist.docs.length === local.docs.docs.length) {
 						// do this when all the _revs have been found
 						local.docs.docs = doclist.docs;
@@ -138,7 +142,9 @@
 		var push = function (item, handler) {
 			if (item) {
 				this.docs.docs.push(item);
-				if (handler && _.isFunction(handler) && this.docs.docs.length===this.Max) {
+				if (handler && 
+					_.isFunction(handler) && 
+					this.docs.docs.length===this.Max) {
 					this.save(handler);
 					this.docs.docs = [];
 				}
