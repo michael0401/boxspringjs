@@ -6,11 +6,11 @@ The BoxspringJS database API provides a uniform interface to CouchDB database se
 
 ####Summary
 
-*[heartbeat]()
+- [heartbeat]()
 
-__heartbeat(callback)__
+#####heartbeat(callback)
 
-*Confirm the connection to the server with no authentication.* 
+######Confirm the connection to the server with no authentication.
 
         mydb.heartbeat(function(err, response) {
         
@@ -55,21 +55,21 @@ __heartbeat(callback)__
   </tr>
 </table>
 
-__session(callback)__
+#####session(callback)
 
-*Authenticate this user for this database.*
+######Authenticate this user for this database.
 
-__all_dbs(callback)__
+#####all_dbs(callback)
 
-*Return a list of all databases available on the server.*
+######Return a list of all databases available on the server.
 
-__all_docs(callback)__
+#####all_docs(callback)
 
-*Return a list of all documents contained in this database.*
+######Return a list of all documents contained in this database.
 
-__db_info(callback)__
+#####db_info(callback)
 
-*Return an object with details of the database on the server.*
+######Return an object with details of the database on the server.
 
     mydb.db_info(function(err, response) {
         
@@ -93,21 +93,17 @@ __db_info(callback)__
         console.log(response.data.db_name); // 'my-db'
     }    
 
-__save(callback)__
+#####save(callback)
 
-*Create this database on the server. Server will return a 401 `CONFLICT` if the database is already existing or 409 `UNAUTHORIZED` if you do not have permission for this database.*
+######Create this database on the server. Server will return a 401 `CONFLICT` if the database is already existing or 409 `UNAUTHORIZED` if you do not have permission for this database.
 
-__remove(callback)__
+#####remove(callback)
 
-*Remove this database from the server.*
+######Remove this database from the server.
 
-__doc(id)__
+#####doc(id)
 
-<<<<<<< HEAD
-*Create an object describing document with id=`id`.* 
-=======
-*Create an object describing document with `id=id`.* 
->>>>>>> 9b6901d3c43d02938351bead3e2f5d243afc84d6
+######Create an object describing document with `id=id`. 
 
 > Note: Creating a document object does not create the document on the server. For that you must call the <code>save</code> method of the document object.
 
@@ -120,9 +116,9 @@ __doc(id)__
 	
 See [Document methods](###Document methods)
 
-__bulk([doclist])__
+#####bulk([doclist])
 
-*Create an object for loading and removing lists of documents. `doclist` is a JavaScript array of JSON objects produced by calling the `source()` method of a document object without any arguments.*
+######Create an object for loading and removing lists of documents. `doclist` is a JavaScript array of JSON objects produced by calling the `source()` method of a document object without any arguments.
 
 See [Bulk methods](###Bulk methods)
 
