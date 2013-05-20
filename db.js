@@ -296,7 +296,7 @@
 		var remove = function (handler) {
 			var local = this;
 
-			db_info(function (err, response) {
+			this.db_info(function (err, response) {
 				if (err || !responseOk(response)) {
 					handler(err);
 				}
