@@ -36,7 +36,7 @@ spreadsheets, line charts, heat maps, etcetera.
     mydb.save(function(err, response) {
     
       if (err) {
-        return console.log(('error creating database: ' + mydb.name, err);
+        return console.log('error creating database: ' + mydb.name, err);
       }
       
       // create a new document object
@@ -129,6 +129,7 @@ The following <code>options</code> can be supplied to initialize the database ob
   </tr>
 </table>
 
+
 ###Database object methods
 
 __heartbeat(callback)__
@@ -147,6 +148,42 @@ Confirm the connection to the server with no authentiation.
             
         }
 
+
+> **BoxspringJS Response Object** 
+
+> All BoxspringJS http request methods provide the callback two arguments: <code>err</code> and a <code>response</code> object. <code>err</code> is the <code>Error</code> object thrown by the request method if an unexpected http response is given, i.e., anything code greater than or equal to <code>400</code>. The <code>response</code> object will always have the following four properties, some of which may not be filled in:
+
+<table>
+  <tr>
+    <th>Property</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>code</td>
+    <td>Number</td>
+    <td>[http status codes](http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html)</td>
+  </tr>
+  <tr>
+    <td>header</td>
+    <td>Object</td>
+    <td>The http request header</td>
+  </tr>
+  <tr>
+    <td>request</td>
+    <td>Object</td>
+    <td>The request object, including <code>hostname, port, path, method, and body</code></td>
+  </tr>
+  <tr>
+    <td>data</td>
+    <td>Object</td>
+    <td>The parsed result of the request.</td>
+  </tr>
+</table>
+
+> Refer to [Complete HTTP API Reference](http://wiki.apache.org/couchdb/Complete_HTTP_API_Reference) for details on the contents of response.data returned for each method.
+
+
 __session(callback)__
 
 Authenticate this user for this database.
@@ -163,13 +200,25 @@ Authenticate this user for this database.
             
         }
 
+__all_dbs()__
+
+Return a list of all databases available on the server.
+
+####Example:
+
+        mydb.all_dbs(function(err, response) {
+        
+            if (err) {
+                return console.log('error fetching all_dbs', err);
+            }
+            
+            console.log('the following databases were found', response.data);
+        }
 
 
-session
+__all_docs()__
 
-all_dbs
 
-all_docs
         
      
 
