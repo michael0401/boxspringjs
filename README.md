@@ -116,6 +116,11 @@ The following <code>options</code> can be supplied to initialize the database ob
     <td>The default map/reduce view for this database</td>
   </tr>
     <tr>
+    <td>designName</td>
+    <td>String</td>
+    <td>"_design/default"</td>
+    <td>The name of the design document describing map/reduce views to use for this session. Note: If this design document is not already existing on the server, you will have to save it to the server first.</td>
+    <tr>
     <td>maker</td>
     <td>Function</td>
     <td></td>
