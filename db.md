@@ -7,9 +7,17 @@ The BoxspringJS database API provides a uniform interface to CouchDB database se
 ####Summary
 
 - [heartbeat](#heartbeat)
+- [session](#session)
+- [all_dbs](#all_dbs)
+- [all_docs](#all_docs)
+- [all_docs](#db_info)
+- [save](#save)
+- [remove](#remove)
+- [doc](#doc)
 - [bulk](#bulk)
-- [bulk](#####bulk)
+- [design](#design)
 
+<a name="heartbeat" />
 #####heartbeat(callback)
 
 Confirm the connection to the server with no authentication.
@@ -57,18 +65,22 @@ Confirm the connection to the server with no authentication.
   </tr>
 </table>
 
+<a name="session" />
 #####session(callback)
 
 Authenticate this user for this database.
 
+<a name="all_dbs" />
 #####all_dbs(callback)
 
 Return a list of all databases available on the server.
 
+<a name="all_docs" />
 #####all_docs(callback)
 
 Return a list of all documents contained in this database.
 
+<a name="db_info" />
 #####db_info(callback)
 
 Return an object with details of the database on the server.
@@ -95,14 +107,17 @@ Return an object with details of the database on the server.
         console.log(response.data.db_name); // 'my-db'
     }    
 
+<a name="save" />
 #####save(callback)
 
 Create this database on the server. Server will return a 401 `CONFLICT` if the database is already existing or 409 `UNAUTHORIZED` if you do not have permission for this database.
 
+<a name="remove" />
 #####remove(callback)
 
 Remove this database from the server.
 
+<a name="doc" />
 #####doc(id)
 
 Create an object describing document with `id=id`. 
@@ -116,13 +131,12 @@ Create an object describing document with `id=id`.
 	console.log(mydoc).source();
 	// -> { '_id', 'my-doc } );
 	
-See [Document methods](###Document methods)
+See [Document methods](https://github.com/rranauro/boxspringjs/blob/master/doc.md)
 
+<a name="bulk" />
 #####bulk([doclist])
 
 Create an object for loading and removing lists of documents. `doclist` is a JavaScript array of JSON objects produced by calling the `source()` method of a document object without any arguments.
-
-See [Bulk methods](###Bulk methods)
 
   	var mybulk = mydb.bulk([mydoc1.source(), mydoc2.source()])
 		.save(function(err, response) {
@@ -137,4 +151,15 @@ See [Bulk methods](###Bulk methods)
 				}
 			})
 	});
+
+See [Bulk methods](https://github.com/rranauro/boxspringjs/blob/master/bulk.md)
+	
+<a name="design" />
+#####design(name, maker, index)
+
+Create a design document named `name`. `maker` defines a function that returns an object containing a [CouchDB design document][1]. `index` refers to a `map()/reduce()` function described by the design document.
+
+See [Design methods](https://github.com/rranauro/boxspringjs/blob/master/design.md)
+
+[1] http://guide.couchdb.org/draft/design.html
 
