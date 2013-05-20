@@ -154,7 +154,7 @@ __remove(callback)__
 
 __doc(id)__
 
-*Create an object describing document with id=`id`. 
+*Create an object describing document with `id=id`.* 
 
 > Note: Creating a document object does not create the document on the server. For that you must call the <code>save</code> method of the document object.
 
