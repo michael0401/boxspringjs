@@ -150,7 +150,6 @@
 		// create the database;
 		that.path = path(name);		
 		that.db_exists = false;
-		console.log(boxspring);
 		that.HTTP = UTIL.fileio.HTTP(boxspring.authorize.server, {}).get;
 
 		var queryHTTP = function (service, options, query, callback) {

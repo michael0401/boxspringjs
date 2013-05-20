@@ -66,7 +66,11 @@
 		that.views = views;
 		that.emitter = emitter;
 		that.query = translateQuery(_.omit(options, 'system'));
-		that.system = that.db.system.post();
+		that.system = (that.db && that.db.system && that.db.system.post()) ||
+			{ 	'asynch': false,
+				'cache_size': undefined, //10,
+				'page_size': undefined, //100,
+				'delay': 0.5 };
 
 		var setQuery = function (queryParams, systemParams) {
 			if (_.isObject (queryParams)) {

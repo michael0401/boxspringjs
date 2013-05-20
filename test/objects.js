@@ -47,6 +47,8 @@ docObject = 	[ 'updated_docinfo',
 	  'authorize',
 	  'db',
 	  'bulk',
+	  'create',
+	  'delete',
 	  'doc',
 	  'design',
 	  'view',
@@ -55,6 +57,8 @@ docObject = 	[ 'updated_docinfo',
 	  'cell',
 	  'query',
 	  'name',
+	  'open',
+	  'source',
 	  'id',
 	  'index',
 	  'maker',
@@ -88,6 +92,7 @@ docObject = 	[ 'updated_docinfo',
 	  'docinfo' ],
 
 bulkObject = 	[ 'VERSION',
+      'status',
 	  'boxspring',
 	  'authorize',
 	  'db',
@@ -241,8 +246,8 @@ queryObject = [ 'VERSION',
 	  'pivot',
 	  'display',
 	  'vis',
-	  'system',
-	  'server' ],
+	  'server',
+	  'qid' ],
 	
 viewObject = [ 'on',
 	  'off',
@@ -256,7 +261,6 @@ viewObject = [ 'on',
 	  'emitter',
 	  'query',
 	  'system',
-	  '_callbacks',
 	  'setQuery',
 	  'fetch',
 	  'node',
@@ -291,8 +295,7 @@ test('objects', function (t) {
 		t.equal(false, true, testname);
 		if (_.difference(actual, intersection).length > 0) {
 			console.log(_.difference(actual, intersection), 'not found in actual');		
-		}
-		if (_.difference(expected, intersection).length > 0) {
+		} else if (_.difference(expected, intersection).length > 0) {
 			console.log(_.difference(expected, intersection), 'missing from actual');		
 		}
 	}
