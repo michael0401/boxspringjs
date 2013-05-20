@@ -132,7 +132,7 @@
 				// when updating, we might get an error if the doc doesn't exist
 				// otherwise just keep going
 				if (!err || response.code === 404) {
-					this.updated_docinfo = _.extend(this.updated_docinfo, data || {});
+					local.updated_docinfo = _.extend(local.updated_docinfo, data || {});
 					return save.call(local, handler);	
 				}
 				handler(err, response);
