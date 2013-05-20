@@ -4,8 +4,6 @@ __boxspring([name, [options]])__
 
 Create a new database object. <code>name</code> is a string for the name of the database on the server. <em>Note: Creating a database object does not create the database on the server. For that you must call the <code>save</code> method of the database object.</em>
 
-####Example:
-
         var mydb = boxspring('my-db');
         
 The following <code>options</code> can be supplied to initialize the database object:
@@ -58,8 +56,6 @@ The BoxspringJS database API provides a uniform interface to CouchDB database se
 __heartbeat(callback)__
 
 *Confirm the connection to the server with no authentiation.* 
-
-####Example:
 
         mydb.heartbeat(function(err, response) {
         
@@ -120,8 +116,6 @@ __db_info(callback)__
 
 *Return an object with details of the database on the server.*
 
-####Example:
-
     mydb.db_info(function(err, response) {
         
         if (err) {
@@ -154,13 +148,11 @@ __remove(callback)__
 
 __doc(id)__
 
-*Create an object describing document with id=`id`. 
+*Create an object describing document with id=`id`.* 
 
 > Note: Creating a document object does not create the document on the server. For that you must call the <code>save</code> method of the document object.
 
 > If you do not provide an id for the document, one will be created for it.
-
-####Example:
 
 	var mydoc = mydb.doc('my-doc);
 
@@ -171,11 +163,9 @@ See [Document methods](###Document methods)
 
 __bulk([doclist])__
 
-*Create an object for loading and removing lists of documents. `doclist` is a JavaScript array of JSON objects produced by calling the `source()` method of a document object without any arguments.
+*Create an object for loading and removing lists of documents. `doclist` is a JavaScript array of JSON objects produced by calling the `source()` method of a document object without any arguments.*
 
 See [Bulk methods](###Bulk methods)
-
-####Example: 
 
   	var mybulk = mydb.bulk([mydoc1.source(), mydoc2.source()])
 		.save(function(err, response) {
@@ -195,9 +185,7 @@ See [Bulk methods](###Bulk methods)
 		
 __source([json-object])__
 
-*Set/get the contents of the document. If you supply a JSON object as an argument to `source()`, the contents of the object will be used to extend the document's contents. When used this way the document `save()` method can be chained to `source()` to populate the documents content and save it to the server:
-
-####Example
+*Set/get the contents of the document. If you supply a JSON object as an argument to `source()`, the contents of the object will be used to extend the document's contents. When used this way the document `save()` method can be chained to `source()` to populate the documents content and save it to the server:*
 
 	mydoc.source({'content': 'some-data' }).update(function(err, response) {
 		if (err) {
@@ -212,7 +200,7 @@ __source([json-object])__
 			'content': 'some-data' }
 	});
 
-*By persisting this information about the document you can use the same document object to simplify updating document contents and save the document repeatedly within a session.
+*By persisting this information about the document you can use the same document object to simplify updating document contents and save the document repeatedly within a session.*
 
 > Note 1: You must supply a property owner for your new document content or else the `_id` and `_rev` information will be over-written and subsequent save requests will fail.
 
@@ -222,15 +210,13 @@ __source([json-object])__
 
 __save(callback)__
 
-*Save the contents of a document object to the server.
+*Save the contents of a document object to the server.*
 
 __retrieve(callback)__
 
 #####Alias: __create(callback)__
 
-*Read the contents of a document from the server, and update the document object with it.
-
-####Example
+*Read the contents of a document from the server, and update the document object with it.*
 
 	var mydoc = mydb.doc('my-doc').retrieve(function(err, response) {
 		if (err) {
@@ -242,14 +228,13 @@ __retrieve(callback)__
 
 __update(callback)__
 
-*Use this method to update the contents of a document existing on the server.
+*Use this method to update the contents of a document existing on the server.*
 
 > Note 1: If the document does not already exist on the server, then update will create it.
 
 > Note 2: The document resulting on the server will be over-written with the contents of your document object, except the _id and _rev information. **If this is not what you wan, then you should be sure to issue a `retrieve()` followed by `update()`.
 
-####Example 1: Augmenting the contents of a document on the server.
-
+	// Augmenting the contents of a document on the server.
 	var mydoc1 = mydb.doc('mydoc1').source({'contents' : 'some-data' });
 	
 	mydoc1.save(function(err, response) {
@@ -272,8 +257,8 @@ __update(callback)__
 			});
 	});
 	
-####Example 2: Over-writing the contents of a document on the server.
-	
+
+	//Over-writing the contents of a document on the server.
 	var mydoc2 = mydb.doc('mydoc1');
 	
 	mydoc2.retrieve(function(err, response) {
@@ -296,17 +281,17 @@ __update(callback)__
 
 __remove(callback)__
 
-*Remove a document from the database server.
+*Remove a document from the database server.*
 
 #####Alias: __delete(callback)__
 
 __info(callback)__
 
-*Get the revision information for a document
+*Get the revision information for a document.*
 
 __head(callback)__
 
-*Get the http request header for a document
+*Get the http request header for a document.*
 
 > Use head when you only need to test the existence of a document on the server. 
 
@@ -320,8 +305,6 @@ __docId()__
 
 *Helper function, returns an object containing the unique document identifier.
 
-#####Example
-
 	var mydoc = mydb.doc('my-doc');
 	
 	console.log(mydoc.docId());
@@ -329,16 +312,16 @@ __docId()__
 
 __docRev()__
 
-*Helper function, returns an object containing the latest revision of the document on the server.
+*Helper function, returns an object containing the latest revision of the document on the server.*
 
 > Only useful after `head()` or `retrieve()` or `save()`
  
 __url2Id(url, reverse)__
 
-*Helper function, converts a `url` to a valid document identifier, or if `reverse=true` converts an id to a valid `url`.  
+*Helper function, converts a `url` to a valid document identifier, or if `reverse=true` converts an id to a valid `url`.*  
 
 __docHdr(name, value)__
 
-*Helper function, returns an object with `headers` property who value is an object with property `name=value`
+*Helper function, returns an object with `headers` property who value is an object with property `name=value`*
 
 
