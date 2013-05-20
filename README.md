@@ -2,6 +2,8 @@
 
 A toolkit for cross-platform development of CouchDB Applications.
 
+##Overview
+
 From the command line on the server, use BoxspringJS and Node.js to develop content aggregation tools to drive 
 CouchDB map/reduce engine. 
 BoxspringJS provides methods for queuing bulk http requests when downloading data and wraps 
@@ -25,3 +27,63 @@ values by their labels.
 BoxspringJS provides a uniform interface to Google Visualization library. Evented query/result
 objects are transformed in to Google Table objects where they can be rendered into 
 spreadsheets, line charts, heat maps, etcetera.  
+
+##Example
+    // initialized a new database object
+    var mydb = boxspring('my-db');
+    
+    // create it on the server
+    mydb.save(function(err, response) {
+    
+      if (err) {
+        throw new Error('Unable to create database ' + mydb.name);
+      }
+      
+      // create a new document object
+      var mydoc = mydb.doc('my-doc');
+      
+      // add some content to the document
+      mydoc.extend({'resources': 'some-data'});
+      
+      // save the document to the database on the server
+      mydoc.save(function(err, response) {
+      
+        if (err) {
+          return console.log('error creating document', err);
+        }
+        
+        // change the content of the document
+        mydoc.extend({'resources': 'revised-data'})
+        
+          // mydoc object keeps track of the documnet revision for update method
+          .update(function(err, response) {
+            
+            if (err) {
+              return console.log('error updating document', err);
+            }
+            
+            console.log('Successfully updated ' + mydoc.docId();
+            mydoc.remove(function(err, response) {
+              if (err) {
+                return console.log('unable to remove', mydoc.doc(), err);
+              }
+                
+              // try to open the document just removed
+              mydoc.open(function(err, response) {
+              
+                if (!err) {
+                  return console.log('expected open to fail', mydoc.docId(), err);
+                }
+                // we expect 401
+                if (response.code === 404) {
+                  console.log('Successfully removed ' + mydoc.docId();
+                }
+              } 
+            }
+          }
+        }
+      }
+     
+
+
+    
