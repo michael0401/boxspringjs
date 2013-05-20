@@ -72,6 +72,11 @@
 			return((name && value) ? { 'headers': hdr[name] = value } : {});
 		};
 		that.docHdr = docHdr;
+		
+		var exists = function () {
+			return (_.has(this.updated_docinfo, '_rev'));
+		};
+		that.exists = exists;
 
 		// Purpose: Method for saving to the database
 		// Arguments: { docinfo: document object, oncompletion: string or function }
@@ -84,15 +89,20 @@
 			return this;
 		};
 		that.save = save;
+		that.create = save;
 
-		var retrieve = function (handler) {
-			var local = this;
-			this.queryHTTP('doc_retrieve', this.docId(), {}, function (err, response) {
+		var retrieve = function (handler, revs_info) {
+			var local = this
+			, options = revs_info ? { 'revs_info': true } : {};
+			
+			this.queryHTTP('doc_retrieve', this.docId(), options, 
+			function (err, response) {
 				handler(err, local.sync(err, response));
 			});
 			return this;
 		};
 		that.retrieve = retrieve;
+		that.open = retrieve;
 
 		var head = function (handler) {
 			var local = this;
@@ -115,12 +125,17 @@
 
 		// if data is provided, add it to the current document over-writing 
 		// existing key-values; otherwise just save the current state of the doc in memory
-		var update = function (handler) {
+		var update = function (handler, data) {
 			var local = this;
 			
-			retrieve.call(this, function(err) {
+			retrieve.call(this, function(err, response) {
 				// when updating, we might get an error if the doc doesn't exist
-				save.call(local, handler);
+				// otherwise just keep going
+				if (!err || response.code === 404) {
+					this.updated_docinfo = _.extend(this.updated_docinfo, data || {});
+					return save.call(local, handler);	
+				}
+				handler(err, response);
 			});
 			return this;
 		};
@@ -140,19 +155,17 @@
 			return this;
 		};
 		that.remove = remove;
+		that.delete = remove;
 
 		var info = function (handler) {
-			retrieve(handler, { 'revs_info': true });
+			// set the 'revs_info' flag to true on retrieve;
+			this.retrieve(handler, true);
 			return this;
 		};
 		that.info = info;
 
-		var exists = function () {
-			return (_.has(this.updated_docinfo, '_rev'));
-		};
-		that.exists = exists;
-
-		// Purpose: takes a document object as input, or returns an existing document object.
+		// Purpose: takes a document object as input, 
+		// or returns an existing document object.
 		var docinfo = function (docinfo) {
 			if (docinfo) {
 				_.extend(this.updated_docinfo, docinfo);
@@ -161,6 +174,7 @@
 			return(this.updated_docinfo);
 		};
 		that.docinfo = docinfo;
+		that.source = docinfo;
 		return that;		
 	};
 	global.doc = doc;

@@ -24,7 +24,8 @@
 	"use strict";
 	// Purpose: routines for bulk saving and removing
 	var bulk = function (doclist) {
-		var that;
+		var that
+		, lastResponse = [];
 		
 		// extend the bulk object with the owner db object
 		that = _.extend({}, this);
@@ -33,20 +34,24 @@
 		that.headers = { 'X-Couch-Full-Commit': false };
 		that.options = { 'batch': 'ok' };
 
+		// What it does: Returns and array to the caller with false at the index
+		// of the doc if it succeeded, and the document information if it failed
+		var status = function() {
+			return _.map(lastResponse, function(doc) {
+				return (doc && doc.error === 'conflict') ? doc : false;
+			});
+		};
+		that.status = status;
+
 		var exec = function (docsObj, callback) {
-			var conflicts = function (response) { // some posts may fail, captures Ok and NotOk posts
-					response.conflicts = false;
-					(response && response.data).forEach(function(doc) {
-						if (doc.error === 'conflict') {
-							response.conflicts = true;
-						}
-					});
-				return(response);
-			};
+
 			this.queryHTTP('bulk', { 
 				'body': docsObj,
 				'headers': this.headers 
 				}, this.options, function (err, response) {
+					if (!err) {
+						lastResponse = response && response.data;						
+					}
 					callback(err, response);
 				});
 		};
