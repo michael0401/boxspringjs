@@ -2,63 +2,61 @@
 
 ###BoxspringJS Modules
 
-[Creating a new database object](#create-db)
+* [Creating a new database object](#create-db)
 
-[Database methods](#database-methods)
+* [Database methods](#database-methods)
 
-- [heartbeat](#heartbeat)
-- [session](#session)
-- [all_dbs](#all_dbs)
-- [all_docs](#all_docs)
-- [all_docs](#db_info)
-- [save](#save)
-- [remove](#remove)
-- [doc](#doc)
-- [bulk](#bulk)
-- [design](#design)
+	* [heartbeat](#heartbeat)
+	* [session](#session)
+	* [all_dbs](#all_dbs)
+	* [all_docs](#all_docs)
+	* [all_docs](#db_info)
+	* [save](#save)
+	* [remove](#remove)
+	* [doc](#doc)
+	* [bulk](#bulk)
+	* [design](#design)
 
 
-[Document methods](#document-methods)
+* [Document methods](#document-methods)
 
-- [source](#source) __alias docinfo()__
-- [save](#save) __alias create()__
-- [retrieve](#retrieve)
-- [update](#update)
-- [remove](#remove) __alias delete()__
-- [info](#info)
-- [head](#head)
+	* [source](#source) __alias docinfo()__
+	* [save](#save) __alias create()__
+	* [retrieve](#retrieve)
+	* [update](#update)
+	* [remove](#remove) __alias delete()__
+	* [info](#info)
+	* [head](#head)
+	* Helper functions
+		* [exists](#exists)
+		* [docId](#docId)
+		* [docRev](#docRev)
+		* [docHdr](#docHdr)
+		* [url2Id](#url2Id)
 
-*Helper functions*
+* [Bulk methods](#bulk-methods)
 
-- [exists](#exists)
-- [docId](#docId)
-- [docRev](#docRev)
-- [docHdr](#docHdr)
-- [url2Id](#url2Id)
+	* [max](#max)
+	* [push](#bulkpush)
+	* [status](#bulkstatus)
+	* [save](#bulksave)
+	* [remove](#bulkremove)
+	* [getLength](#bulkgetlength)
+	* [fullCommit](#fullcommit)
 
-[Bulk methods](#bulk-methods)
+* [Design methods](#design-methods)
 
-- [max](#max)
-- [push](#bulkpush)
-- [status](#bulkstatus)
-- [save](#bulksave)
-- [remove](#bulkremove)
-- [getLength](#bulkgetlength)
-- [fullCommit](#fullcommit)
+	* [Defining a design document](#custom)
+	* [commit](#commit)
+	* [system](#design-system)
+	* [query](#design-query)
+	* [get](#design-get)
 
-[Design methods](#design-methods)
+* [Query/Result methods](#query-result-methods)
 
-- [Defining a design document](#custom)
-- [commit](#commit)
-- [system](#design-system)
-- [query](#design-query)
-- [get](#design-get)
+* [Rows/Row/Cell methods](#rows-methods)
 
-[Query/Result methods](#query-result-methods)
-
-[Rows/Row/Cell methods](#rows-methods)
-
-[Display methods](#display-methods)
+* [Display methods](#display-methods)
 
 <a name="create-db" />
 ####boxspring([name, [options]])
