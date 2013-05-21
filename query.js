@@ -51,11 +51,11 @@
 			'group_level': undefined,
 			'descending': false,
 			'key': undefined,
-			'keys': undefined,
-			'filter': {},
-			'pivot': false,
-			'display': false,
-			'vis': 'table'
+			'keys': undefined
+// list function			'filter': {},
+// list function			'pivot': false,
+//move			'display': false,
+//move			'vis': 'table'
 		}));
 
 		// if system control parameters (page_size, cache_size, ...) were passed in,

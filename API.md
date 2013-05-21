@@ -1,56 +1,54 @@
-##API Reference
+### BoxspringJS API Reference
 
-###BoxspringJS Modules
-
-* [Creating a new database object](#create-db)
+* [Initialize a database object](#create-db)
 
 * [Database methods](#database-methods)
 
-	* [heartbeat](#heartbeat)
-	* [session](#session)
-	* [all_dbs](#all_dbs)
-	* [all_docs](#all_docs)
-	* [all_docs](#db_info)
-	* [save](#save)
-	* [remove](#remove)
-	* [doc](#doc)
-	* [bulk](#bulk)
-	* [design](#design)
+	* [heartbeat](#heartbeat) - verify the existence of the server
+	* [session](#session) - authenticate a name/password for a session
+	* [all_dbs](#all_dbs) - generate a list of available databases
+	* [all_docs](#all_docs) - generate a list of documents for a given database
+	* [db_info](#db_info) - return statistics and vital information about a database
+	* [save](#save) - save a database definition to the server
+	* [remove](#remove) - remove a database from the server
+	* [doc](#doc) - instantiate a new document object
+	* [bulk](#bulk) - instantiate a new bulk document object
+	* [design](#design) - instantiate a new design document object
 
 
 * [Document methods](#document-methods)
 
-	* [source](#source) __alias docinfo()__
-	* [save](#save) __alias create()__
-	* [retrieve](#retrieve)
-	* [update](#update)
-	* [remove](#remove) __alias delete()__
-	* [info](#info)
-	* [head](#head)
+	* [source](#source) *alias docinfo()* - setter/getter for document content
+	* [save](#save) *alias create()* - save document to server
+	* [retrieve](#retrieve) - fetch document from server
+	* [update](#update) - create a new revision of document with updated content
+	* [remove](#remove) *alias delete()* - remove the document from the server
+	* [head](#head) - get the http request header for a document
 	* Helper functions
-		* [exists](#exists)
-		* [docId](#docId)
-		* [docRev](#docRev)
-		* [docHdr](#docHdr)
-		* [url2Id](#url2Id)
+		* [info](#info) - get the revision information for a document
+		* [exists](#exists) - returns true if the document exists on the server
+		* [docId](#docId) - returns an object with the document identifier
+		* [docRev](#docRev) - returns an object with the document revision
+		* [docHdr](#docHdr) - returns an object with the identifier and revision
+		* [url2Id](#url2Id) - formats a URL to a valid document identifier
 
 * [Bulk methods](#bulk-methods)
 
-	* [max](#max)
-	* [push](#bulkpush)
-	* [status](#bulkstatus)
-	* [save](#bulksave)
-	* [remove](#bulkremove)
-	* [getLength](#bulkgetlength)
-	* [fullCommit](#fullcommit)
+	* [max](#max) - the maximum number of documents to save for any single http request
+	* [push](#bulkpush) - add a document to the list of documents to save
+	* [status](#bulkstatus) - returns an array with vitals on any document that failed to save
+	* [save](#bulksave) - saves the list of documents to the server
+	* [remove](#bulkremove) - removes the list of documents from the server
+	* [getLength](#bulkgetlength) - returns the number of documents awaiting bulk save/remove
+	* [fullCommit](#fullcommit) - tell server to verify the data before issues success
 
 * [Design methods](#design-methods)
 
 	* [Defining a design document](#custom)
-	* [commit](#commit)
-	* [system](#design-system)
-	* [query](#design-query)
-	* [get](#design-get)
+	* [commit](#commit) - add properties to and update a document without fetching it from the server
+	* [system](#design-system) - system properties to define asynchronous query behavior
+	* [query](#design-query) - master query method
+	* [get](#design-get) - lower-level query method
 
 * [Query/Result methods](#query-result-methods)
 
@@ -865,6 +863,34 @@ __Step 3: Save the new design document to the server__
 	}, moreData);
 
 
+<a name="query-result-methods" />
+###Query/Result methods
+
+*The Query/Result object is the heart of the BoxspringJS data model. A `query()` object is instantiated off of the [design document object](#design-query) and it inherits the design's name and design document.*
+
+	// Example instantiation of a query object
+ 	var myquery = mydesign.query({});
+
+	// set asynch = true
+	mydesign.system.update({'asynch': true, 'cache-size': 10, 'page-size': 100});
+
+	myquery.on('result', function(err, response) {
+		// check for errors and process first 100 rows here...
+	});
+	
+	myquery.on('more-data', function(err, response) {
+		// check for errors and send more data to the model view, if you like.
+	});
+	
+	// now initiate the query
+	myquery.server();
 
 
-[Query/Result methods](#query-result-methods)
+
+
+
+, invoked from a [database object](#design) allows you to define and execute map/reduce functions in your client (Node.js or browser), and commit them to the server. The definition of a map/reduce view index on the design document is the natural place for describing your data. BoxspringJS uses the flexible design document structure to allow you to define a `header` where key/column labels are defined.*
+
+
+
+
