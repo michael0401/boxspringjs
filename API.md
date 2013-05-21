@@ -1,14 +1,75 @@
 ##API Reference
 
+###BoxspringJS Modules
+
+[Creating a new database object](#create-db)
+
+[Database methods](#database-methods)
+
+- [heartbeat](#heartbeat)
+- [session](#session)
+- [all_dbs](#all_dbs)
+- [all_docs](#all_docs)
+- [all_docs](#db_info)
+- [save](#save)
+- [remove](#remove)
+- [doc](#doc)
+- [bulk](#bulk)
+- [design](#design)
+
+
+[Document methods](#document-methods)
+
+- [source](#source) __alias docinfo()__
+- [save](#save) __alias create()__
+- [retrieve](#retrieve)
+- [update](#update)
+- [remove](#remove) __alias delete()__
+- [info](#info)
+- [head](#head)
+
+*Helper functions*
+
+- [exists](#exists)
+- [docId](#docId)
+- [docRev](#docRev)
+- [docHdr](#docHdr)
+- [url2Id](#url2Id)
+
+[Bulk methods](#bulk-methods)
+
+- [max](#max)
+- [push](#bulkpush)
+- [status](#bulkstatus)
+- [save](#bulksave)
+- [remove](#bulkremove)
+- [getLength](#bulkgetlength)
+- [fullCommit](#fullcommit)
+
+[Design methods](#design-methods)
+
+- [Defining a design document](#custom)
+- [commit](#commit)
+- [system](#design-system)
+- [query](#design-query)
+- [get](#design-get)
+
+[Query/Result methods](#query-result-methods)
+
+[Rows/Row/Cell methods](#rows-methods)
+
+[Display methods](#display-methods)
+
+<a name="create-db" />
 ####boxspring([name, [options]])
 
-Create a new database object. `name` is a string for the name of the database on the server. 
+*Create a new database object. `name` is a string for the name of the database on the server.*
 
 > Note: Creating a database object does not create the database on the server. For that use the `save()` method of the database object.
 
         var mydb = boxspring('my-db');
         
-The following `options` can be supplied to initialize the database object:
+*The following `options` can be supplied to initialize the database object:*
 
 <table>
   <tr>
@@ -48,15 +109,6 @@ The following `options` can be supplied to initialize the database object:
   </tr>
 </table>
 
-###BoxspringJS Modules
-
-- [Database methods](#database-methods)
-- [Document methods](#document-methods)
-- [Bulk methods](#bulk-methods)
-- [Design methods](#design-methods)
-- [Query/Result methods](#query-result-methods)
-- [Rows/Row/Cell methods](#rows-methods)
-- [Display methods](#display-methods)
 
 ###Library Modules
 
@@ -116,6 +168,7 @@ The database API provides a uniform interface to CouchDB database services for s
 
 > All BoxspringJS http request methods provide the callback two arguments: <code>err</code> and a <code>response</code> object. <code>err</code> is the <code>Error</code> object thrown by the request method if an unexpected http response is given, i.e., anything code greater than or equal to <code>400</code>. The <code>response</code> object will always have the following four properties, some of which may not be filled in:
 
+<a name="response-object" />
 <table>
   <tr>
     <th>Property</th>
@@ -208,7 +261,7 @@ The database API provides a uniform interface to CouchDB database services for s
 	var mydoc = mydb.doc('my-doc);
 
 	console.log(mydoc).source();
-	// -> { '_id', 'my-doc } );
+	// -> { '_id', 'my-doc' } );
 	
 *See [Document methods](doc-methods)*
 
@@ -441,7 +494,7 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 		if (err) {
 			// handle the error
 		}
-		response.status.forEach(function(failed) {
+		response.status().forEach(function(failed) {
 			if (failed) {
 				console.log(failed);
 				// -> {"id":"doc1","error":"conflict","reason":"Document update conflict."}
@@ -520,7 +573,7 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 *See also [design updates](#design-methods)*
 
 <a name="bulkremove" />
-######remove(callback)
+#####remove(callback)
 
 *Removes a list of documents from the server. `remove()` will issue a [`doc.head()`](#head) request for each document to get its revision and to mark the document for deletion. There is no queueing for bulk `remove()` so you should be sure your client has enough memory to store the array of documents you are removing, bearing in mind all you need to provide to `remove()` is an object containing the document identifier as in `{ '_id': 'identifier' }`. You can get this by calling `doc.docId()` on any document object.*
 
@@ -556,7 +609,7 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 <a name="design-methods" />
 ###Design document methods
 
-*The design document object, invoked from a [database object](#bulk) allows you to define and execute map/reduce functions in your client (Node.js or browser), and commit them to the server. The definition of a map/reduce view index on the design document is the natural place for describing your data. BoxspringJS uses the flexible design document structure to allow you to define a `header` where key/column labels are defined.*
+*The design document object, invoked from a [database object](#design) allows you to define and execute map/reduce functions in your client (Node.js or browser), and commit them to the server. The definition of a map/reduce view index on the design document is the natural place for describing your data. BoxspringJS uses the flexible design document structure to allow you to define a `header` where key/column labels are defined.*
 
 
 	//The default design document included in BoxspringJS is shown here:
@@ -622,8 +675,9 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 
 - [Defining a design document](#custom)
 - [commit](#commit)
-- [get](#design-get)
+- [system](#design-system)
 - [query](#design-query)
+- [get](#design-get)
 
 #####Defining a design document
 
@@ -711,7 +765,7 @@ __Step 3: Save the new design document to the server__
     <tr>
     <td>updateName</td>
     <td>String</td>
-    <td>The name of the update method in our design document. In the example above, this would be "updates"</td>
+    <td>The name of the update method in our design document. In the example above, this would be "my-commit"</td>
   </tr>
     <tr>
     <td>documentProperties</td>
@@ -724,10 +778,95 @@ __Step 3: Save the new design document to the server__
   </tr>
 </table>
 
+<a name="design-system" />
+#####system object
+
+*The `design.system` object is a hash used to control the asynchronous behavior of a `query` or `get` request.*
+
+<table>
+  <tr>
+    <th>Property</th>
+    <th>Type</th>
+    <th>Default Value</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>asynch</td>
+    <td>Boolean</td>
+	<td>false</td>
+    <td>If true and the `get` request specifies a `page-size` option, BoxspringJS will continue to fetch rows of data up to the `cache-limit` and deposit them using the `moreData` callback. When `false`, the `get` request will return only the first quantity of rows to the callback, regardless of whether `page-size` is set or not.</td>
+  </tr>
+  <tr>
+    <td>page-size</td>
+    <td>Number</td>
+    <td>undefined</td>
+    <td>The maximum number of rows to return for a single http GET request.</td>
+  </tr>
+    <tr>
+    <td>cache-size</td>
+    <td>Number</td>
+    <td>Infinite</td>
+    <td>The number of `page-size` blocks to fetch from the server.</td>
+  <tr>
+    <td>delay</td>
+    <td>Number</td>
+    <td>0.5</td>
+    <td>Time to wait between asynchronous http requests to the server for more data.</td>
+  </tr>
+</table>
+
+*To update the system hash variables, use the following:*
+
+	var mydesign = mydb.design().system.update({
+		'asynch': true,
+		'page-size': 100,
+		'cache-size': 10
+	});
+	
+	console.log(mydesign.system.get('asynch'));
+	// -> true
+
+<a name="design-query" />
+#####query(options)
+
+*Query the server, using the `view` defined by the current design document object. The `options` arguments are taken directly from the [CouchDB View API](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options).*
+
+> The `query()` method of the design object relies on `get()` to complete its work. Observe that `query()` takes no `callback` argument, instead it uses events to communicate its status. The details of the events `query()` uses to indicate its status are described in the [Query/Result methods](#query-result-methods) section.
+
 <a name="design-get" />
 #####get(options, callback, moreDataCallback)
 
+*Fetch row data from the server using the `view` defined by the current design document object. `options` are the same as used by [`query()`](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options). When data is returned from the server, `callback` function is executed with the [`response` object](#response-object) and some [helper methods](#rows-methods) to streamline downstream processing and rendering the data.*
+
+*The `moreDataCallback` function is executed with the [response](#response-object) after the first block of rows are returned to the callback to handle subsequent fetches of data when the system property `asynch=true`.*
+
+	// Example get request.
+	var mydesign = mydb.design('my-design', ddoc, 'my-view');
+	
+	// update the system variables
+	mydesign.system.update({
+		'asynch': true,
+		'cache-size: 2,
+		'page-size: 10
+	});
+	
+	// define a function to catch the rows not initially displayed
+	var moreData = function(err, response) {
+		if (!err) {
+			console.log(response.offset());
+			// -> 1
+		}
+	};
+	
+	// get some data;
+	mydesign.get({}, function(err, response) {
+		if (!err) {
+			console.log(response.offset());
+			// -> 0
+		}
+	}, moreData);
 
 
-<a name="design-query" />
 
+
+[Query/Result methods](#query-result-methods)

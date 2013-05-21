@@ -72,6 +72,8 @@ For display, BoxspringJS provides a uniform interface to Google Visualization li
 
 ##Install
 
+##Acknowledgements
+
 ##License
 
 
