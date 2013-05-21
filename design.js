@@ -262,10 +262,12 @@
 				res.on('data', function (r) {
 					// create a result object instrumented with row helpers 
 					// and design document info
+					
 					var result = global.rows(r, local.ddoc.ddoc, local);					
 					if (callback && _.isFunction(callback)) {
 						if (system && system.asynch === false) {
 							// just write wrapped data to the calling program. 
+							//console.log('got data!', caller(result), caller === _.item);
 							callback(null, caller(result));
 						} else if ((system && system.asynch === true) && 
 							triggered === false) {

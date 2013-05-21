@@ -53,9 +53,11 @@
 * [Query/Result methods](#query-result-methods)
 	* [query events](#query-events)
 	* [result helper methods](#result-helper-methods)
-	
 
 * [Rows/Row/Cell methods](#rows-methods)
+	* [rows collection helper methods](#rows-collection-helper-methods)
+	* [row helper methods](#row-helper-methods)
+	* [cell helper methods](#cell-helper-methods)
 
 * [Display methods](#display-methods)
 
@@ -681,6 +683,12 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 #####Defining a design document
 
 <a name="custom" />
+> BoxspringJS unobtrusively extends the design document with header, type, and formatting to simplify downstream view processing. There is no requirement that these data be provided, nor does the data interfere with any native database properties. There are three principal extensions:
+
+__types: domain specific data types__
+__formats: domain specific formatting methods__
+__header: key/column labels__
+
 *To define your own design document, do the following:*
 
 __Step 1: Define a design document maker function__
@@ -705,6 +713,8 @@ __Step 1: Define a design document maker function__
 			},
 			"views": {
 				'lib': {
+					// formats is used by the cell object to provide domain specific formatting
+					// of data base on the data type.
 					'formats': function() {
 						var formatter = function(name) {
 							return 'formatted: ' + name;
@@ -738,7 +748,9 @@ __Step 2: Instantiate a design document object__
 
 __Step 3: Save the new design document to the server__
 
-	mydesign.update(function(err, response) {
+	// mydesign.ddoc is a document object. Its contents are the design document. 'update' is a
+	// method of the document object
+	mydesign.ddoc.update(function(err, response) {
 		if (err) {
 			// handle the error
 		}
@@ -974,6 +986,176 @@ __Step 3: Save the new design document to the server__
 </table>
 
 
+<a name="rows-methods" />
+###Rows/Row/Cell methods
 
+*The `rows(), row(), and cell() methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively.` First, the [response object](#response-object) from a `get()` is wrapped by the `rows()` object, then each individual row is wrapped by `rows()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.*
 
+*A `visible` hash object keeps track of key/values requested and found across all rows. For example, when displaying tabular data, if a there is never a value for a key, then it may be possible to hide that column from the display.*
 
+	// Example use
+	var rowdata = result.visible
+	
+	// result.each() = [['field1': 'yes!'], ['field2': undefined ]];
+	
+	result.each().forEach(function(row) {
+		console.log(row.select('field1'), row.select('field2));
+	});
+	// -> 'yes!', undefined
+	// -> undefined, undefined
+	
+	console.log(rowdata.setValues());
+	// -> { 'field1': true }
+
+######set(key, value)
+
+*Set the
+
+*The `rows()` methods provides handy helper functions to iterate over all rows `each()`, get the `first()` and `last()` rows of a collection, and hide the details of the result data structure `offset(), total_rows(), and getLength()`.
+
+<a name="rows-collection-helper-methods" />
+####rows collection helper methods
+
+#####each()
+
+*Returns an array of rows, wrapped in `row()` methods which can be easily iterated.*
+
+#####offset()
+
+*Returns the `offset` of the first row relative to all rows in the view.*
+
+#####total_rows()
+
+*Returns the total number of rows for this index.*
+
+#####getLength()
+
+*Returns the number of rows attached to this result object.*
+
+#####first()
+
+*Returns the first row in the collection.*
+
+#####last()
+
+*Returns the last row in the collection.*
+
+#####facets()
+
+*Returns the list of unique values for a key over the set of rows, the 'facet'*
+
+#####sortByValue(iterator)
+
+*Returns the list of rows sorted by the value of the iterator.*
+
+	// consider this set of rows
+	var rows = response.each();
+ 	// rows = [ { 'key': 'A', 'value': {'X': 1, 'Y': 2 }}, { 'key': 'B', 'value': {'X': 2, 'Y': 1 }}];
+		
+	console.log(rows.sortByValue(function(x) { return x.value['Y'] }));
+	// -> [	{ 'key': 'B', 'value': {'X': 2, 'Y': 1 }},
+			{ 'key': 'A', 'value': {'X': 1, 'Y': 2 }}]
+	
+
+#####range()
+
+*Returns the first and last keys of an index.*
+
+#####getSortColumn() 
+
+*Setter/getter for defining the `sort-column`. Used mostly by the downstream `view` processes.
+
+#####getDisplayColumns()
+
+*Setter/getter for modifying the list of columns to display. Used mostly by the downstream `view` processes.*
+
+#####column2Index(columnLabel)
+
+*Uses the `header` information from the [design document](#design-methods) to convert a column label to an index. Returns the index of the column requested, or the index of 'sort-column', or 0 if both are not found.*
+
+#####index2Column(index)
+
+*Converts an integer index into the column list and uses the header section of the [design document](#design-methods) to return the name of the column.*
+
+#####sortByColumn(reverse)
+
+*If columns are integers, returns the columns sorted. Otherwise returns the columns in their original order, or in reverse order if `reverse` argument is true.*
+
+<a name="row-helper-methods" />
+####row()
+
+#####getKey()
+
+*Get the `key` property of a row of data.*
+
+#####getValue()
+
+*Get the `value` property of a row of data.*
+
+#####select(property)
+
+*Returns value of `property`.*
+
+#####selectFor(property, value)
+
+*Returns true if row `property` value equals `value`.*
+
+#####filter(object)
+
+*Returns true if ALL property values of the row match ALL property values of `object`.*
+
+<a name="cell-helper-methods" />
+####cell()
+
+#####columnType(name, type, [width])
+#####columnType(object)
+
+*Extend the list of data types.*
+
+	// BoxspringJS provides the following built-in types:	
+	/*
+	{ 'year': ['number',1],
+	'month': ['number',1],
+	'country': ['string',2],
+	'city': ['string',2],
+	'state': ['string',2],
+	'address': ['string',4],
+	'count': ['number',1],
+	'sum': ['number',1],
+	'average': ['number',1],
+	'keyword': ['string',1],
+	'index': ['number',1],
+	'values': ['object',2],
+	'row total': ['number',1],
+	'column total': ['number',1],
+	'view': ['string', 1],
+	'summary': ['object', 8] };
+	*/
+	// The array value consists of [ type, width ] where `type` is a JavaScript type and `width` is a 
+	// numeric width that can be used by downstream `view` processes to format and layout the data
+
+> Use columnType with an `object` argument to bulk update the set of available data types.
+> Call columnType individually with `name`, `type`, and optional `width` to add individual types. `width` defaults to 1 if none is supplied.
+> If the [design document](#custom) specifies a list of types for the domain, then these are automatically used to extend the list of built-in types available to the application.
+
+#####hasType(label)
+
+*Returns true if `label` has a `type` definition.*
+	
+#####getType(label)
+
+*Returns the requested type from the list of valid types.*
+
+#####columnWidth(label)
+
+*Returns the numeric width of the requested label.*
+
+#####newCell(label, [value, [type]])
+#####newCell(object)
+
+*Returns an object with five properties: `name, value, type, format, properties`. This object is plug-and-play with the Google Visualization object format.*
+
+> newCell will determine the type by comparing the label provided to the values in the columnTypes object. If the value does not match the intended type then it will attempt to `coerce` the value to the intended type. Failing this, it will set the type and value to `String`.
+
+> If a `format()` function is provided on the [design document](#custom) it will be applied to fill in the format property of the object being returned.
+ 
