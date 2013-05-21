@@ -51,6 +51,9 @@
 	* [get](#design-get) - lower-level query method
 
 * [Query/Result methods](#query-result-methods)
+	* [query events](#query-events)
+	* [result helper methods](#result-helper-methods)
+	
 
 * [Rows/Row/Cell methods](#rows-methods)
 
@@ -868,28 +871,108 @@ __Step 3: Save the new design document to the server__
 
 *The Query/Result object is the heart of the BoxspringJS data model. A `query()` object is instantiated off of the [design document object](#design-query) and it inherits the design's name and design document.*
 
-	// Example instantiation of a query object
+	// Example instantiation of a query object and executing a query
  	var myquery = mydesign.query({});
 
 	// set asynch = true
 	mydesign.system.update({'asynch': true, 'cache-size': 10, 'page-size': 100});
 
-	myquery.on('result', function(err, response) {
+	myquery.on('result', function(err, result) {
 		// check for errors and process first 100 rows here...
 	});
 	
-	myquery.on('more-data', function(err, response) {
+	myquery.on('more-data', function(err, result) {
 		// check for errors and send more data to the model view, if you like.
 	});
 	
 	// now initiate the query
 	myquery.server();
 
+####query events
 
+*As depicted in the example above, the `query()` object will trigger the __result__ and __more-data__ events when it has data from the server.*
 
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Event</th>
+  </tr>
+  <tr>
+    <td>result</td>
+    <td>The server has delivered its first response to the application.</td>
+  </tr>
+  <tr>
+    <td>more-data</td>
+    <td>First and subsequent responses when system variable asynch=true</td>
+  </tr>
+  <tr>
+    <td>completed</td>
+    <td>All of the rows from the server have been fetched into memory.</td>
+  </tr>
+</table>
 
+<a name="result-helper-methods" />
+#####result helper methods
 
-, invoked from a [database object](#design) allows you to define and execute map/reduce functions in your client (Node.js or browser), and commit them to the server. The definition of a map/reduce view index on the design document is the natural place for describing your data. BoxspringJS uses the flexible design document structure to allow you to define a `header` where key/column labels are defined.*
+*The result object comes wrapped with methods so that the application can navigate the cache. A `nextPrev()` method provides access to the next or previous "page" of rows available in memory, or if the application has reached the last page available it will increase the `cache-size` by one and on its own will initiate another `get()` request to get the next page from the server. __At present, BoxspringJS will accumulate more pages rather than shift the earliest page out of memory.__*
+
+######unPaginate()
+
+*Returns a `result()` object as though all the pages were fetched in a single http request.*
+
+######nextPrev(direction)
+
+*Takes a string argument `'next'` or `'previous'` and triggers an event `'on-display'` with the next or previous page of rows from the cache. Does nothing if current page is page 0 and previous page is requested or if on last page and next page is requested.*
+
+> Automatically fetches more data from server if on last page of the cache and still more data on server,
+
+######pageInfo()
+
+*Returns an object used by the data views to control the session.*
+
+<table>
+  <tr>
+    <th>Property</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>completed</td>
+	<td>Boolean</td>
+    <td>Value equals 'true' when there are no more rows to fetch.</td>
+  </tr>
+  <tr>
+    <td>page</td>
+    <td>Number</td>
+	<td>The current page.</td>
+  </tr>
+  <tr>
+    <td>pages</td>
+    <td>Number</td>
+	<td>Total number of pages needed for all rows.</td>
+  </tr>
+  <tr>
+    <td>total-rows</td>
+    <td>Number</td>
+	<td>The total number of rows for this query.</td>
+  </tr>
+  <tr>
+    <td>page-size</td>
+    <td>Number</td>
+	<td>The requested page-size from design.system.get('page-size')</td>
+  </tr>
+  <tr>
+    <td>cached-pages</td>
+    <td>Number</td>
+	<td>The total number of cached pages in memory, for this query</td>
+  </tr>
+  <tr>
+    <td>last-page</td>
+    <td>Number</td>
+	<td>The index of the last cached page.</td>
+  </tr>
+</table>
+
 
 
 
