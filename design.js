@@ -26,6 +26,7 @@
 	// What it does: Templated data structure for a CouchDB design document; 
 	// map functions of defaultDesign are capable of also running in Nodejs.
 	var defaultDesign = function () {
+		// Note: CouchdDB defines toJSON globally to its environment, this won't be there on the server
 		var toJSON = function(o) {
 			return(JSON.stringify(o));
 		};
@@ -57,9 +58,6 @@
 				}				
 			},
 			'views': {
-				'lib': {
-					'underscore': exports.val = ";"
-				},
 				'Index': {
 					'map': function (doc) {
 						if (doc && doc._id) {
