@@ -686,7 +686,9 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 > BoxspringJS unobtrusively extends the design document with header, type, and formatting to simplify downstream view processing. There is no requirement that these data be provided, nor does the data interfere with any native database properties. There are three principal extensions:
 
 __types: domain specific data types__
+
 __formats: domain specific formatting methods__
+
 __header: key/column labels__
 
 *To define your own design document, do the following:*
@@ -989,14 +991,14 @@ __Step 3: Save the new design document to the server__
 <a name="rows-methods" />
 ###Rows/Row/Cell methods
 
-*The `rows(), row(), and cell() methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively.` First, the [response object](#response-object) from a `get()` is wrapped by the `rows()` object, then each individual row is wrapped by `rows()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.*
+*The `rows(), row(), and cell() methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively. First, the [response object](#response-object) from a `get()` is wrapped by the `rows()` object, then each individual row is wrapped by `row()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.*
 
 *A `visible` hash object keeps track of key/values requested and found across all rows. For example, when displaying tabular data, if a there is never a value for a key, then it may be possible to hide that column from the display.*
 
 	// Example use
 	var rowdata = result.visible
 	
-	// result.each() = [['field1': 'yes!'], ['field2': undefined ]];
+	// result.each() == [['field1': 'yes!'], ['field2': undefined ]];
 	
 	result.each().forEach(function(row) {
 		console.log(row.select('field1'), row.select('field2));
@@ -1006,10 +1008,6 @@ __Step 3: Save the new design document to the server__
 	
 	console.log(rowdata.setValues());
 	// -> { 'field1': true }
-
-######set(key, value)
-
-*Set the
 
 *The `rows()` methods provides handy helper functions to iterate over all rows `each()`, get the `first()` and `last()` rows of a collection, and hide the details of the result data structure `offset(), total_rows(), and getLength()`.
 
@@ -1061,9 +1059,13 @@ __Step 3: Save the new design document to the server__
 
 *Returns the first and last keys of an index.*
 
+	// using the output of the example above
+	console.log(rows.range());
+	// -> {'start': 'B', 'end': 'A' }
+
 #####getSortColumn() 
 
-*Setter/getter for defining the `sort-column`. Used mostly by the downstream `view` processes.
+*Setter/getter for defining the `sort-column`. Used mostly by the downstream `view` processes.*
 
 #####getDisplayColumns()
 
@@ -1132,7 +1134,8 @@ __Step 3: Save the new design document to the server__
 	'summary': ['object', 8] };
 	*/
 	// The array value consists of [ type, width ] where `type` is a JavaScript type and `width` is a 
-	// numeric width that can be used by downstream `view` processes to format and layout the data
+	// relative numeric width that can be used by downstream `view` processes to format and layout the 
+	// data. For example, `address` would be afford 4 units of width in display, versus only 1 for `year`.
 
 > Use columnType with an `object` argument to bulk update the set of available data types.
 > Call columnType individually with `name`, `type`, and optional `width` to add individual types. `width` defaults to 1 if none is supplied.
@@ -1153,7 +1156,9 @@ __Step 3: Save the new design document to the server__
 #####newCell(label, [value, [type]])
 #####newCell(object)
 
-*Returns an object with five properties: `name, value, type, format, properties`. This object is plug-and-play with the Google Visualization object format.*
+*Returns an object with five properties: `name, value, type, format, properties`. 
+
+> This object can be easily transformed into downstream graphing packages such as Googles Visualization Table format.*
 
 > newCell will determine the type by comparing the label provided to the values in the columnTypes object. If the value does not match the intended type then it will attempt to `coerce` the value to the intended type. Failing this, it will set the type and value to `String`.
 

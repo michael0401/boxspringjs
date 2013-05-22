@@ -1,4 +1,5 @@
 require('../index');
+// Documentation: https://npmjs.org/package/tape
 var test = require('tape')
 , ddoc = function () {
 	return {
@@ -27,8 +28,45 @@ var boxspringjs = boxspring('regress')
 , newdoc = boxspringjs.doc('sample-content').docinfo({'content': Date() })
 , newdoc1 = boxspringjs.doc('write-file-test').docinfo({'content': Date() });
 
+// tests to verify db save/remove
+test('boxspring-create-db', function(t) {
+	var mydb = boxspring('phantomdb');
+	
+	t.plan(1);
+	
+	var create = function(db) {
+		db.save(function(err, response) {
+			if (err) {
+				console.log('could not create database - ', db.name);
+				throw err;
+			} else {
+				console.log(db.name, 'successfully created.');
+				db.db_info(function(err, response) {
+					t.equal(response.data.db_name, 'phantomdb', 'database-created');					
+				});
+			}
+		});
+	}
+	
+	mydb.db_info(function(err, response) {
+		if (err) {
+			console.log('database not found, creating...');
+			create(mydb);
+		} else {
+			console.log('database already exists, removing...');
+			mydb.remove(function(err, response) {
+				if (err) {
+					console.log('unable to remove - ', mydb.name);
+					throw err;
+				} else {
+					create(mydb);
+				}
+			});
+		}
+	});
+});
 
-// Documentation: https://npmjs.org/package/tape
+// tests to verify db.js
 test('boxspringjs-1', function (t) {
 
 	t.plan(9);
@@ -71,7 +109,7 @@ test('boxspringjs-1', function (t) {
 });
 
 
-
+// document create, update, remove
 test('boxspringjs-2', function (t) {
 
 	t.plan(6);
@@ -102,7 +140,7 @@ test('boxspringjs-2', function (t) {
 	
 });
 
-
+// reading view indexes
 test('boxspringjs-3', function (t) {
 
 	t.plan(4);

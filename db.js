@@ -149,7 +149,6 @@
 				
 		// create the database;
 		that.path = path(name);		
-		that.db_exists = false;
 		that.HTTP = UTIL.fileio.HTTP(boxspring.authorize.server, {}).get;
 
 		var queryHTTP = function (service, options, query, callback) {
@@ -255,10 +254,7 @@
 		that.all_docs = all_docs;
 
 		var exists = function (response) {
-			if (response && response.data && response.data.hasOwnProperty('db_name')) {
-				this.db_exists = true;
-			}
-			return this.db_exists;
+			return (response && response.data && response.data.hasOwnProperty('db_name'));
 		};
 		that.exists = exists;
 
@@ -277,7 +273,7 @@
 			var local = this;
 
 			db_info.call(local, function (err, response) {
-				if (!err && !exists(response)) {
+				if (err && !exists(response)) {
 					local.queryHTTP('db_save', function (err) { 
 						// save it, then call the handler with the db_info
 						if (err) {
@@ -297,16 +293,11 @@
 			var local = this;
 
 			this.db_info(function (err, response) {
-				if (err || !responseOk(response)) {
-					handler(err);
+				if (exists(response)) {
+					local.queryHTTP('db_remove', handler);
+				} else {
+					handler(err, response);
 				}
-							
-				local.queryHTTP('db_remove', function (err) {
-					if (err) {
-						handler(err);
-					}
-					db_info.call(local, handler);
-				});
 			});
 			return this;
 		};
