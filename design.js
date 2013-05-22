@@ -82,12 +82,22 @@
 		});
 	};
 	
-	var design = function (id, custom, index) {		
+	var design = function (id, custom, index) {
 		// extend this object with the db methods from the caller
-		var that = _.extend({}, this)
+		var that = _.extend({}, this) 
+		, designName = id || this.designName || _.uniqueId('_design/design-')
+		, doc;
 		
+		// design documents are '_design/' + name. If '_design' is not provided with the id then prepend
+		if (designName.indexOf('_design/') !== 0) {
+			designName = '_design/'+designName.split('/')[0];
+		}
+				
+		// update the object.designName
+		that.designName = designName;
+				
 		// create a document object
-		, doc = this.doc(id || this.designName || _.uniqueId('_design/design-'));
+		doc = this.doc(designName);
 				
 		// set the view index for this design
 		that.index = arguments.length === 3 ? index : (this.index || 'Index'); 

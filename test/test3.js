@@ -48,10 +48,67 @@ var test = require('tape')
 , anotherdb = boxspring('regress', {
 	'id': 'anotherdb',
 	'index': 'my-view',
-	'designName': '_design/my-design',
+	'designName': 'my-design',
 	'maker': ddoc
 })
 ;
+
+(function () {
+
+	test('boxspringjs-2', function (t) {
+		t.plan(9);
+		console.log('Running boxspringjs-2: 8');
+
+		var design = boxspringjs.design();
+		t.equal(typeof design, 'object');
+		t.equal(typeof design.get, 'function');
+		t.equal(anotherdb.design().designName, '_design/my-design', 'design-name-test');
+		
+		var anotherdbDesignTests = function () {
+			anotherdb.design().ddoc.update(function(err, response) {
+				t.equal(response.code, 201, 'anotherdb-design');
+				anotherdb.design().get({}, function (err, c) {
+					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, 
+					function(e, n) {	
+						t.equal(c.data.rows.length, n.data.total_rows, 'my-view-respnose');
+					});
+				});
+			});
+		}
+
+
+		var designTests = function () {
+			// What this does: gets a list of documents using the built-in 'Index' view. 
+			// For each document, it gets the key.id and calls the server-side 'update' using 
+			// a local update handler 'my-commit'. After the last completion, it asserts the test
+			// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
+			// running in node.js and not on the server.
+			design.get({'index': 'Index'}, function(e, r) {
+
+				design.get({ 'index': 'Index' }, function(e, n) {
+					t.equal(r.data.rows.length, n.data.rows.length, 'view-tests');
+					design.commit('base_test_suite', 'in-place', { 'random': Date.now() }, 
+					function(e, commit) {
+						t.equal(commit.code, 201, 'update-handler');
+						anotherdbDesignTests();
+					});					
+				}); 
+			});		
+		};
+
+		design.ddoc.update(function(err, response) {
+			t.equal(response.code, 201, 'design-saved');
+			design.ddoc.retrieve(function(err, res) {
+				var readBack = res.data
+				, designKeys = _.keys(readBack.updates)
+					.concat(_.keys(readBack.views));
+				t.equal(_.difference(designKeys, 
+					[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
+				designTests();
+			});
+		});		
+	});	
+}());
 
 (function() {
 	test('row-tests', function (t) {
@@ -110,62 +167,6 @@ var test = require('tape')
 			t.equal(typeof selected.format, 'undefined');
 		});
 	});
-}());
-
-(function () {
-
-	test('boxspringjs-2', function (t) {
-		t.plan(8);
-		console.log('Running boxspringjs-2: 8');
-
-		var design = boxspringjs.design();
-		t.equal(typeof design, 'object');
-		t.equal(typeof design.get, 'function');
-		
-		var anotherdbDesignTests = function () {
-			anotherdb.design().ddoc.update(function(err, response) {
-				t.equal(response.code, 201, 'anotherdb-design');
-				anotherdb.design().get({}, function (err, c) {
-					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, 
-					function(e, n) {	
-						t.equal(c.data.rows.length, n.data.total_rows, 'my-view-respnose');
-					});
-				});
-			});
-		}
-
-
-		var designTests = function () {
-			// What this does: gets a list of documents using the built-in 'Index' view. 
-			// For each document, it gets the key.id and calls the server-side 'update' using 
-			// a local update handler 'my-commit'. After the last completion, it asserts the test
-			// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
-			// running in node.js and not on the server.
-			design.get({'index': 'Index'}, function(e, r) {
-
-				design.get({ 'index': 'Index' }, function(e, n) {
-					t.equal(r.data.rows.length, n.data.rows.length, 'view-tests');
-					design.commit('base_test_suite', 'in-place', { 'random': Date.now() }, 
-					function(e, commit) {
-						t.equal(commit.code, 201, 'update-handler');
-						anotherdbDesignTests();
-					});					
-				}); 
-			});		
-		};
-
-		design.ddoc.update(function(err, response) {
-			t.equal(response.code, 201, 'design-saved');
-			design.ddoc.retrieve(function(err, res) {
-				var readBack = res.data
-				, designKeys = _.keys(readBack.updates)
-					.concat(_.keys(readBack.views));
-				t.equal(_.difference(designKeys, 
-					[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
-				designTests();
-			});
-		});		
-	});	
 }());
 
 (function() {
