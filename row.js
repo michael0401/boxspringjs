@@ -25,10 +25,10 @@
 
 	var row = function (owner, currentRow) {		
 		// Object for creating a hash out of the row for accessing and manipulating it
-		var that = _.extend({}, currentRow, UTIL.hash());
+		var that = _.extend({}, currentRow, boxspring.UTIL.hash());
 		that.columns = (owner && owner.columns) || [];
 		that.keys = (owner && owner.keys) || [];
-		that.visible = (owner && owner.visible) || UTIL.hash();
+		that.visible = (owner && owner.visible) || boxspring.UTIL.hash();
 		that.cell = (owner && owner.cell);
 
 		var getKey = function (index) {

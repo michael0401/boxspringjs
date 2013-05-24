@@ -74,7 +74,7 @@
 			// does no checking for update conflicts. saving or removing docs without their _rev will fail
 			(function (handler) {
 				var doclist=_.clone(local.docs.docs)
-					, Queue= UTIL.queue();
+					, Queue= boxspring.UTIL.queue();
 
 				// Create a Queue to hold the slices of our list of docs
 				var doclistSlice = function (data) {

@@ -149,7 +149,7 @@
 				
 		// create the database;
 		that.path = path(name);		
-		that.HTTP = UTIL.fileio.HTTP(boxspring.authorize.server, {}).get;
+		that.HTTP = boxspring.UTIL.fileio.HTTP(boxspring.authorize.server, {}).get;
 
 		var queryHTTP = function (service, options, query, callback) {
 			var viewOrUpdate = options.view || options.update || ''
@@ -208,7 +208,7 @@
 			user.name = userId.name;
 			user.password = userId.password;
 			user.data = { name: userId.name, password: userId.password };			
-			db.HTTP = UTIL.fileio.HTTP(authorize.server, user).get;
+			db.HTTP = boxspring.UTIL.fileio.HTTP(authorize.server, user).get;
 			db.HTTP({ 
 				'path':'/_session', 
 				'method': 'POST', 

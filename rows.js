@@ -46,7 +46,7 @@
 
 		// What it does: Provides methods for updating the state of a collection of rows;
 		var collection = function () {
-			var that = UTIL.hash()
+			var that = boxspring.UTIL.hash()
 			, local = this;	
 			// What it does: set/get property names for the values that exist for a given row;
 			// When called over a collection of rows, provides the existence of a value for a column

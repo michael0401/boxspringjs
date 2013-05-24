@@ -18,8 +18,6 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-
-
 (function(global) {
 	"use strict";
 
@@ -63,63 +61,3 @@
 	}
 
 }).call(this);
-
-/*	
-	// throw an error if someone else is defining Object.create
-	if (typeof Object.prototype.create === 'undefined') {
-		// Adapted From Eloquent Javascript 
-		// Adds a 'create' method to all objects using the caller as the prototype.
-		// create executes a 'construct' method of the prototype, if it exists	
-		Object.prototype.create = function() {
-			var object = duplicate(this);
-
-			if (object.construct !== undefined) {
-				object.construct.apply(object, arguments);
-			}
-			return object;
-		};
-
-		Object.prototype.extend = function(properties) {
-			var result = duplicate(this);
-
-			forEachIn(properties, function(name, value) {
-				result[name] = value;
-			});
-			return result;
-		};
-	} else {
-		throw 'Fatal - someone else is defining Object.create';
-	}
-*/
-	
-	/*
-	var tmp = function(name, config) {
-		// create the db
-		var db = duplicate(boxspring.db)
-			.create(_.extend({'name': (name || _.uniqueId('db-')) }, config));
-
-		// What it does: Extends the db object with methods for bulk save/remove. 
-		// Over-writes db save/remove methods;
-		var bulk = function (docList) {
-			return _.extend(duplicate(db), boxspring.bulk.create(docList || [], this));
-		};
-		db.bulk = bulk;
-
-		var doc = function (id) {
-			return _.extend(duplicate(db), boxspring.doc.create(id));
-		};
-		db.doc = doc;
-
-		// What it does: Returns a design document for the named design; sets up linkages to the 
-		// definitions for map/reduce, document access methods, and key/column definitions;
-		var design = function(ddocId, maker, index) {	
-			return _.extend(duplicate(db), boxspring.design.create({
-				'doc': doc(ddocId || db.designName || '_design/default'),
-				'maker': maker || this.maker,
-				'index': index || this.index
-			}));
-		};
-		db.design = design;
-		return db;
-	};
-	*/

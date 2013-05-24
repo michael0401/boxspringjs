@@ -132,7 +132,7 @@
 		that.views = that.maker()().views;
 
 		// system parameters to control the query behavior
-		that.system = UTIL.hash({
+		that.system = boxspring.UTIL.hash({
 			'asynch': false,
 			'cache_size': undefined, //10,
 			'page_size': undefined, //100,
