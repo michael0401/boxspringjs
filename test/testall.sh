@@ -9,3 +9,5 @@ echo Test3
 node test3.js | grep 'not ok'
 echo Test4
 node test4.js | grep 'not ok'
+echo Test5
+node test5.js | grep 'not ok'

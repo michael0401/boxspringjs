@@ -214,9 +214,26 @@ if (typeof boxspring === 'undefined') {
 		};
 		that.heartbeat = heartbeat;
 
-		var login = function (handler) {
-			this.queryHTTP('login', { 'body': user }, {}, handler);
+		// What it does: attempts to login the user to this database. if the `auth` is provided as an argument
+		// the `user` variable is updated. Otherwise it uses the `user` variable visible within this object.
+		var login = function (auth, handler) {
+			handler = _.toArray(arguments)[arguments.length-1];
+			user = auth === handler ? user : auth;
+
+			this.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(this.url), user).get;
+			this.queryHTTP('login', { 
+				'body': user, 
+				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}}, {}, handler);
 			return this;
+			
+			/*
+			object.HTTP({ 
+					'path':'/_session' + '/' + name, 
+					'method': 'POST', 
+					'body': user, 
+					'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
+			});
+			*/
 		};
 		that.login = login;
 		
@@ -301,13 +318,8 @@ if (typeof boxspring === 'undefined') {
 		
 		return function (url) {
 			// all subsequent HTTP calls will use the supplied credentials.
-			object.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(url || '127.0.0.1'), user).get;
-			object.HTTP({ 
-					'path':'/_session' + '/' + name, 
-					'method': 'POST', 
-					'body': user, 
-					'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
-			});
+			object.url = url || '127.0.0.1'
+			object.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(object.url), user).get;
 			return _.extend({}, object);
 		};
 	}

@@ -62,16 +62,23 @@
 * [Display methods](#display-methods)
 
 <a name="create-db" />
-####boxspring([name, [options]])
+####Boxspring.extend([name, [options]])
 
-*Create a new database object. `name` is a string for the name of the database on the server.*
+*Boxspring borrows from the [Backbone] inheritance model allowing you to __extend__ the base object with your own __options__ object to create new template database. Pass in a string `name` for the name of the database on the server. To instantiate a new database, invoke these objects with the __url__ string describing your database server.*
 
 > Note: Creating a database object does not create the database on the server. For that use the `save()` method of the database object.
 
-        var mydb = boxspring('my-db');
-        
-*The following `options` can be supplied to initialize the database object:*
+		// create a new database template
+        var Mydb = Boxspring.extend('my-db', { 'auth': auth })
+		, dblocal = Mydb('127.0.0.1)
+		, dbpublic = Mydb('https://www.somwhere-out-there.com');
+		
+		// same database name, same authentication, different objects
+		console.log(dblocal.name === dbpublic.name, dblocal === dbpublic);
+		// -> true, false
 
+* Some built-in Boxspring properties are defined in the table below.*
+        
 <table>
   <tr>
     <th>Property</th>
@@ -103,10 +110,10 @@
     <td>A function that returns a design document object</td>
   </tr>
     <tr>
-    <td>authorization</td>
-    <td>Function</td>
+    <td>auth</td>
+    <td>object</td>
     <td></td>
-    <td>A callback function with authentication status</td>
+    <td>{ auth: { name: "user-name", password: "secret-password" }}</td>
   </tr>
 </table>
 
@@ -138,6 +145,7 @@ The database API provides a uniform interface to CouchDB database services for s
 
 - [heartbeat](#heartbeat)
 - [session](#session)
+- [login](#login)
 - [all_dbs](#all_dbs)
 - [all_docs](#all_docs)
 - [all_docs](#db_info)
@@ -201,7 +209,12 @@ The database API provides a uniform interface to CouchDB database services for s
 <a name="session" />
 #####session(callback)
 
-*Authenticate this user for this database.*
+*Authenticate this user on the server.*
+
+<a name="login" />
+#####login([auth], callback)
+
+*Authenticate this user for this database. If you supply an `auth` object it will be used instead of any `name/password` provided when the object was created.*
 
 <a name="all_dbs" />
 #####all_dbs(callback)

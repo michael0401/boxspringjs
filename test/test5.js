@@ -30,17 +30,18 @@ var test = require('tape')
 
 test('boxspringjs-1', function (t) {
 
-	t.plan(4);
+	t.plan(6);
 	
 	var db1 = Boxspring.extend('regress', { 'auth': thisauth.auth })('127.0.0.1')
 	, db2 = Boxspring.extend('regress', { 'auth': badname.auth })()
 	, db3 = Boxspring.extend('regress', { 'auth': badpass.auth })()
-	, db4 = Boxspring.extend('regress', {'auth': alternate.auth })();	
+	, db4 = Boxspring.extend('regress', {'auth': alternate.auth })()
+	, db5 = Boxspring.extend('regress')();	
 	
 	var confirmSession = function(db, expected, name, count) {
 		count = typeof count === 'undefined' ? 0 : count;
 		
-		db.session(function(err, result) {
+		db.login(function(err, result) {
 			if (result.code === expected) {
 				t.equal(result.code, expected, name);				
 			} else {
@@ -61,39 +62,15 @@ test('boxspringjs-1', function (t) {
 	confirmSession(db3, 401, 'bad-password');
 	confirmSession(db4, 200, 'hashed-auth');
 	
+	// provide authentication argument to update the object
+	db5.login(alternate.auth, function(err, response) {
+		t.equal(response.code, 200, 'login-test1');
+	});
 	
-//	 { ok: true, name: null, roles: [ '_admin' ] } }
-
-
+	// try to over-ride an existing credential
+	db1.login(alternate.auth, function(err, response) {
+		t.equal(response.code, 200, 'login-test2');
+	});
 	
-	var xyz = function(err, result) {
-			
-		t.equal(result.code, 200, 'login');
-		
-		boxspringjs.heartbeat(function(err, data) {
-			t.equal(data.code, 200, 'heartbeat');
-		});
-
-		boxspringjs.session(function(err, data) {
-			t.equal(data.code, 200, 'session');
-		});
-
-		boxspringjs.db_info(function(err, data) {
-			t.equal(data.code, 200, 'db_info');
-		});
-
-		boxspringjs.all_dbs(function(err, data) {
-			t.equal(data.code, 200, 'all_dbs');
-
-			// gets root name by default, then tests getting name with id provided
-			t.equal(anotherdb.name, 'regress', 'regress-name');
-			// tests the defaultView method since not defined
-			t.equal(anotherdb.index, 'my-view', 'my-view');
-			// not explicitly defined 'default'
-			t.equal(boxspringjs.designName, '_design/default', 'default');
-			// makes sure we return a .doc object		
-			t.equal(typeof boxspringjs.doc, 'function', 'function');
-		});
-	};
 });
 
