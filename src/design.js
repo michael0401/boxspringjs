@@ -296,7 +296,7 @@
 		that.get = get;
 
 		var query = function(options) {
-			return boxspring.query.call(this, options);	
+			return this.boxspring.query.call(this, options);	
 		};
 		that.query = query;	
 		return that;	

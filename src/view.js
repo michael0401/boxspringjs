@@ -58,7 +58,7 @@
 	};
 	
 	var view = function (db, options, design, views, emitter) {	
-		var that = _.extend({}, boxspring.db().events());
+		var that = _.extend({}, db.events());
 			
 		that.db = db;
 		that.design = design;

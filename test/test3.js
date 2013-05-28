@@ -1,7 +1,6 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = boxspring('regress', {
-	'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
+, boxspringjs = Maker('127.0.0.1')
 , ddoc = function () {
 	return {
 		"updates": {
@@ -46,23 +45,12 @@ var test = require('tape')
 		}
 	};
 }
-, anotherdb = boxspring('regress', {
+, anotherdb = Boxspring.extend('regress', {
 	'id': 'anotherdb',
 	'index': 'my-view',
 	'designName': 'my-design',
-	'maker': ddoc, 
-	'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
-	
-anotherdb.login(function(err, response) {
-	console.log(response.request, response.code, response.header, response.data);
-});
-
-//boxspringjs.login(function(err, response) {
-//	console.log('bx', response.request, response.code, response.data);	
-//});
-
-return;
-
+	'maker': ddoc,
+	'auth': auth.auth })('127.0.0.1');
 
 (function () {
 
@@ -78,8 +66,6 @@ return;
 		var anotherdbDesignTests = function () {
 			anotherdb.design().ddoc.update(function(err, response) {
 				t.equal(response.code, 201, 'anotherdb-design');
-				console.log(response);
-				throw 'abort...';
 				anotherdb.design().get({}, function (err, c) {
 					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, 
 					function(e, n) {	

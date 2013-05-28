@@ -24,15 +24,15 @@ var test = require('tape')
 }
 
 
-var boxspringjs = boxspring('regress', {
-	'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
+var Boxspringjs = Maker
+, boxspringjs = Boxspringjs('127.0.0.1')
 , newdoc = boxspringjs.doc('sample-content').docinfo({'content': Date() })
 , newdoc1 = boxspringjs.doc('write-file-test').docinfo({'content': Date() });
 
 // tests to verify db save/remove
 test('boxspring-create-db', function(t) {
-	var mydb = boxspring('phantomdb', {
-		'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
+	var mydb = Boxspring.extend('phantomdb', {
+		'auth': { 'name': 'couchdb', 'password': 'couchdb' }})('127.0.0.1');
 	
 	t.plan(1);
 	
@@ -73,11 +73,11 @@ test('boxspringjs-1', function (t) {
 
 	t.plan(8);
 	
-	var anotherdb = boxspring('regress', {
+	var anotherdb = Boxspring.extend('regress', {
 		'id': 'anotherdb',
 		'index': 'my-view',
 		'designName': 'my-design',
-		'maker': ddoc}, {'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
+		'maker': ddoc}, {'auth': { 'name': 'couchdb', 'password': 'couchdb' }})('127.0.0.1');
 						
 	boxspringjs.heartbeat(function(err, data) {
 		t.equal(data.code, 200, 'heartbeat');

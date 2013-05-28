@@ -25,8 +25,7 @@
 		
 	// What it does: Query / Result Objects
 	var query = function (options) {
-		var db = this 
-		, queryParameters = ['reduce',
+		var queryParameters = ['reduce',
 							'limit',
 							'startkey',
 							'endkey',
@@ -36,7 +35,7 @@
 							'keys']
 							
 		// give this object some events	
-		, that = _.extend({}, db, db.boxspring.db().events());
+		, that = _.extend({'db': this }, this && this.events());
 		
 		// create a query id for this, mostly for debugging 
 		that.qid = _.uniqueId('query-');
@@ -58,12 +57,17 @@
 //move			'vis': 'table'
 		}));
 
+		// inherit the system cache from the owner
+		that.system = this.system;
+
 		// if system control parameters (page-size, cache-size, ...) were passed in,
 		// update them 
 		if (options && options.system) {
-			db.system.update(options.system);
-		}
+				that.system.update(options.system);
+		} 
 		
+		// Response Wrapper: wraps the response object with methods and helpers to manage the flow of data
+		// from the server to the application
 		var result = function () {					
 			var queryPages = { 'pages': [] }
 			, current_chunk = 0
@@ -72,8 +76,8 @@
 			// wraps the response.data object with some helper methods
 			var data = function (response) {
 				// helpers						
-				response.query = that;			// owner
-				response.system = db.system;	// access to page-size downstream
+				response.query = that;						// owner
+				response.system = response.query.system;	// access to page-size downstream
 				response.rid = _.uniqueId('result-');
 
 				var pages = function () {
@@ -111,7 +115,7 @@
 					return ({ 
 						'completed': (local.total_rows() === (local.offset() + local.getLength())),
 						'totalRows': local.total_rows(),
-						'pageSize': (db.system.get('page-size') || this.totalRows),
+						'pageSize': (response.system.get('page-size') || this.totalRows),
 						'cachedPages': queryPages.pages.length, 
 						'page': current_page         ,
 						'next': function() {
@@ -175,7 +179,7 @@
 				// accumulates the rest of the pages for this result, if 'asynch'
 				//console.log('result', response.offset(), response.query.get('system'));
 				// when asynch=true, relay the data to the listener
-				if (db.system.get('asynch') === true && 
+				if (response.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
 					
 					if (response.pageInfo().completed) {
@@ -195,7 +199,7 @@
 		var get = function () {	
 			var local = this;
 
-			db.get(_.pick(this, queryParameters), function(err, result) {
+			this.db.get(_.pick(this, queryParameters), function(err, result) {
 				if (err) {
 					console.log(err);
 				}	

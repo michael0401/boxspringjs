@@ -300,9 +300,8 @@ if (typeof boxspring === 'undefined') {
 		, object = db.call(this, name, options);
 		
 		return function (url) {
-			console.log('exeing', url, _.urlParse(url));
 			// all subsequent HTTP calls will use the supplied credentials.
-			object.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(url || ''), user).get;
+			object.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(url || '127.0.0.1'), user).get;
 			object.HTTP({ 
 					'path':'/_session' + '/' + name, 
 					'method': 'POST', 

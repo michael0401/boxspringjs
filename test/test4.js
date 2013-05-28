@@ -1,9 +1,7 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = boxspring('regress', {
-	'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
-, anotherdb = boxspring('regress', 	{
-		'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
+, boxspringjs = Maker('127.0.0.1')
+, anotherdb = Maker('127.0.0.1')
 , ddoc = function () {
 	return {
 		"updates": {
@@ -73,6 +71,15 @@ return;
 */
 
 
+//var query = anotherdb.design().query({
+//	'reduce': true,
+//	'limit': 500 }, {
+//		'auth': auth.auth })
+		
+//console.log(query);
+//return;
+
+	
 (function() {
 	test('query-smoke-tests', function (t) {
 		t.plan(9);
@@ -80,10 +87,10 @@ return;
 		var query = anotherdb.design().query({
 			'reduce': true,
 			'limit': 500 }, {
-				'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
+				'auth': auth.auth })
 		, query2 = anotherdb.design().query({
 			'reduce': false
-		}, 	{ 'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
+		}, 	{ 'auth': auth.auth });
 			
 		// smoke test: make sure we have two different objects
 		t.equal(query.reduce === query2.reduce, false, 'query-create-1');

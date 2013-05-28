@@ -1,9 +1,11 @@
 require('../index');
 var test = require('tape')
-, bx = boxspring('regress', {'id': 'my-db'})
-, bx2 = boxspring('regress', {'id': 'your-db', 'designName': 'your-design' })
-, newdoc = bx.doc('sample-content').docinfo({'content': Date() })
-, newdoc1 = bx.doc('write-file-test').docinfo({'content': Date() })
+, Bx = Boxspring.extend('regress', {'id': 'my-db'})
+, db = Bx('127.0.0.1')
+, Bx2 = Boxspring.extend('regress', {'id': 'your-db', 'designName': 'your-design' })
+, db2 = Bx2('127.0.0.1')
+, newdoc = db.doc('sample-content').docinfo({'content': Date() })
+, newdoc1 = db.doc('write-file-test').docinfo({'content': Date() })
 ;
 
 var dbObject = [ 'boxspring',
@@ -30,6 +32,7 @@ var dbObject = [ 'boxspring',
   'responseOk',
   'heartbeat',
   'session',
+  'login',
   'all_dbs',
   'all_docs',
   'exists',
@@ -39,7 +42,6 @@ var dbObject = [ 'boxspring',
   'events' ],
 
 docObject = 	[ 'updated_docinfo',
-	  'VERSION',
 	  'boxspring',
 	  'UTIL',
 	  'db',
@@ -68,6 +70,7 @@ docObject = 	[ 'updated_docinfo',
 	  'responseOk',
 	  'heartbeat',
 	  'session',
+	  'login',
 	  'all_dbs',
 	  'all_docs',
 	  'exists',
@@ -86,8 +89,7 @@ docObject = 	[ 'updated_docinfo',
 	  'info',
 	  'docinfo' ],
 
-bulkObject = 	[ 'VERSION',
-      'status',
+bulkObject = 	[ 'status',
 	  'boxspring',
 	  'UTIL',
 	  'db',
@@ -112,6 +114,7 @@ bulkObject = 	[ 'VERSION',
 	  'responseOk',
 	  'heartbeat',
 	  'session',
+	  'login',
 	  'all_dbs',
 	  'all_docs',
 	  'exists',
@@ -188,8 +191,7 @@ cellObject = [ 'builtInColumns',
 	  'newCell',
 	  'newColumn' ],	
 
-queryObject = [ 'VERSION',
-	  'boxspring',
+queryObject = [ 'boxspring',
 	  'db',
 	  'bulk',
 	  'doc',
@@ -237,6 +239,7 @@ queryObject = [ 'VERSION',
 	  'display',
 	  'vis',
 	  'server',
+	  'system',
 	  'qid' ],
 	
 viewObject = [ 'on',
@@ -258,20 +261,19 @@ viewObject = [ 'on',
 	  'end' ];			
 	
 test('objects', function (t) {
-	t.plan(14);
+	t.plan(17);
 	
-	var db = boxspring();
-
-	t.equal(bx.id, 'my-db', 'db-options-check1');
-	t.equal(bx2.id, 'your-db', 'db-options-check2');
+	t.equal(Boxspring.VERSION, '0.0.1', 'version-check');
+	t.equal(db.id, 'my-db', 'db-options-check1');
+	t.equal(db2.id, 'your-db', 'db-options-check2');
 	t.equal(newdoc===newdoc1, false, 'doc-check1');
 	t.equal(newdoc.docinfo()._id===newdoc1.docinfo()._id, false, 'doc-check2');
-	t.equal(typeof boxspring, 'function');
-	t.equal(_.identical([ 'function', 'function', 'function', 'function' ],
-		[typeof boxspring, typeof bx.doc, typeof bx.design, typeof bx.bulk]), true, 
+	t.equal(typeof Boxspring, 'object', 'maker-object');
+	t.equal(typeof Boxspring.extend, 'function', 'extend-object');
+	t.equal(_.identical([ 'function', 'object', 'function', 'function', 'function' ],
+		[typeof Bx, typeof db, typeof db.doc, typeof db.design, typeof db.bulk]), true, 
 		'boxspring');
 		
-
 	var compare = function (actual, expected, testname) {
 		var intersection = _.intersection(actual, expected);
 
@@ -286,7 +288,7 @@ test('objects', function (t) {
 		if (_.difference(actual, intersection).length > 0) {
 			console.log(_.difference(actual, intersection), 'not found in actual');		
 		} else if (_.difference(expected, intersection).length > 0) {
-			console.log(_.difference(expected, intersection), 'missing from actual');		
+			console.log(_.difference(expected, intersection), 'missing from expected');		
 		}
 	}
 
@@ -296,8 +298,9 @@ test('objects', function (t) {
 	compare(rowObject, _.keys(db.row()), 'row'); 
 	compare(rowsObject, _.keys(db.rows()), 'rows'); 
 	compare(cellObject, _.keys(db.cell()), 'cell');
-	compare(queryObject, _.keys(db['query'](boxspring())), 'query');
-	compare(viewObject, _.keys(db['view'](boxspring())), 'view');
+	compare(queryObject, _.keys(db['query'](db)), 'query');
+	t.equal(typeof db.design().query().system, 'object', 'system-object');
+	compare(viewObject, _.keys(db['view'](db)), 'view');
 	
 });
 

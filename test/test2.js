@@ -1,7 +1,6 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = boxspring('regress', {
-	'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
+, boxspringjs = Maker('127.0.0.1')
 , doc1 = boxspringjs.doc('first').docinfo({content: 'aw'})
 , doc2 = boxspringjs.doc('second').docinfo({content: 'shucks'})
 ;
