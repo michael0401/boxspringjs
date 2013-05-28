@@ -18,7 +18,11 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global bx: true */
+/*global _: true, boxspring: true, Backbone: true */
+
+if (typeof boxspring === 'undefined') {
+	var boxspring = function () {};	
+}
 
 (function(global) {
 	"use strict";
@@ -102,7 +106,7 @@
 
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
-				'login': [ '/_session','POST'],
+				'login': [ '/_session' + dbname,'POST'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
 				'heartbeat': [ '','GET' ],
@@ -136,20 +140,21 @@
 		return that;
 	};
 	
-	var db = function (name, config) {
-		var user = {}
-		, that = _.extend({}, global, _.defaults(config || {}, {
+	var db = function (name, options) {
+		var user = (options && options.auth) || {'name': '', 'paswword': ''}
+		, that = _.extend({}, _.defaults(options || {}, {
 			'name': name,
-			'id': config && config.id || _.uniqueId('db-'),
+			'id': (options && options.id) || _.uniqueId('db-'),
 			'index': 'Index',
 			'maker': undefined,
 			'designName': '_design/default',
-			'authorization': (config && config.authorization) || function () {}
 		}));
-				
-		// create the database;
-		that.path = path(name);		
-		that.HTTP = boxspring.UTIL.fileio.HTTP(boxspring.authorize.server, {}).get;
+		
+		// extend the db object with the boxspring template;
+		that = _.extend(that, this);
+		
+		// create the database linkages using the path object;
+		that.path = path(name);
 
 		var queryHTTP = function (service, options, query, callback) {
 			var viewOrUpdate = options.view || options.update || ''
@@ -165,14 +170,13 @@
 			//console.log('path', service, id, viewOrUpdate, target, isValidQuery(query));
 			var queryObj = {
 				'path': this.path.url(service, id, viewOrUpdate, target) +
-				 	_.formatQuery(isValidQuery(query || {})),
+					_.formatQuery(isValidQuery(query || {})),
 				'method': this.path.method(service),
 				'body': body,
 				'headers': headers
 			};			
-			//console.log('doHTTP');
+
 			this.HTTP(queryObj, function (err, res) {
-				//console.log('didHTTP');
 				if ((callback && typeof callback) === 'function') {
 					callback(err, res);
 				}
@@ -193,35 +197,10 @@
 		// Purpose: helper to get the 'rev' code from documents. used by doc and bulk requests
 		var getRev = function (o) {				
 			if (o && o.header && o.header.etag) {
-				return o.header.etag.replace(/\"/g, '').replace(/\r/g,'') 
+				return o.header.etag.replace(/\"/g, '').replace(/\r/g,'');
 			}
 		};
 		that.getRev = getRev;
-		
-		// execute it on instantiation. caller provides a callback in config.authorization if
-		// application wants to wait for completion before issuing first HTTP request. Otherwise,
-		// all subsequent HTTP calls will use the supplied credentials in global.auth.
-		(function (db, authorize) {
-			var userId=(authorize && authorize.credentials) || { 
-				'name': '', 'password': '' 
-			};
-			user.name = userId.name;
-			user.password = userId.password;
-			user.data = { name: userId.name, password: userId.password };			
-			db.HTTP = boxspring.UTIL.fileio.HTTP(authorize.server, user).get;
-			db.HTTP({ 
-				'path':'/_session', 
-				'method': 'POST', 
-				'body': user.data, 
-				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
-				}, function (err, result) {
-					if (err) {
-						db.authorization(err);
-					}
-					db.authorization.call(db, err, result);
-				});
-			return this;
-		}(that, global.authorize));
 		
 		// helper function as multiple codes can be Ok
 		var responseOk=function (r) { 
@@ -235,6 +214,12 @@
 		};
 		that.heartbeat = heartbeat;
 
+		var login = function (handler) {
+			this.queryHTTP('login', { 'body': user }, {}, handler);
+			return this;
+		};
+		that.login = login;
+		
 		var session = function (handler) {
 			this.dbQuery('session', handler);
 			return this;
@@ -306,9 +291,25 @@
 		var events = function(Obj) {
 			return _.extend(Obj || {}, _.clone(Backbone.Events));
 		};
-		that.events = events;
+		that.events = events;		
 		return that;		
 	};
-	global.db = db;
-	
+
+	global.db = function(name, options) {
+		var user = (options && options.auth) || { 'name': '', 'paswword': '' }
+		, object = db.call(this, name, options);
+		
+		return function (url) {
+			console.log('exeing', url, _.urlParse(url));
+			// all subsequent HTTP calls will use the supplied credentials.
+			object.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(url || ''), user).get;
+			object.HTTP({ 
+					'path':'/_session' + '/' + name, 
+					'method': 'POST', 
+					'body': user, 
+					'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
+			});
+			return _.extend({}, object);
+		};
+	}
 })(boxspring);

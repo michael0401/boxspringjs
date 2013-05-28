@@ -58,7 +58,7 @@
 	};
 	
 	var view = function (db, options, design, views, emitter) {	
-		var that = _.extend({}, boxspring().events());
+		var that = _.extend({}, boxspring.db().events());
 			
 		that.db = db;
 		that.design = design;
@@ -68,21 +68,21 @@
 		that.query = translateQuery(_.omit(options, 'system'));
 		that.system = (that.db && that.db.system && that.db.system.post()) ||
 			{ 	'asynch': false,
-				'cache_size': undefined, //10,
-				'page_size': undefined, //100,
+				'cache-size': undefined, //10,
+				'page-size': undefined, //100,
 				'delay': 0.5 };
 
 		var setQuery = function (queryParams, systemParams) {
 			if (_.isObject (queryParams)) {
 				this.query = _.extend(this.query, queryParams);
 			}
-			// rule: if reduce=true then page_size=0;
+			// rule: if reduce=true then page-size=0;
 			if (_.has(this.query, 'reduce') && this.query.reduce === true) {
-				this.system.page_size = 0;
+				this.system['page-size'] = 0;
 				this.system.asynch = false;
 			} else if (systemParams.asynch === true) {
-				this.system.page_size = systemParams.page_size;
-				this.system.cache_size = systemParams.cache_size || Number.MAX_VALUE;
+				this.system['page-size'] = systemParams['page-size'];
+				this.system['cache-size'] = systemParams['cache-size'] || Number.MAX_VALUE;
 			}
 			return this.query;
 		};
@@ -113,7 +113,7 @@
 
 			var nextLimit = function(query, size) {					
 				if (system.asynch && _.isNumber(size) && size > 0) {
-					return(_.extend(query, { 'limit': system.page_size+1 }));
+					return(_.extend(query, { 'limit': system['page-size']+1 }));
 				}
 				return query;
 			};
@@ -121,13 +121,13 @@
 			var chunk = function (startkey) {
 				var queryMethod = (index === 'all_docs') ? 'all_docs' : 'view';
 
-				// remaining cache_size get smaller on each successive fetch
-				system.cache_size = _.isNumber(system.cache_size) 
-					? system.cache_size-1 
+				// remaining cache-size get smaller on each successive fetch
+				system['cache-size'] = _.isNumber(system['cache-size']) 
+					? system['cache-size']-1 
 					: undefined;
 
 				query = nextQuery(query, startkey);
-				query = nextLimit(query, system.page_size);
+				query = nextLimit(query, system['page-size']);
 				// execute the query and process the response
 				//console.log('db.query', design, index, query);
 
@@ -147,9 +147,9 @@
 							response.queryOptions = query;
 							response.moreData = events.moreData;
 
-							// trim the rows, because we got page_size+1
-							if ((system.page_size > 0) && 
-								(response.data.rows.length > system.page_size)) { 
+							// trim the rows, because we got page-size+1
+							if ((system['page-size'] > 0) && 
+								(response.data.rows.length > system['page-size'])) { 
 									response.data.rows = 
 									response.data.rows.slice(0,response.data.rows.length-1);
 							}
@@ -171,7 +171,7 @@
 				//console.log('chunk-data', system);
 				// if I've got less than the full index; and asynchronous request
 				if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && 
-					(system.asynch === true && system.cache_size)) {
+					(system.asynch === true && system['cache-size'])) {
 						// pause the asynchronous read, 
 						// so we don't flood the browser and the net
 						_.wait((system && system.delay) || 1/10, function() {
@@ -192,7 +192,7 @@
 			});
 
 			this.moreData = function () {
-				system.cache_size += 1;
+				system['cache-size'] += 1;
 				chunk(nextkey);
 			};
 			chunk();		

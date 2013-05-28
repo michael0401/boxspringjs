@@ -1,7 +1,9 @@
 require('../index');
 var test = require('tape')
-, boxspringjs = boxspring('regress')
-, anotherdb = boxspring('regress')
+, boxspringjs = boxspring('regress', {
+	'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
+, anotherdb = boxspring('regress', 	{
+		'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
 , ddoc = function () {
 	return {
 		"updates": {
@@ -49,10 +51,10 @@ var test = require('tape')
 
 /*
 var original1 = boxspringjs.design().query({
-	'system': {'asynch': true, 'page_size': 100, 'cache_size': 2, 'delay': 1/10 }
+	'system': {'asynch': true, 'page-size': 100, 'cache-size': 2, 'delay': 1/10 }
 })
 , original2 = boxspringjs.design().query({
-	'system': {'asynch': true, 'page_size': 100, 'cache_size': 2, 'delay': 1/10 }
+	'system': {'asynch': true, 'page-size': 100, 'cache-size': 2, 'delay': 1/10 }
 });;
 
 
@@ -77,10 +79,11 @@ return;
 		
 		var query = anotherdb.design().query({
 			'reduce': true,
-			'limit': 500 })
+			'limit': 500 }, {
+				'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
 		, query2 = anotherdb.design().query({
 			'reduce': false
-		});
+		}, 	{ 'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
 			
 		// smoke test: make sure we have two different objects
 		t.equal(query.reduce === query2.reduce, false, 'query-create-1');
@@ -123,7 +126,7 @@ return;
 		, pages
 		, query = boxspringjs.design().query();
 		
-		query.system.update({'asynch': true, 'page_size': 200 });
+		query.system.update({'asynch': true, 'page-size': 200 });
 		query.on('result', function(result) {
 			pages = Math.floor(result.total_rows() / 200);
 			t.plan(pages+1);
@@ -144,7 +147,7 @@ return;
 		var pages
 		, page
 		, query = boxspringjs.design().query({
-			'system': {'asynch': true, 'page_size': 100, 'cache_size': 2, 'delay': 1/10 }
+			'system': {'asynch': true, 'page-size': 100, 'cache-size': 2, 'delay': 1/10 }
 		});
 		
 		query.on('result', function(result) {

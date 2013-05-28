@@ -1,5 +1,5 @@
 /* ===================================================
- * base-utils.js v0.01
+ * boxspring.js v0.01
  * https://github.com/rranauro/base-utilsjs
  * ===================================================
  * Copyright 2013 Incite Advisors, Inc.
@@ -18,46 +18,41 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-(function(global) {
+if (typeof boxspring === 'undefined') {
+	boxspring = {};
+}
+
+if (typeof UTIL === 'undefined') {
+	throw new Error('boxspring.js mut define a UTIL variable.');
+}
+
+// Inherit the UTIL objects 
+boxspring.UTIL = UTIL;
+
+
+(function(template) {
 	"use strict";
-
-
-	// From Eloquent Javascript
-	// Returns an object using the supplied object as its prototype
-	var duplicate = function(object) {
-		function OneShotConstructor(){}
-		OneShotConstructor.prototype = object;
-		return new OneShotConstructor();
-	};
-
-	var forEachIn = function (object, action) {
-		var property;
-
-		for (property in object) {
-			if (Object.prototype.hasOwnProperty.call(object, property)) {
-				action(property, object[property]);
-			}
-		}
-	};
-
+		
+	// add 'boxspring' to the template
+	template.boxspring = template;
+		
 	var Boxspring = function () {
 		return this;
+	}
+	
+	Boxspring.prototype.extend = function () {	
+		// db.apply returns a new database object with the supplied arguments
+		return template.db.apply(template, arguments);
 	};
 
-	var boxspring = function () {
-		return boxspring.db.apply(new Boxspring(), arguments);
-	};
-		
 	// Current version.
-	boxspring.VERSION = '0.0.1';
+	Boxspring.prototype.VERSION = '0.0.1';
 	
-	if (typeof exports !== 'undefined') {
-		if (typeof module !== 'undefined' && module.exports) {
-	      exports = module.exports = boxspring;
-	    }
-		exports.boxspring = boxspring;
+	
+	if (typeof module !== 'undefined' && module.exports) {
+		module.exports = Boxspring;
 	} else {
-		global.boxspring = boxspring;
+		global.Boxspring = Boxspring;
 	}
 
-}).call(this);
+}).call(this, boxspring);

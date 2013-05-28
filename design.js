@@ -134,8 +134,8 @@
 		// system parameters to control the query behavior
 		that.system = boxspring.UTIL.hash({
 			'asynch': false,
-			'cache_size': undefined, //10,
-			'page_size': undefined, //100,
+			'cache-size': undefined, //10,
+			'page-size': undefined, //100,
 			'delay': 0.5
 		});
 

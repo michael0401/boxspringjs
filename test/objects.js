@@ -1,4 +1,4 @@
-require ('../index');
+require('../index');
 var test = require('tape')
 , bx = boxspring('regress', {'id': 'my-db'})
 , bx2 = boxspring('regress', {'id': 'your-db', 'designName': 'your-design' })
@@ -6,10 +6,8 @@ var test = require('tape')
 , newdoc1 = bx.doc('write-file-test').docinfo({'content': Date() })
 ;
 
-var dbObject = [ 'VERSION',
-  'boxspring',
+var dbObject = [ 'boxspring',
   'UTIL',
-  'authorize',
   'db',
   'bulk',
   'doc',
@@ -24,7 +22,6 @@ var dbObject = [ 'VERSION',
   'index',
   'maker',
   'designName',
-  'authorization',
   'path',
   'HTTP',
   'queryHTTP',
@@ -45,7 +42,6 @@ docObject = 	[ 'updated_docinfo',
 	  'VERSION',
 	  'boxspring',
 	  'UTIL',
-	  'authorize',
 	  'db',
 	  'bulk',
 	  'create',
@@ -64,7 +60,6 @@ docObject = 	[ 'updated_docinfo',
 	  'index',
 	  'maker',
 	  'designName',
-	  'authorization',
 	  'path',
 	  'HTTP',
 	  'queryHTTP',
@@ -95,7 +90,6 @@ bulkObject = 	[ 'VERSION',
       'status',
 	  'boxspring',
 	  'UTIL',
-	  'authorize',
 	  'db',
 	  'bulk',
 	  'doc',
@@ -110,7 +104,6 @@ bulkObject = 	[ 'VERSION',
 	  'index',
 	  'maker',
 	  'designName',
-	  'authorization',
 	  'path',
 	  'HTTP',
 	  'queryHTTP',
@@ -197,7 +190,6 @@ cellObject = [ 'builtInColumns',
 
 queryObject = [ 'VERSION',
 	  'boxspring',
-	  'authorize',
 	  'db',
 	  'bulk',
 	  'doc',
@@ -212,7 +204,6 @@ queryObject = [ 'VERSION',
 	  'index',
 	  'maker',
 	  'designName',
-	  'authorization',
 	  'path',
 	  'HTTP',
 	  'queryHTTP',
@@ -302,11 +293,11 @@ test('objects', function (t) {
 	compare(dbObject, _.keys(db), 'db'); 
 	compare(docObject, _.keys(db.doc()), 'doc');
 	compare(bulkObject, _.keys(db.bulk()), 'bulk'); 	
-	compare(rowObject, _.keys(boxspring.row()), 'row'); 
-	compare(rowsObject, _.keys(boxspring.rows()), 'rows'); 
-	compare(cellObject, _.keys(boxspring.cell()), 'cell');
-	compare(queryObject, _.keys(boxspring()['query'](boxspring())), 'query');
-	compare(viewObject, _.keys(boxspring()['view'](boxspring())), 'view');
+	compare(rowObject, _.keys(db.row()), 'row'); 
+	compare(rowsObject, _.keys(db.rows()), 'rows'); 
+	compare(cellObject, _.keys(db.cell()), 'cell');
+	compare(queryObject, _.keys(db['query'](boxspring())), 'query');
+	compare(viewObject, _.keys(db['view'](boxspring())), 'view');
 	
 });
 

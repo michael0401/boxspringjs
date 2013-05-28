@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, boxspring: true */
 
 (function(global) {
 	"use strict";
@@ -35,8 +35,8 @@
 							'key',
 							'keys']
 							
-		// give this object some events			
-		, that = _.extend({}, this, boxspring().events());
+		// give this object some events	
+		, that = _.extend({}, db, db.boxspring.db().events());
 		
 		// create a query id for this, mostly for debugging 
 		that.qid = _.uniqueId('query-');
@@ -58,7 +58,7 @@
 //move			'vis': 'table'
 		}));
 
-		// if system control parameters (page_size, cache_size, ...) were passed in,
+		// if system control parameters (page-size, cache-size, ...) were passed in,
 		// update them 
 		if (options && options.system) {
 			db.system.update(options.system);
@@ -72,7 +72,8 @@
 			// wraps the response.data object with some helper methods
 			var data = function (response) {
 				// helpers						
-				response.query = that;	// owner
+				response.query = that;			// owner
+				response.system = db.system;	// access to page-size downstream
 				response.rid = _.uniqueId('result-');
 
 				var pages = function () {
@@ -110,7 +111,7 @@
 					return ({ 
 						'completed': (local.total_rows() === (local.offset() + local.getLength())),
 						'totalRows': local.total_rows(),
-						'pageSize': (db.system.get('page_size') || this.totalRows),
+						'pageSize': (db.system.get('page-size') || this.totalRows),
 						'cachedPages': queryPages.pages.length, 
 						'page': current_page         ,
 						'next': function() {
@@ -145,14 +146,14 @@
 					}
 					if (!direction) {
 						current_chunk = 0;
-						this.query.trigger('on-display', page.apply(this));
+						this.query.trigger('result', page.apply(this));
 						return this;	
 					} 
 
 					if (_.found(direction, 'next')) {
 						current_chunk += (current_chunk < queryPages.pages.length-1) ? 1 : 0;
 						this.pageInfo().next();					
-						this.query.trigger('on-display', page.apply(this));
+						this.query.trigger('result', page.apply(this));
 						// if we haven't cached all the pages, and we have one more page in
 						// cache before we run out, then cache another page from the server 
 						if (!this.pageInfo().completed && 
@@ -164,7 +165,7 @@
 					} else if (_.found(direction, 'previous')) {
 						current_chunk -= (current_chunk > 0) ? 1 : 0;
 						this.pageInfo().prev();	
-						this.query.trigger('on-display', page.apply(this));									
+						this.query.trigger('result', page.apply(this));									
 					}
 				};
 				response.nextPrev = nextPrev;
@@ -176,7 +177,12 @@
 				// when asynch=true, relay the data to the listener
 				if (db.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
-					response.query.trigger('more-data', response);										
+					
+					if (response.pageInfo().completed) {
+						response.query.trigger('completed', response);																
+					} else {
+						response.query.trigger('more-data', response);																
+					}
 				}
 				return response;
 			};

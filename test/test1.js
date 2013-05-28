@@ -24,13 +24,15 @@ var test = require('tape')
 }
 
 
-var boxspringjs = boxspring('regress')
+var boxspringjs = boxspring('regress', {
+	'auth': { 'name': 'couchdb', 'password': 'couchdb' }})
 , newdoc = boxspringjs.doc('sample-content').docinfo({'content': Date() })
 , newdoc1 = boxspringjs.doc('write-file-test').docinfo({'content': Date() });
 
 // tests to verify db save/remove
 test('boxspring-create-db', function(t) {
-	var mydb = boxspring('phantomdb');
+	var mydb = boxspring('phantomdb', {
+		'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
 	
 	t.plan(1);
 	
@@ -69,45 +71,39 @@ test('boxspring-create-db', function(t) {
 // tests to verify db.js
 test('boxspringjs-1', function (t) {
 
-	t.plan(9);
+	t.plan(8);
 	
 	var anotherdb = boxspring('regress', {
 		'id': 'anotherdb',
 		'index': 'my-view',
 		'designName': 'my-design',
-		'maker': ddoc,
-		'authorization': function(err, result) {
-			
-			t.equal(result.code, 200, 'login');
-			
-			boxspringjs.heartbeat(function(err, data) {
-				t.equal(data.code, 200, 'heartbeat');
-			});
+		'maker': ddoc}, {'auth': { 'name': 'couchdb', 'password': 'couchdb' }});
+						
+	boxspringjs.heartbeat(function(err, data) {
+		t.equal(data.code, 200, 'heartbeat');
+	});
 
-			boxspringjs.session(function(err, data) {
-				t.equal(data.code, 200, 'session');
-			});
+	boxspringjs.session(function(err, data) {
+		t.equal(data.code, 200, 'session');
+	});
 
-			boxspringjs.db_info(function(err, data) {
-				t.equal(data.code, 200, 'db_info');
-			});
+	boxspringjs.db_info(function(err, data) {
+		t.equal(data.code, 200, 'db_info');
+	});
 
-			boxspringjs.all_dbs(function(err, data) {
-				t.equal(data.code, 200, 'all_dbs');
+	boxspringjs.all_dbs(function(err, data) {
+		t.equal(data.code, 200, 'all_dbs');
 
-				// gets root name by default, then tests getting name with id provided
-				t.equal(anotherdb.name, 'regress', 'regress-name');
-				// tests the defaultView method since not defined
-				t.equal(anotherdb.index, 'my-view', 'my-view');
-				// not explicitly defined 'default'
-				t.equal(boxspringjs.designName, '_design/default', 'default');
-				// makes sure we return a .doc object		
-				t.equal(typeof boxspringjs.doc, 'function', 'function');
-			});
-		}
+		// gets root name by default, then tests getting name with id provided
+		t.equal(anotherdb.name, 'regress', 'regress-name');
+		// tests the defaultView method since not defined
+		t.equal(anotherdb.index, 'my-view', 'my-view');
+		// not explicitly defined 'default'
+		t.equal(boxspringjs.designName, '_design/default', 'default');
+		// makes sure we return a .doc object		
+		t.equal(typeof boxspringjs.doc, 'function', 'function');
 	});
 });
-
 
 // document create, update, remove
 test('boxspringjs-2', function (t) {

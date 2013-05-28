@@ -243,7 +243,7 @@ The database API provides a uniform interface to CouchDB database services for s
 <a name="save" />
 #####save(callback)
 
-*Create this database on the server. Server will return a 401 `CONFLICT` if the database is already existing or 409 `UNAUTHORIZED` if you do not have permission for this database.*
+*Create this database on the server. Server will return a 401 `UNAUTHORIZED` if the database is already existing or 409 `CONFLICT` if you do not have permission for this database.*
 
 <a name="remove" />
 #####remove(callback)
