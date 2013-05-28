@@ -77,7 +77,7 @@
 		console.log(dblocal.name === dbpublic.name, dblocal === dbpublic);
 		// -> true, false
 
-* Some built-in Boxspring properties are defined in the table below.*
+*Some built-in Boxspring properties are defined in the table below.*
         
 <table>
   <tr>

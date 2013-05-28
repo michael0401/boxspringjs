@@ -52,7 +52,7 @@ boxspring.UTIL = UTIL;
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = new Boxspring();
 	} else {
-		global.Boxspring = new Boxspring();
+		this.Boxspring = new Boxspring();
 	}
 
 }).call(this, boxspring);

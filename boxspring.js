@@ -4853,7 +4853,7 @@ save: before send fullcommit options
 					//console.log(jqXHR.responseText);
 					if (callback && typeof callback === 'function') {
 						callback(xhrStringValues[xhrString](jqXHR.status), {
-							request: _.exclude(opts, 'agent', 'auth'),
+							request: _.omit(opts, 'agent', 'auth'),
 							method: opts.type,
 							code: jqXHR.status,
 							header: parseHdr(jqXHR.getAllResponseHeaders()),
@@ -5166,7 +5166,7 @@ boxspring.UTIL = UTIL;
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = new Boxspring();
 	} else {
-		global.Boxspring = new Boxspring();
+		this.Boxspring = new Boxspring();
 	}
 
 }).call(this, boxspring);
