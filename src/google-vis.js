@@ -53,7 +53,7 @@
 	*/
 	
 	var googleVis = function (options) {
-		var type = options && options.type
+		var type = (options && options.type) || 'table-chart'
 		, targetDiv = (options && options.targetDiv) || 'on-display'
 		, onSelection = (options && options.onSelection) || 'onSelection'
 		, onPage = (options && options.onPage) || 'onPage';
@@ -290,25 +290,12 @@
 				},
 				'events': {
 					// Purpose: install event handler for 'select'
-					'select': function (caller) {
-						var Rows = []
-						, Selected
-						, cols = result.getDisplayColumns();
-						
+					'select': function (caller) {						
 						// get the integer selected rows
-						Selected = _.map(caller.display.getSelection(), function (s) {
+						var Selected = _.map(caller.display.getSelection(), function (s) {
 							return s.row;
 						});
-						// for each selected row, fetch the values of the key fields
-						Selected.forEach(function(s) {
-							var Keys = [];
-							cols.forEach(function(k, index) {
-								Keys.push(caller.view.getValue(s, index));
-							});
-							Rows.push(Keys);							
-						});
-						result.trigger(onSelection, caller, { 
-							'selected': Selected, 'rows': Rows });
+						result.trigger(onSelection, Selected);						
 					},
 					// Purpose: event handler for 'next' / 'previous' page
 					'page': function (caller, o) {
@@ -497,6 +484,27 @@ o.options.sort = that.hasColumnTotalRow() ? 'event' : 'enable';
 	}
 	// now update the sort direction, set the rows and redraw
 	caller.setRows(o.ascending, caller.getRows(column)).draw();
+},
+
+'select': function (caller) {
+	var Rows = []
+	, Selected
+	, cols = result.getDisplayColumns();
+	
+	// get the integer selected rows
+	Selected = _.map(caller.display.getSelection(), function (s) {
+		return s.row;
+	});
+	// for each selected row, fetch the values of the key fields
+	Selected.forEach(function(s) {
+		var Keys = [];
+		cols.forEach(function(k, index) {
+			Keys.push(caller.view.getValue(s, index));
+		});
+		Rows.push(Keys);							
+	});
+	result.trigger(onSelection, caller, { 
+		'selected': Selected, 'rows': Rows });
 },
 
 */

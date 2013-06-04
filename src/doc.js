@@ -69,7 +69,8 @@
 
 		var docHdr = function (name, value) {
 			var hdr = {};
-			return((name && value) ? { 'headers': hdr[name] = value } : {});
+			hdr[name] = value;
+			return((name && value) ? { 'headers': hdr } : {});
 		};
 		that.docHdr = docHdr;
 		
@@ -104,6 +105,17 @@
 		that.retrieve = retrieve;
 		that.open = retrieve;
 
+		var attachment = function(name, handler) {
+			var local = this
+		
+			this.queryHTTP('doc_attachment', { 'id': this.docId().id, 'attachment': name }, {}, 
+			function (err, response) {
+				handler(err, local.sync(err, response));
+			});
+			return this;			
+		};
+		that.attachment = attachment;
+		
 		var head = function (handler) {
 			var local = this;
 
@@ -128,11 +140,16 @@
 		var update = function (handler, data) {
 			var local = this;
 			
+			// extend the local docinfo with the data already in docinfo and any new data coming
+			// retrieve will over-write our recent updates with the content from the server;
+			data = _.extend({}, local.source(), data || {});
+			
 			retrieve.call(this, function(err, response) {
 				// when updating, we might get an error if the doc doesn't exist
 				// otherwise just keep going
 				if (!err || response.code === 404) {
-					local.updated_docinfo = _.extend(local.updated_docinfo, data || {});
+					// now add back data to update from above and save
+					local.updated_docinfo = _.extend(local.source(), data);
 					return save.call(local, handler);	
 				}
 				handler(err, response);

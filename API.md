@@ -1051,6 +1051,10 @@ __Step 3: Save the new design document to the server__
 
 *Returns the last row in the collection.*
 
+#####getRow(index)
+
+*Returns row `index` in the collection, where `index` is greater than zero and less than `getLength()`. Return `first()` or `last()` if no index argument or the index given is out of bounds.*
+
 #####facets()
 
 *Returns the list of unique values for a key over the set of rows, the 'facet'*
@@ -1076,13 +1080,21 @@ __Step 3: Save the new design document to the server__
 	console.log(rows.range());
 	// -> {'start': 'B', 'end': 'A' }
 
-#####getSortColumn() 
+#####getSortColumn(column) 
 
 *Setter/getter for defining the `sort-column`. Used mostly by the downstream `view` processes.*
 
-#####getDisplayColumns()
+#####getDisplayColumns(columns)
 
 *Setter/getter for modifying the list of columns to display. Used mostly by the downstream `view` processes.*
+
+#####getSelected(selected)
+
+*Setter/getter for marking a set of rows as 'selected'. Argument `selected` is an array of integer row indexes. When called without an argument, returns a new Rows object containing only those selected rows.*
+
+	// For example, to mark rows 1, 2, and 11 as selected
+	rows.getSelected([1, 2, 11]);
+	
 
 #####column2Index(columnLabel)
 

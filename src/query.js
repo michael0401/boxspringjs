@@ -44,7 +44,7 @@
 		that = _.extend(that, _.defaults(options || {}, {
 			// query parameters
 			'reduce': false,
-			'limit': 100,
+			'limit': undefined,
 			'startkey': undefined,
 			'endkey': undefined,
 			'group_level': undefined,
@@ -64,10 +64,10 @@
 		// update them 
 		if (options && options.system) {
 				that.system.update(options.system);
-		} 
+		}
 		
-		// Response Wrapper: wraps the response object with methods and helpers to manage the flow of data
-		// from the server to the application
+		// Response Wrapper: wraps the response object with methods and helpers to manage 
+		// the flow of data from the server to the application
 		var result = function () {					
 			var queryPages = { 'pages': [] }
 			, current_chunk = 0
@@ -181,7 +181,7 @@
 				// when asynch=true, relay the data to the listener
 				if (response.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
-					
+			
 					if (response.pageInfo().completed) {
 						response.query.trigger('completed', response);																
 					} else {

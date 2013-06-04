@@ -62,7 +62,7 @@
 			
 		that.db = db;
 		that.design = design;
-		that.index = (options && options.index);
+		that.index = (options && options.index) || (db && db.index);
 		that.views = views;
 		that.emitter = emitter;
 		that.query = translateQuery(_.omit(options, 'system'));
@@ -71,7 +71,7 @@
 				'cache-size': undefined, //10,
 				'page-size': undefined, //100,
 				'delay': 0.5 };
-
+				
 		var setQuery = function (queryParams, systemParams) {
 			if (_.isObject (queryParams)) {
 				this.query = _.extend(this.query, queryParams);
@@ -130,13 +130,14 @@
 				query = nextLimit(query, system['page-size']);
 				// execute the query and process the response
 				//console.log('db.query', design, index, query);
-
 				db.queryHTTP(queryMethod, 
 					_.extend({ 'id': design }, {'view': index }), query,
 					function (err, response) {
 						
 					if (err) {
-						events.trigger('view-error', err);
+						events.trigger('view-error', new Error('error: ' + response.data.error + 
+							' reason: '+response.data.reason));
+							
 					} else {
 						//console.log('got response!', response.code, response.request);
 						//console.log('db.query after', design, index, query);
@@ -168,12 +169,12 @@
 			};
 
 			events.on('chunk-data', function (res) {
-				//console.log('chunk-data', system);
 				// if I've got less than the full index; and asynchronous request
+				//console.log('chunk-data', res.data.rows.length > 0, tRows < res.data.total_rows, (system.asynch === true && system['cache-size']), res.data.offset);
+				
 				if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && 
 					(system.asynch === true && system['cache-size'])) {
-						// pause the asynchronous read, 
-						// so we don't flood the browser and the net
+						// pause so we don't flood the browser and the net						
 						_.wait((system && system.delay) || 1/10, function() {
 							chunk(res.data.nextkey);						
 						});
@@ -214,7 +215,7 @@
 		var couch = function () {
 			var events = this;
 
-			events.on('chunk-data', function (res) {										
+			events.on('chunk-data', function (res) {									
 				events.trigger('view-data', res);
 			});
 			this.fetch(this);

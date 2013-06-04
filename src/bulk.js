@@ -52,6 +52,7 @@
 					if (!err) {
 						lastResponse = response && response.data;						
 					}
+					response.status = status;
 					callback(err, response);
 				});
 		};
@@ -59,13 +60,17 @@
 
 		var save = function (handler) {
 			var local = this;
-			// updates is the design document containing update methods		
-			if (this.updates) {
-				var funcs = this.updates().updates;
+			// updates is the design document containing update methods	
+			if (_.isFunction(this.maker)) {
+				var funcs = this.maker()().updates || { 'dummy': function() {} };
 				// iterate the update functions to run before posting
 				_.each(this.docs.docs, function (doc) { 
 					_.each(funcs, function (update_method) {
-						update_method(doc);
+						try {
+							update_method(doc);							
+						} catch (e) {
+							console.log(new Error('[bulk] update method failed.'));
+						}
 					});
 				});				
 			}

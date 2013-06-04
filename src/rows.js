@@ -26,9 +26,10 @@
 	var rows = function (response, ddoc, design) {		
 		// Object for adding methods and data to rows of a 
 		// response data object based on information about the design
-		var that = _.extend({}, response);
-
-
+		var that = _.extend({}, response)
+		// initialize 'selected' rows
+		, thisSelected = [];
+		
 		if (ddoc && ddoc.views && ddoc.views[design.index]) {
 			that.sortColumn = _.fetch(ddoc.views[design.index], 'sortColumn') || []; 
 			that.columns = _.fetch(ddoc.views[design.index], 'columns') || [];
@@ -112,6 +113,20 @@
 		};
 		that.last = last;
 		
+		// return the row record at the given index. return the first or last if no index or the
+		// index given is out of bounds.
+		var getRow = function(index) {
+			if (index > -1) {
+				if (index < this.getLength()) {
+					return this.data.rows[index];
+				} else {
+					return this.last();
+				}
+			}
+			return this.first(); 
+		};
+		that.getRow = getRow;
+		
 		var total_rows = function () {
 			return (this.data && this.data.total_rows) || this.first().getValue();
 		};
@@ -123,8 +138,9 @@
 		that.getLength = getLength;
 		
 		// What it does: returns the list of unique values for a key 'facet' over the set of rows
-		var facets = function (name) {		
+		var facets = function (name) {	
 			return _.compact(_.uniq(_.sortBy(_.map(this.each(), function(row) {
+			//	console.log('selecting', name, row.select(name));
 				var s = row.select(name);
 				return (s && s.toString());
 			}), _.item)), true);
@@ -163,6 +179,29 @@
 			return (((this.displayColumns).length && this.displayColumns) || this.columns);
 		};
 		that.getDisplayColumns = getDisplayColumns;
+		
+		// setter/getter for indicating a list of rows is 'selected'
+		var getSelected = function (selectedRows) {
+			var selectedRowData = _.clone(response)
+			, local = this
+			, selectedRowsIndexes;
+			
+			// if argument supplied, update the selected list
+			if (selectedRows) {
+				thisSelected = selectedRows;
+			}
+			
+			// if some have been marked selected, map those rows; else just return everything
+			if (thisSelected.length > 0) {
+				selectedRowList = _.map(thisSelected, function(index) {
+					return local.getRow(index);
+				});
+				selectedRowData.data = selectedRowList;
+			}
+			// make a new rows object from this data and return it;
+			return rows(selectedRowData, ddoc, design);
+		};
+		that.getSelected = getSelected;
 
 		// What it does: returns the index of the column requested, or 'sortColumn', or 0 if not found
 		var column2Index = function (c) {

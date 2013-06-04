@@ -118,6 +118,7 @@ if (typeof boxspring === 'undefined') {
 				'doc_save': [ dbname + '/' + docId,'PUT'], 
 				'doc_update': [ dbname + '/' + docId,'PUT'], 
 				'doc_retrieve': [dbname + '/' + docId,'GET'],  
+				'doc_attachment': [dbname + '/' + docId + '/' + viewOrUpdate,'GET'],  
 				'doc_info': [ dbname + '/' + docId,'GET'],
 				'doc_head': [ dbname + '/' + docId,'HEAD'],  
 				'doc_remove': [ dbname + '/' + docId,'DELETE'],  
@@ -145,9 +146,9 @@ if (typeof boxspring === 'undefined') {
 		, that = _.extend({}, _.defaults(options || {}, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
-			'index': 'Index',
-			'maker': undefined,
-			'designName': '_design/default',
+			'index': (options && options.index) || 'Index',
+			'maker': (options && options.maker) || undefined,
+			'designName': (options && options.designName) || '_design/default',
 		}));
 		
 		// extend the db object with the boxspring template;
@@ -157,7 +158,7 @@ if (typeof boxspring === 'undefined') {
 		that.path = path(name);
 
 		var queryHTTP = function (service, options, query, callback) {
-			var viewOrUpdate = options.view || options.update || ''
+			var viewOrUpdate = options.view || options.update || options.attachment || ''
 			, target = options.target
 			, body = options.body || {}
 			, headers = options.headers || {}
@@ -213,29 +214,6 @@ if (typeof boxspring === 'undefined') {
 			return this;
 		};
 		that.heartbeat = heartbeat;
-
-		// What it does: attempts to login the user to this database. if the `auth` is provided as an argument
-		// the `user` variable is updated. Otherwise it uses the `user` variable visible within this object.
-		var login = function (auth, handler) {
-			handler = _.toArray(arguments)[arguments.length-1];
-			user = auth === handler ? user : auth;
-
-			this.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(this.url), user).get;
-			this.queryHTTP('login', { 
-				'body': user, 
-				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}}, {}, handler);
-			return this;
-			
-			/*
-			object.HTTP({ 
-					'path':'/_session' + '/' + name, 
-					'method': 'POST', 
-					'body': user, 
-					'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
-			});
-			*/
-		};
-		that.login = login;
 		
 		var session = function (handler) {
 			this.dbQuery('session', handler);
@@ -290,13 +268,29 @@ if (typeof boxspring === 'undefined') {
 			return this;
 		};
 		that.save = save;
+		
+		// What it does: attempts to login the user to this database. 
+		// if the `auth` is provided as an argument the `user` variable is updated. 
+		// Otherwise it uses the `user` variable visible within this object.
+		var login = function (auth, handler) {
+			handler = _.toArray(arguments)[arguments.length-1];
+			user = auth === handler ? user : auth;
+			this.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(this.url), user).get;
+			this.queryHTTP('login', { 
+				'body': user, 
+				'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
+			return this;
+			
+		};
+		that.login = login;
 
 		var remove = function (handler) {
 			var local = this;
 
 			this.db_info(function (err, response) {
 				if (exists(response)) {
-					local.queryHTTP('db_remove', handler);
+					this.queryHTTP('db_remove', { 
+						'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
 				} else {
 					handler(err, response);
 				}

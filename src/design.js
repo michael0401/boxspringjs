@@ -100,16 +100,12 @@
 		doc = this.doc(designName);
 				
 		// set the view index for this design
-		that.index = arguments.length === 3 ? index : (this.index || 'Index'); 
-		
-		// defaultDesign, custom maker (if supplied), default headers
-		that.custom = custom || this.maker || defaultDesign;
+		that.index = arguments.length === 3 ? index : this.index; 
+		// custom maker or configged maker, or defaultDesign; default headers
+		that.maker = (custom || this.maker || defaultDesign);
 		that.headers = { 'X-Couch-Full-Commit': false };
+		that.views = that.maker().views;
 		
-				
-		// What this does: Serializes its map/reduce functions; extends the _design/ document 
-		// A VIEW is a property of a DESIGN document.
-		// addView method extends the 'views' object with the supplied map/reduce functions;
 		/*jslint unparam: true */
 		that.ddoc = _.extend({}, doc, {
 			'owner': this,
@@ -122,14 +118,6 @@
 				'lists': {}
 			}
 		});
-
-		// What it does: returns the maker function for this design, either provided by the 
-		// application or defaulted from global.
-		var maker = function () {
-			return((this && this.custom) || defaultDesign);
-		};
-		that.maker = maker;
-		that.views = that.maker()().views;
 
 		// system parameters to control the query behavior
 		that.system = boxspring.UTIL.hash({
@@ -144,13 +132,13 @@
 		that.dateFilter = _.fetch(that.views, 'dateFilter');
 		that.lib = _.fetch(that.views, 'lib');
 		that.doc = _.fetch(that.views, 'doc');
-		that.types = that.maker()() && that.maker()().types;
+		that.types = that.maker() && that.maker().types;
 		that.formats = that.views && that.views.lib && that.views.lib.formats;
 
 		(function (libs) {
 			var ddoc = this.ddoc
 			, views = this.views
-			, libSrc = 'var bx = { "COUCH": true };\n';
+			, libSrc = '\n';
 
 			if (views && views.hasOwnProperty('lib')) {
 				_.each(views.lib, function(lib, name) {
@@ -160,8 +148,8 @@
 				});
 			}
 
-			// add application views and template views from the default design template object	
-			_.each((this.maker())().views, function (views, name) { 
+			// add application views and template views from default design object	
+			_.each(this.views, function (views, name) { 
 				var mapFunc = views.map
 					, reduceFunc = views && views.reduce
 					, header = views && views.header;
@@ -170,7 +158,7 @@
 					ddoc.ddoc.views.lib = {};
 					_.each(views, function (value, key) {
 						var fn = _.Serialize(value)
-							, prePend = fn.indexOf('function') !== -1 ? 'exports.fn = ' : 'exports.val = ';
+							, prePend = '';
 						ddoc.ddoc.views.lib[key] = {};
 						ddoc.ddoc.views.lib[key] = prePend + _.Serialize(value); 
 					});
@@ -188,22 +176,24 @@
 			});
 
 			// 'updates' methods
-			_.each((this.maker())().updates, function (updates, name) { 
+			_.each(this.maker().updates, function (updates, name) { 
 				ddoc.ddoc.updates[name] = {};
 				ddoc.ddoc.updates[name] = _.Serialize(updates);
 			});
 
 			// add the 'types' structure, if it exists
-			if ((this.maker()()).hasOwnProperty('types')) {
-				this.ddoc.ddoc.types = (this.maker()()).types;
+			if (this.maker().hasOwnProperty('types')) {
+				this.ddoc.ddoc.types = this.maker().types;
 			}
 
 			// finally update the design document content using .docinfo() method
 			this.ddoc.docinfo(this.ddoc.ddoc);
+			
 			return this;
 		}.call(that));
 
-		// Purpose: Emulates CouchDB view/emit functions on the "client", to execute map functions
+		// Purpose: Emulates CouchDB view/emit functions on the "client"
+		// TBD: Not tested
 		var emulate = function (name) {
 			// When running in node.js, calling functions need to find 'emit' in its scope 
 			// On server side, will use couchdb's built-in emit()
@@ -220,15 +210,16 @@
 				tree.reduce = reduce;
 				return tree;
 			}
-			, e = emitter((this.maker())().views[name]);
+			, e = emitter(this.maker().views[name]);
 			emit = e.emit;
 			return(e);
 		};
 		that.emulate = emulate;
 
-		// this update takes advantage of CouchDB 'updates' handlers. The design document function 
-		// specified in 'updateName' will execute on the server, saving the round-trip to the 
-		// client a enforcing consistent attributing of the documents on the server for a corpus.
+		// this update takes advantage of CouchDB 'updates' handlers. 
+		// The design document function specified in 'updateName' will execute on 
+		// the server, saving the round-trip to the client a enforcing consistent
+		// attributing of the documents on the server for a corpus.
 
 		var full = function (fc) {
 			this.headers['X-Couch-Full-Commit'] = fc;
@@ -264,16 +255,15 @@
 				_.extend({'index': this.index, 'system': system }, options), 
 										this.ddoc.docId().id, this.ddoc.views);
 
-			view.on('error', function (err) {				
-				throw err;
+			view.on('error', function (err) {
+				throw new Error(err || 'Invalid request.');
 			});
 
 			view.end('couch', function(res) {
 				res.on('data', function (r) {
 					// create a result object instrumented with row helpers 
 					// and design document info
-					
-					var result = global.rows(r, local.ddoc.ddoc, local);					
+					var result = global.rows(r, local.maker(), local);	
 					if (callback && _.isFunction(callback)) {
 						if (system && system.asynch === false) {
 							// just write wrapped data to the calling program. 

@@ -47,29 +47,6 @@ var test = require('tape')
 	};
 };
 
-/*
-var original1 = boxspringjs.design().query({
-	'system': {'asynch': true, 'page-size': 100, 'cache-size': 2, 'delay': 1/10 }
-})
-, original2 = boxspringjs.design().query({
-	'system': {'asynch': true, 'page-size': 100, 'cache-size': 2, 'delay': 1/10 }
-});;
-
-
-original1.on('result', function() {
-	console.log('yes! 1');
-});
-
-original2.on('result', function() {
-	console.log('yes! 2');
-});
-
-original2.server();
-original1.server();
-
-return;
-*/
-
 
 //var query = anotherdb.design().query({
 //	'reduce': true,
@@ -128,29 +105,8 @@ return;
 }());
 
 (function() {
-	test('query-more-data-tests', function (t) {
-		var rowCount
-		, pages
-		, query = boxspringjs.design().query();
-		
-		query.system.update({'asynch': true, 'page-size': 200 });
-		query.on('result', function(result) {
-			pages = Math.floor(result.total_rows() / 200);
-			t.plan(pages+1);
-			t.equal(result.getLength(), 200, 'initial-result');
-			rowCount = result.total_rows();
-		});
-		
-		query.on('more-data', function(result) {
-			t.equal(query.qid, result.query.qid, query.qid);
-//			t.equal(pages, pages, 'more-data');
-		});
-		query.server();
-	});
-}());
-
-(function() {
 	test('query-paging-tests', function (t) {
+		console.log('!!!');
 		var pages
 		, page
 		, query = boxspringjs.design().query({
@@ -158,15 +114,15 @@ return;
 		});
 		
 		query.on('result', function(result) {
-			page = 1;
-			pages = Math.ceil(result.total_rows()/100);
-			t.plan((pages-1)*2);
-			//console.log('query-paging-tests:', (pages-1)*2);
-		});
-		
-		query.on('on-display', function(result) {
-			t.equal(1, 1, page.toString());
-			page += 1;
+			if (typeof page === 'undefined') {
+				page = 1;
+				pages = Math.ceil(result.total_rows()/100);
+				t.plan((pages-1)*2);
+				//console.log('query-paging-tests:', (pages-1)*2);				
+			} else {
+				t.equal(1, 1, page.toString());
+				page += 1;				
+			}
 		});
 		
 		query.on('more-data', function(result) {
@@ -181,6 +137,35 @@ return;
 				result.nextPrev('next');					
 			}
 		});
+		
+		query.on('completed', function(r) {
+			query.trigger('more-data', r);
+		});
 		query.server();
 	});
 }());
+
+(function() {
+	test('query-more-data-tests', function (t) {
+		var rowCount
+		, pages
+		, query = boxspringjs.design().query();
+		
+		query.system.update({'asynch': true, 'page-size': 200 });
+		query.on('result', function(result) {
+			pages = Math.floor(result.total_rows() / 200);
+			t.plan(pages+5);
+			
+			t.equal(result.getLength(), 200, 'initial-result');
+			rowCount = result.total_rows();
+		});
+
+		var register = function (result) {
+			t.equal(query.qid, result.query.qid, query.qid);
+		}
+		query.on('completed', register);
+		query.on('more-data', register);
+		query.server();
+	});
+}());
+

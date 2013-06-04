@@ -25,7 +25,7 @@
 
 	var row = function (owner, currentRow) {		
 		// Object for creating a hash out of the row for accessing and manipulating it
-		var that = _.extend({}, currentRow, boxspring.UTIL.hash());
+		var that = _.extend({}, currentRow, this.UTIL.hash());
 		that.columns = (owner && owner.columns) || [];
 		that.keys = (owner && owner.keys) || [];
 		that.visible = (owner && owner.visible) || boxspring.UTIL.hash();
@@ -33,7 +33,7 @@
 
 		var getKey = function (index) {
 			var key = _.isArray(this && this.key) ? this.key : [ this && this.key ];
-			return key[index || 0];
+			return typeof index !== 'undefined' ? key[index] : key;
 		};
 		that.getKey = getKey;
 
@@ -44,15 +44,6 @@
 
 		// What it does: return the value of 'name' in this row
 		var select = function (name) {
-			var summary = {};
-			if (name === 'summary') {
-				summary = this.post();
-				summary.total = this.get('summary') && this.get('summary').total;
-				return summary;
-			} 
-			if (name === 'total') {
-				return this.contains('summary') && this.get('summary').total; 
-			}
 			return this.get(name);
 		};
 		that.select = select;
@@ -184,7 +175,7 @@
 				});
 			}
 		}(that));
-		
+				
 		return that;
 	};
 	global.row = row;

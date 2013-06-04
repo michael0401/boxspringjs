@@ -171,7 +171,7 @@ var test = require('tape')
 (function() {
 	test('rows-tests', function (t) {
 		t.plan(23);
-		console.log('Running rows-tests: 16');
+		console.log('Running rows-tests: 23');
 		
 		anotherdb.design().get({}, function(err, response) {
 			t.equal((response.each()).length, response.data.rows.length);
@@ -199,7 +199,8 @@ var test = require('tape')
 			t.equal(response.offset(), 0);
 			t.equal(response.total_rows(), response.getLength());
 			t.equal(response.facets('_id').length, response.getLength());
-			t.equal(response.facets('content').length, 2);
+			//console.log(response.facets('content'), 2);
+			t.equal(response.facets('content').length, 3);
 			t.equal(response.facets('find-nothing').length, 0);
 			t.equal(response.range().start, response.data.rows[0].key);
 			t.equal(response.range().end, response.last().key);				

@@ -118,6 +118,7 @@ if (typeof boxspring === 'undefined') {
 				'doc_save': [ dbname + '/' + docId,'PUT'], 
 				'doc_update': [ dbname + '/' + docId,'PUT'], 
 				'doc_retrieve': [dbname + '/' + docId,'GET'],  
+				'doc_attachment': [dbname + '/' + docId + '/' + viewOrUpdate,'GET'],  
 				'doc_info': [ dbname + '/' + docId,'GET'],
 				'doc_head': [ dbname + '/' + docId,'HEAD'],  
 				'doc_remove': [ dbname + '/' + docId,'DELETE'],  
@@ -145,9 +146,9 @@ if (typeof boxspring === 'undefined') {
 		, that = _.extend({}, _.defaults(options || {}, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
-			'index': 'Index',
-			'maker': undefined,
-			'designName': '_design/default',
+			'index': (options && options.index) || 'Index',
+			'maker': (options && options.maker) || undefined,
+			'designName': (options && options.designName) || '_design/default',
 		}));
 		
 		// extend the db object with the boxspring template;
@@ -157,7 +158,7 @@ if (typeof boxspring === 'undefined') {
 		that.path = path(name);
 
 		var queryHTTP = function (service, options, query, callback) {
-			var viewOrUpdate = options.view || options.update || ''
+			var viewOrUpdate = options.view || options.update || options.attachment || ''
 			, target = options.target
 			, body = options.body || {}
 			, headers = options.headers || {}
@@ -213,29 +214,6 @@ if (typeof boxspring === 'undefined') {
 			return this;
 		};
 		that.heartbeat = heartbeat;
-
-		// What it does: attempts to login the user to this database. if the `auth` is provided as an argument
-		// the `user` variable is updated. Otherwise it uses the `user` variable visible within this object.
-		var login = function (auth, handler) {
-			handler = _.toArray(arguments)[arguments.length-1];
-			user = auth === handler ? user : auth;
-
-			this.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(this.url), user).get;
-			this.queryHTTP('login', { 
-				'body': user, 
-				'headers': { 'Content-Type':'application/x-www-form-urlencoded'}}, {}, handler);
-			return this;
-			
-			/*
-			object.HTTP({ 
-					'path':'/_session' + '/' + name, 
-					'method': 'POST', 
-					'body': user, 
-					'headers': { 'Content-Type':'application/x-www-form-urlencoded'}
-			});
-			*/
-		};
-		that.login = login;
 		
 		var session = function (handler) {
 			this.dbQuery('session', handler);
@@ -290,13 +268,29 @@ if (typeof boxspring === 'undefined') {
 			return this;
 		};
 		that.save = save;
+		
+		// What it does: attempts to login the user to this database. 
+		// if the `auth` is provided as an argument the `user` variable is updated. 
+		// Otherwise it uses the `user` variable visible within this object.
+		var login = function (auth, handler) {
+			handler = _.toArray(arguments)[arguments.length-1];
+			user = auth === handler ? user : auth;
+			this.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(this.url), user).get;
+			this.queryHTTP('login', { 
+				'body': user, 
+				'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
+			return this;
+			
+		};
+		that.login = login;
 
 		var remove = function (handler) {
 			var local = this;
 
 			this.db_info(function (err, response) {
 				if (exists(response)) {
-					local.queryHTTP('db_remove', handler);
+					this.queryHTTP('db_remove', { 
+						'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
 				} else {
 					handler(err, response);
 				}
@@ -395,7 +389,8 @@ if (typeof boxspring === 'undefined') {
 
 		var docHdr = function (name, value) {
 			var hdr = {};
-			return((name && value) ? { 'headers': hdr[name] = value } : {});
+			hdr[name] = value;
+			return((name && value) ? { 'headers': hdr } : {});
 		};
 		that.docHdr = docHdr;
 		
@@ -430,6 +425,17 @@ if (typeof boxspring === 'undefined') {
 		that.retrieve = retrieve;
 		that.open = retrieve;
 
+		var attachment = function(name, handler) {
+			var local = this
+		
+			this.queryHTTP('doc_attachment', { 'id': this.docId().id, 'attachment': name }, {}, 
+			function (err, response) {
+				handler(err, local.sync(err, response));
+			});
+			return this;			
+		};
+		that.attachment = attachment;
+		
 		var head = function (handler) {
 			var local = this;
 
@@ -454,11 +460,16 @@ if (typeof boxspring === 'undefined') {
 		var update = function (handler, data) {
 			var local = this;
 			
+			// extend the local docinfo with the data already in docinfo and any new data coming
+			// retrieve will over-write our recent updates with the content from the server;
+			data = _.extend({}, local.source(), data || {});
+			
 			retrieve.call(this, function(err, response) {
 				// when updating, we might get an error if the doc doesn't exist
 				// otherwise just keep going
 				if (!err || response.code === 404) {
-					local.updated_docinfo = _.extend(local.updated_docinfo, data || {});
+					// now add back data to update from above and save
+					local.updated_docinfo = _.extend(local.source(), data);
 					return save.call(local, handler);	
 				}
 				handler(err, response);
@@ -560,6 +571,7 @@ if (typeof boxspring === 'undefined') {
 					if (!err) {
 						lastResponse = response && response.data;						
 					}
+					response.status = status;
 					callback(err, response);
 				});
 		};
@@ -567,13 +579,17 @@ if (typeof boxspring === 'undefined') {
 
 		var save = function (handler) {
 			var local = this;
-			// updates is the design document containing update methods		
-			if (this.updates) {
-				var funcs = this.updates().updates;
+			// updates is the design document containing update methods	
+			if (_.isFunction(this.maker)) {
+				var funcs = this.maker()().updates || { 'dummy': function() {} };
 				// iterate the update functions to run before posting
 				_.each(this.docs.docs, function (doc) { 
 					_.each(funcs, function (update_method) {
-						update_method(doc);
+						try {
+							update_method(doc);							
+						} catch (e) {
+							console.log(new Error('[bulk] update method failed.'));
+						}
 					});
 				});				
 			}
@@ -784,16 +800,12 @@ if (typeof boxspring === 'undefined') {
 		doc = this.doc(designName);
 				
 		// set the view index for this design
-		that.index = arguments.length === 3 ? index : (this.index || 'Index'); 
-		
-		// defaultDesign, custom maker (if supplied), default headers
-		that.custom = custom || this.maker || defaultDesign;
+		that.index = arguments.length === 3 ? index : this.index; 
+		// custom maker or configged maker, or defaultDesign; default headers
+		that.maker = (custom || this.maker || defaultDesign);
 		that.headers = { 'X-Couch-Full-Commit': false };
+		that.views = that.maker().views;
 		
-				
-		// What this does: Serializes its map/reduce functions; extends the _design/ document 
-		// A VIEW is a property of a DESIGN document.
-		// addView method extends the 'views' object with the supplied map/reduce functions;
 		/*jslint unparam: true */
 		that.ddoc = _.extend({}, doc, {
 			'owner': this,
@@ -806,14 +818,6 @@ if (typeof boxspring === 'undefined') {
 				'lists': {}
 			}
 		});
-
-		// What it does: returns the maker function for this design, either provided by the 
-		// application or defaulted from global.
-		var maker = function () {
-			return((this && this.custom) || defaultDesign);
-		};
-		that.maker = maker;
-		that.views = that.maker()().views;
 
 		// system parameters to control the query behavior
 		that.system = boxspring.UTIL.hash({
@@ -828,13 +832,13 @@ if (typeof boxspring === 'undefined') {
 		that.dateFilter = _.fetch(that.views, 'dateFilter');
 		that.lib = _.fetch(that.views, 'lib');
 		that.doc = _.fetch(that.views, 'doc');
-		that.types = that.maker()() && that.maker()().types;
+		that.types = that.maker() && that.maker().types;
 		that.formats = that.views && that.views.lib && that.views.lib.formats;
 
 		(function (libs) {
 			var ddoc = this.ddoc
 			, views = this.views
-			, libSrc = 'var bx = { "COUCH": true };\n';
+			, libSrc = '\n';
 
 			if (views && views.hasOwnProperty('lib')) {
 				_.each(views.lib, function(lib, name) {
@@ -844,8 +848,8 @@ if (typeof boxspring === 'undefined') {
 				});
 			}
 
-			// add application views and template views from the default design template object	
-			_.each((this.maker())().views, function (views, name) { 
+			// add application views and template views from default design object	
+			_.each(this.views, function (views, name) { 
 				var mapFunc = views.map
 					, reduceFunc = views && views.reduce
 					, header = views && views.header;
@@ -854,7 +858,7 @@ if (typeof boxspring === 'undefined') {
 					ddoc.ddoc.views.lib = {};
 					_.each(views, function (value, key) {
 						var fn = _.Serialize(value)
-							, prePend = fn.indexOf('function') !== -1 ? 'exports.fn = ' : 'exports.val = ';
+							, prePend = '';
 						ddoc.ddoc.views.lib[key] = {};
 						ddoc.ddoc.views.lib[key] = prePend + _.Serialize(value); 
 					});
@@ -872,22 +876,24 @@ if (typeof boxspring === 'undefined') {
 			});
 
 			// 'updates' methods
-			_.each((this.maker())().updates, function (updates, name) { 
+			_.each(this.maker().updates, function (updates, name) { 
 				ddoc.ddoc.updates[name] = {};
 				ddoc.ddoc.updates[name] = _.Serialize(updates);
 			});
 
 			// add the 'types' structure, if it exists
-			if ((this.maker()()).hasOwnProperty('types')) {
-				this.ddoc.ddoc.types = (this.maker()()).types;
+			if (this.maker().hasOwnProperty('types')) {
+				this.ddoc.ddoc.types = this.maker().types;
 			}
 
 			// finally update the design document content using .docinfo() method
 			this.ddoc.docinfo(this.ddoc.ddoc);
+			
 			return this;
 		}.call(that));
 
-		// Purpose: Emulates CouchDB view/emit functions on the "client", to execute map functions
+		// Purpose: Emulates CouchDB view/emit functions on the "client"
+		// TBD: Not tested
 		var emulate = function (name) {
 			// When running in node.js, calling functions need to find 'emit' in its scope 
 			// On server side, will use couchdb's built-in emit()
@@ -904,15 +910,16 @@ if (typeof boxspring === 'undefined') {
 				tree.reduce = reduce;
 				return tree;
 			}
-			, e = emitter((this.maker())().views[name]);
+			, e = emitter(this.maker().views[name]);
 			emit = e.emit;
 			return(e);
 		};
 		that.emulate = emulate;
 
-		// this update takes advantage of CouchDB 'updates' handlers. The design document function 
-		// specified in 'updateName' will execute on the server, saving the round-trip to the 
-		// client a enforcing consistent attributing of the documents on the server for a corpus.
+		// this update takes advantage of CouchDB 'updates' handlers. 
+		// The design document function specified in 'updateName' will execute on 
+		// the server, saving the round-trip to the client a enforcing consistent
+		// attributing of the documents on the server for a corpus.
 
 		var full = function (fc) {
 			this.headers['X-Couch-Full-Commit'] = fc;
@@ -948,16 +955,15 @@ if (typeof boxspring === 'undefined') {
 				_.extend({'index': this.index, 'system': system }, options), 
 										this.ddoc.docId().id, this.ddoc.views);
 
-			view.on('error', function (err) {				
-				throw err;
+			view.on('error', function (err) {
+				throw new Error(err || 'Invalid request.');
 			});
 
 			view.end('couch', function(res) {
 				res.on('data', function (r) {
 					// create a result object instrumented with row helpers 
 					// and design document info
-					
-					var result = global.rows(r, local.ddoc.ddoc, local);					
+					var result = global.rows(r, local.maker(), local);	
 					if (callback && _.isFunction(callback)) {
 						if (system && system.asynch === false) {
 							// just write wrapped data to the calling program. 
@@ -1052,7 +1058,7 @@ if (typeof boxspring === 'undefined') {
 			
 		that.db = db;
 		that.design = design;
-		that.index = (options && options.index);
+		that.index = (options && options.index) || (db && db.index);
 		that.views = views;
 		that.emitter = emitter;
 		that.query = translateQuery(_.omit(options, 'system'));
@@ -1061,7 +1067,7 @@ if (typeof boxspring === 'undefined') {
 				'cache-size': undefined, //10,
 				'page-size': undefined, //100,
 				'delay': 0.5 };
-
+				
 		var setQuery = function (queryParams, systemParams) {
 			if (_.isObject (queryParams)) {
 				this.query = _.extend(this.query, queryParams);
@@ -1120,13 +1126,14 @@ if (typeof boxspring === 'undefined') {
 				query = nextLimit(query, system['page-size']);
 				// execute the query and process the response
 				//console.log('db.query', design, index, query);
-
 				db.queryHTTP(queryMethod, 
 					_.extend({ 'id': design }, {'view': index }), query,
 					function (err, response) {
 						
 					if (err) {
-						events.trigger('view-error', err);
+						events.trigger('view-error', new Error('error: ' + response.data.error + 
+							' reason: '+response.data.reason));
+							
 					} else {
 						//console.log('got response!', response.code, response.request);
 						//console.log('db.query after', design, index, query);
@@ -1158,12 +1165,12 @@ if (typeof boxspring === 'undefined') {
 			};
 
 			events.on('chunk-data', function (res) {
-				//console.log('chunk-data', system);
 				// if I've got less than the full index; and asynchronous request
+				//console.log('chunk-data', res.data.rows.length > 0, tRows < res.data.total_rows, (system.asynch === true && system['cache-size']), res.data.offset);
+				
 				if ((res.data.rows.length > 0 && tRows < res.data.total_rows) && 
 					(system.asynch === true && system['cache-size'])) {
-						// pause the asynchronous read, 
-						// so we don't flood the browser and the net
+						// pause so we don't flood the browser and the net						
 						_.wait((system && system.delay) || 1/10, function() {
 							chunk(res.data.nextkey);						
 						});
@@ -1204,7 +1211,7 @@ if (typeof boxspring === 'undefined') {
 		var couch = function () {
 			var events = this;
 
-			events.on('chunk-data', function (res) {										
+			events.on('chunk-data', function (res) {									
 				events.trigger('view-data', res);
 			});
 			this.fetch(this);
@@ -1268,9 +1275,10 @@ if (typeof boxspring === 'undefined') {
 	var rows = function (response, ddoc, design) {		
 		// Object for adding methods and data to rows of a 
 		// response data object based on information about the design
-		var that = _.extend({}, response);
-
-
+		var that = _.extend({}, response)
+		// initialize 'selected' rows
+		, thisSelected = [];
+		
 		if (ddoc && ddoc.views && ddoc.views[design.index]) {
 			that.sortColumn = _.fetch(ddoc.views[design.index], 'sortColumn') || []; 
 			that.columns = _.fetch(ddoc.views[design.index], 'columns') || [];
@@ -1354,6 +1362,20 @@ if (typeof boxspring === 'undefined') {
 		};
 		that.last = last;
 		
+		// return the row record at the given index. return the first or last if no index or the
+		// index given is out of bounds.
+		var getRow = function(index) {
+			if (index > -1) {
+				if (index < this.getLength()) {
+					return this.data.rows[index];
+				} else {
+					return this.last();
+				}
+			}
+			return this.first(); 
+		};
+		that.getRow = getRow;
+		
 		var total_rows = function () {
 			return (this.data && this.data.total_rows) || this.first().getValue();
 		};
@@ -1365,8 +1387,9 @@ if (typeof boxspring === 'undefined') {
 		that.getLength = getLength;
 		
 		// What it does: returns the list of unique values for a key 'facet' over the set of rows
-		var facets = function (name) {		
+		var facets = function (name) {	
 			return _.compact(_.uniq(_.sortBy(_.map(this.each(), function(row) {
+			//	console.log('selecting', name, row.select(name));
 				var s = row.select(name);
 				return (s && s.toString());
 			}), _.item)), true);
@@ -1405,6 +1428,29 @@ if (typeof boxspring === 'undefined') {
 			return (((this.displayColumns).length && this.displayColumns) || this.columns);
 		};
 		that.getDisplayColumns = getDisplayColumns;
+		
+		// setter/getter for indicating a list of rows is 'selected'
+		var getSelected = function (selectedRows) {
+			var selectedRowData = _.clone(response)
+			, local = this
+			, selectedRowsIndexes;
+			
+			// if argument supplied, update the selected list
+			if (selectedRows) {
+				thisSelected = selectedRows;
+			}
+			
+			// if some have been marked selected, map those rows; else just return everything
+			if (thisSelected.length > 0) {
+				selectedRowList = _.map(thisSelected, function(index) {
+					return local.getRow(index);
+				});
+				selectedRowData.data = selectedRowList;
+			}
+			// make a new rows object from this data and return it;
+			return rows(selectedRowData, ddoc, design);
+		};
+		that.getSelected = getSelected;
 
 		// What it does: returns the index of the column requested, or 'sortColumn', or 0 if not found
 		var column2Index = function (c) {
@@ -1473,7 +1519,7 @@ if (typeof boxspring === 'undefined') {
 
 	var row = function (owner, currentRow) {		
 		// Object for creating a hash out of the row for accessing and manipulating it
-		var that = _.extend({}, currentRow, boxspring.UTIL.hash());
+		var that = _.extend({}, currentRow, this.UTIL.hash());
 		that.columns = (owner && owner.columns) || [];
 		that.keys = (owner && owner.keys) || [];
 		that.visible = (owner && owner.visible) || boxspring.UTIL.hash();
@@ -1481,7 +1527,7 @@ if (typeof boxspring === 'undefined') {
 
 		var getKey = function (index) {
 			var key = _.isArray(this && this.key) ? this.key : [ this && this.key ];
-			return key[index || 0];
+			return typeof index !== 'undefined' ? key[index] : key;
 		};
 		that.getKey = getKey;
 
@@ -1492,15 +1538,6 @@ if (typeof boxspring === 'undefined') {
 
 		// What it does: return the value of 'name' in this row
 		var select = function (name) {
-			var summary = {};
-			if (name === 'summary') {
-				summary = this.post();
-				summary.total = this.get('summary') && this.get('summary').total;
-				return summary;
-			} 
-			if (name === 'total') {
-				return this.contains('summary') && this.get('summary').total; 
-			}
 			return this.get(name);
 		};
 		that.select = select;
@@ -1632,7 +1669,7 @@ if (typeof boxspring === 'undefined') {
 				});
 			}
 		}(that));
-		
+				
 		return that;
 	};
 	global.row = row;
@@ -1837,7 +1874,7 @@ if (typeof boxspring === 'undefined') {
 		that = _.extend(that, _.defaults(options || {}, {
 			// query parameters
 			'reduce': false,
-			'limit': 100,
+			'limit': undefined,
 			'startkey': undefined,
 			'endkey': undefined,
 			'group_level': undefined,
@@ -1857,10 +1894,10 @@ if (typeof boxspring === 'undefined') {
 		// update them 
 		if (options && options.system) {
 				that.system.update(options.system);
-		} 
+		}
 		
-		// Response Wrapper: wraps the response object with methods and helpers to manage the flow of data
-		// from the server to the application
+		// Response Wrapper: wraps the response object with methods and helpers to manage 
+		// the flow of data from the server to the application
 		var result = function () {					
 			var queryPages = { 'pages': [] }
 			, current_chunk = 0
@@ -1974,7 +2011,7 @@ if (typeof boxspring === 'undefined') {
 				// when asynch=true, relay the data to the listener
 				if (response.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
-					
+			
 					if (response.pageInfo().completed) {
 						response.query.trigger('completed', response);																
 					} else {
@@ -2007,6 +2044,147 @@ if (typeof boxspring === 'undefined') {
 	global.query = query;
 }(boxspring));	
 
+
+/* ===================================================
+ * display.js v0.01
+ * https://github.com/rranauro/boxspringjs
+ * ===================================================
+ * Copyright 2013 Incite Advisors, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+/*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
+/*global _: true */
+
+(function(global) {
+	"use strict";	
+	
+	var display = function(options) {
+		var target
+		, supportedEvents = ['result', 'more-data', 'completed', 'onPage', 'onSelection'];
+		
+		// this model requires a query object 
+		target = _.extend({}, { 'query': options.query });
+		
+		if (!target.query.on || !target.query.trigger) {
+			throw new Error('[ display ] You must supply a query object with events.');
+		}
+		
+		// What it does: executes a client callback on a display event
+		var relay = function(context, eventStr, callback) {
+			this.on(eventStr, function() {
+				if (_.isFunction(callback)) {
+					callback.apply(context, [ eventStr ].concat(_.toArray(arguments)));
+				}
+			});
+		};
+		
+		var addEventListener = function (eventStr, callback) {
+			var context = this;
+			if (_.found(supportedEvents, eventStr)) {
+				relay.call(target.query, context, eventStr, callback);	
+			} else {
+				throw new Error('[ display ] Unrecognized event - ' + eventStr);
+			}
+		};
+		target.addEventListener = addEventListener;
+		return target;
+	};
+	global.display = display;
+
+}(boxspring));	
+
+/*
+
+// What it does: maintains a hash of selected keys
+var handleSelections = function (result, tableData) {
+	var local = result
+	, that = {}
+	, pageInfo = tableData.data.result.pageInfo();				
+	
+	that.query = this;
+	that.reference = tableData.data;
+	that.selectedKeys = tableData.selectedKeys;
+	that.rowIndices = tableData.rowIndices;
+
+	// remove any previous selections on this page before starting
+	// hash is as follows: hash[id] = page#
+	if (local.selected) {
+		local.selected.each(function(pageNo, id) {
+			if (pageNo === (pageInfo && pageInfo.page)) {
+				local.selected.remove(id);
+			}
+		});
+	}
+	// install these keys into the 'selected' hash, associated with this page
+	that.selectedKeys.forEach(function(key) {
+		local.selected.store(key, pageInfo.page);
+	});
+	
+	that.listEnd = function () {
+		var startkey
+		, endkey;
+		
+		if (this.selectedKeys.length > 0) {
+			startkey = this.selectedKeys[this.selectedKeys.length-1];
+			endkey = this.selectedKeys[this.selectedKeys.length-1].concat({});
+		}
+		
+		return({
+			'reduce': false,
+			'startkey': _.map(startkey, function(x) { 
+				return x.toString(); }),
+			'endkey': _.map(endkey, function(x) { 
+				return (_.isObject(x) ? {} : x.toString()); })
+		});			
+	};
+	return that;
+};
+query.handleSelections = handleSelections;
+
+// What it does: refreshes the display. if query is a 'pivot', it recalculates the result
+// but, only if the application does not say 'displayOnly'
+var refresh = function () {
+	this.events.trigger(this.get('onDisplay'), this.result);
+	return this;
+};
+query.refresh = refresh;
+
+
+	
+};
+query.server = get;
+
+
+// incremental adds keys for keyed searches
+var selectKeys = function (k) {
+	var local = this;
+				
+	if (k && k.length > 0 ) {
+		k.forEach(function(key) {
+			local.selected.store(key, 1);
+		});	
+	}
+	return(_.reduce(_.map(this.selected.keys(), function (x) { 
+		return x.split(','); 
+		}), function (x, y) {
+				x.push(y);
+				return x;
+			}, []));
+};
+query.selectKeys = selectKeys;
+*/
 
 /* ===================================================
  * base-utils.js v0.01
@@ -2235,6 +2413,11 @@ if (typeof _ === 'undefined') {
 		},'');
 	};
 	baseUtils.filterNonAscii = filterNonAscii;
+	
+	var filterNonAlphaNumeric = function (s) {
+		return _.trim(s.replace(/[^a-z0-9]/gi,'-'));
+	};
+	baseUtils.filterNonAlphaNumeric = filterNonAlphaNumeric;
 	
 	// What it does: extracts the properties from the first object based on the 
 	// properties in the from array or list of argument strings.
@@ -2628,6 +2811,11 @@ if (typeof _ === 'undefined') {
 		},'');
 	};
 	baseUtils.filterNonAscii = filterNonAscii;
+	
+	var filterNonAlphaNumeric = function (s) {
+		return _.trim(s.replace(/[^a-z0-9]/gi,'-'));
+	};
+	baseUtils.filterNonAlphaNumeric = filterNonAlphaNumeric;
 	
 	// What it does: extracts the properties from the first object based on the 
 	// properties in the from array or list of argument strings.
@@ -3081,7 +3269,7 @@ Changelog:
 
 		return str_format;
 	})();
-	sprintfUtils.springf = sprintf;
+	sprintfUtils.sprintf = sprintf;
 
 	var vsprintf = function(fmt, argv) {
 		argv.unshift(fmt);
@@ -3092,7 +3280,133 @@ Changelog:
 	_.mixin(sprintfUtils)
 
 }());
-/* ===================================================
+/*
+Carlo Zottman: https://github.com/carlo/jquery-base64
+# jquery-base64
+
+Rather simple jQuery'fication of
+[Nick Galbreath's base64 string encoder](http://stringencoders.googlecode.com/svn-history/r210/trunk/javascript/base64.js).
+
+I didn't like having a global `base64` variable around, that's all.
+
+
+## Usage
+
+* `$.base64.encode( "this is a test" )` returns `"dGhpcyBpcyBhIHRlc3Q="`
+* `$.base64.decode( "dGhpcyBpcyBhIHRlc3Q=" )` returns `"this is a test"`
+
+
+## Known issues
+
+JSLint is complaining about the "unexpected use of '<<'/'|'".  No idea, suggestions welcome.
+
+
+## Developers
+
+Original code by [Nick Galbreath](http://stringencoders.googlecode.com/svn-history/r210/trunk/javascript/base64.js).
+Port by [Carlo Zottmann](http://github.com/carlo).
+
+
+## License
+
+MIT license, just like [the original](http://stringencoders.googlecode.com/svn-history/r210/trunk/javascript/base64.js).
+
+
+*/
+"use strict";
+(function () {
+    var $,
+		_PADCHAR = "=",
+        _ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+        _VERSION = "1.0";
+
+    function _getbyte64(s, i) {
+        var idx = _ALPHA.indexOf(s.charAt(i));
+        if (idx === -1) {
+            throw "Cannot decode base64"
+        }
+        return idx
+    }
+
+    function _decode(s) {
+        var pads = 0,
+            i, b10, imax = s.length,
+            x = [];
+        s = String(s);
+        if (imax === 0) {
+            return s
+        }
+        if (imax % 4 !== 0) {
+            throw "Cannot decode base64"
+        }
+        if (s.charAt(imax - 1) === _PADCHAR) {
+            pads = 1;
+            if (s.charAt(imax - 2) === _PADCHAR) {
+                pads = 2
+            }
+            imax -= 4
+        }
+        for (i = 0; i < imax; i += 4) {
+            b10 = (_getbyte64(s, i) << 18) | (_getbyte64(s, i + 1) << 12) | (_getbyte64(s, i + 2) << 6) | _getbyte64(s, i + 3);
+            x.push(String.fromCharCode(b10 >> 16, (b10 >> 8) & 255, b10 & 255))
+        }
+        switch (pads) {
+        case 1:
+            b10 = (_getbyte64(s, i) << 18) | (_getbyte64(s, i + 1) << 12) | (_getbyte64(s, i + 2) << 6);
+            x.push(String.fromCharCode(b10 >> 16, (b10 >> 8) & 255));
+            break;
+        case 2:
+            b10 = (_getbyte64(s, i) << 18) | (_getbyte64(s, i + 1) << 12);
+            x.push(String.fromCharCode(b10 >> 16));
+            break
+        }
+        return x.join("")
+    }
+
+    function _getbyte(s, i) {
+        var x = s.charCodeAt(i);
+        if (x > 255) {
+            throw "INVALID_CHARACTER_ERR: DOM Exception 5 ("+x+")";
+        }
+        return x
+    }
+
+    function _encode(s) {
+        if (arguments.length !== 1) {
+            throw "SyntaxError: exactly one argument required"
+        }
+        s = String(s);
+        var i, b10, x = [],
+            imax = s.length - s.length % 3;
+        if (s.length === 0) {
+            return s
+        }
+        for (i = 0; i < imax; i += 3) {
+            b10 = (_getbyte(s, i) << 16) | (_getbyte(s, i + 1) << 8) | _getbyte(s, i + 2);
+            x.push(_ALPHA.charAt(b10 >> 18));
+            x.push(_ALPHA.charAt((b10 >> 12) & 63));
+            x.push(_ALPHA.charAt((b10 >> 6) & 63));
+            x.push(_ALPHA.charAt(b10 & 63))
+        }
+        switch (s.length - imax) {
+        case 1:
+            b10 = _getbyte(s, i) << 16;
+            x.push(_ALPHA.charAt(b10 >> 18) + _ALPHA.charAt((b10 >> 12) & 63) + _PADCHAR + _PADCHAR);
+            break;
+        case 2:
+            b10 = (_getbyte(s, i) << 16) | (_getbyte(s, i + 1) << 8);
+            x.push(_ALPHA.charAt(b10 >> 18) + _ALPHA.charAt((b10 >> 12) & 63) + _ALPHA.charAt((b10 >> 6) & 63) + _PADCHAR);
+            break
+        }
+        return x.join("")
+    }
+    _.mixin ({
+        decode: _decode,
+        encode: _encode,
+        VERSION: _VERSION
+    });
+
+}());/* ===================================================
  * js-url.js v0.01
  * https://github.com/rranauro/boxspringjs
  * ===================================================
@@ -4772,7 +5086,7 @@ if (typeof UTIL === 'undefined') {
 			//console.log('nodeGet, user:', user);
 			//console.log('file-utils nodeGet', opts, typeof callback);
 			var stream = ''
-			, requestType = (opts && opts.headers && opts.headers['content-type'])		
+			, requestType = (opts && opts.headers && opts.headers['Content-Type'])		
 			, req = http.request(opts, function(res) {
 				//console.log('nodeGet rquest', typeof res);				
 				res.setEncoding('ascii');
@@ -4894,6 +5208,7 @@ save: before send fullcommit options
 						_.extend(opts, { 'data': (JSON.stringify(opts.body || {})).replace(/\r/g, '') });
 					}	
 				} 
+								
 				jqueryGet({
 					'url': typeof opts==='string' ? opts : (_.has(opts, 'path') ? opts.path : ''),
 					'type': opts.method,
@@ -4905,6 +5220,7 @@ save: before send fullcommit options
 					'hostname': host, 
 					'port': port, 
 					'path': opts === '' ? '' : opts && opts.path,
+					'headers': _.isObject(opts) ? opts.headers : {},
 					'method': (opts && opts.method) || 'GET',
 					'body': (opts && opts.body && JSON.stringify(opts.body)) || {},
 					'auth': auth }, callback);
