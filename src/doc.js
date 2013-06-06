@@ -160,14 +160,11 @@
 
 		var remove = function (handler) {
 			var local = this;
-			head.call(this, function (err) {
+			head.call(this, function (err, response) {
 				if (err) {
-					handler(err);
-				}				
-				local.queryHTTP('doc_remove', local.docId(), local.docRev(), 
-				function (err, response) {
 					handler(err, response);
-				});				
+				}				
+				local.queryHTTP('doc_remove', local.docId(), local.docRev(), handler);			
 			});
 			return this;
 		};

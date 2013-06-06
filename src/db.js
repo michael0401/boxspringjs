@@ -106,7 +106,7 @@ if (typeof boxspring === 'undefined') {
 
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
-				'login': [ '/_session' + dbname,'POST'],
+				'login': [ '/_session','POST'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
 				'heartbeat': [ '','GET' ],
@@ -153,6 +153,9 @@ if (typeof boxspring === 'undefined') {
 		
 		// extend the db object with the boxspring template;
 		that = _.extend(that, this);
+		
+		// include the maker object
+		that.Boxspring = Boxspring;
 		
 		// create the database linkages using the path object;
 		that.path = path(name);
@@ -270,19 +273,110 @@ if (typeof boxspring === 'undefined') {
 		that.save = save;
 		
 		// What it does: attempts to login the user to this database. 
-		// if the `auth` is provided as an argument the `user` variable is updated. 
-		// Otherwise it uses the `user` variable visible within this object.
-		var login = function (auth, handler) {
-			handler = _.toArray(arguments)[arguments.length-1];
-			user = auth === handler ? user : auth;
-			this.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(this.url), user).get;
+		var login = function (handler) {
+			var local = this;
+			
 			this.queryHTTP('login', { 
 				'body': user, 
-				'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
+				'headers': {}}, {}, function(err, response) {
+					if (err) {
+						return handler(err, response);
+					}
+					local.session(handler);
+				});
+// https?
+//				'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
 			return this;
 			
 		};
 		that.login = login;
+		
+		// used by userSignUp and userDelete
+		var authFileUserDocName = function(name) {
+			return 'org.couchdb.user:'+name;
+		};
+		
+		var signUp = function(userAuth, roles, handler) {
+			var local = this
+			, users = this.Boxspring.extend('_users', { 'auth': user })(this.url)
+			, newUser = this.Boxspring.extend(this.name, {'auth': userAuth})(this.url)
+			, taken;
+			
+			// fetch the _users database and check for the availability of the user 'name'
+			users.all_docs(function(err, r1) {
+				if (err) {
+					return handler(err, r1);
+				}
+				
+				// return error if name is taken
+				_.each(r1.data.rows, function(row) {
+					taken = taken || (row.id.split(':')[1] === userAuth.name);
+				});
+
+				if (taken) {
+					return handler(err, {
+						'code': 409,
+						'data': {'error': 'signup failed', 'reason': 'name taken'}});
+				}
+				// create a document and add it to the _users database
+				users.doc(authFileUserDocName(userAuth.name)).source({
+					'type': 'user',
+					'name': userAuth.name,
+					'password': userAuth.password,
+					'roles': roles
+				}).save(function(err, r2) {					
+					if (err) {
+						// something is wrong, return an error
+						return handler(err, r2);
+					}
+					// log in this new user and provide a new database handle in the callback
+					newUser.login(function(err, response) {
+						if (err || response.code === 401) {
+							return handler(err, response);
+						}
+						handler(null, response, newUser);
+					});
+				});
+			});		
+		};
+		that.signUp = signUp;
+		
+		var getUser = function (name, handler) {
+			var users = this.Boxspring.extend('_users', { 'auth': user })(this.url)
+			, doc = users.doc(authFileUserDocName(name)).retrieve(function(err, response) {
+				handler(err, response, doc);
+			});
+		};
+		that.getUser = getUser;
+		
+		var deleteUser = function (name, handler) {
+			var users = this.Boxspring.extend('_users', {'auth': user })(this.url);
+		
+			this.getUser(name, function(err, response, doc) {
+				if (err || response.code === 401) {
+					if (response.code === 401) {
+						return handler(new Error('User name not found.'), response);
+					} 
+					return handler(err, response);
+				}
+				// remove this user document from the _users
+				doc.remove(handler);
+			});
+		};
+		that.deleteUser = deleteUser;
+		
+		var updateUser = function(name, newAuth, newRoles, handler) {
+			var local = this
+			, users = this.Boxspring.extend('_users', {'auth': user })(this.url); 
+			
+			users.deleteUser(name, function(err, response) {
+				if (err) {
+					return handler(err, response);
+				}
+				users.signUp(newAuth, newRoles, handler);
+			});
+		};
+		that.updateUser = updateUser;
 
 		var remove = function (handler) {
 			var local = this;

@@ -14,7 +14,12 @@
 	* [doc](#doc) - instantiate a new document object
 	* [bulk](#bulk) - instantiate a new bulk document object
 	* [design](#design) - instantiate a new design document object
-
+	* [Authentication methods](#authentication-methods)
+		* [login](#login) - authenticate a user and update the credentials
+		* [getUser](#getUser) - determine if a `name` is already exists
+		* [signUp](#signUp) - create a new user account
+		* [updateUser](#updateUser) - update the `password` for a user account
+		* [deleteUser](#deleteUser) - remove a user account from the system
 
 * [Document methods](#document-methods)
 
@@ -154,6 +159,7 @@ The database API provides a uniform interface to CouchDB database services for s
 - [doc](#doc)
 - [bulk](#bulk)
 - [design](#design)
+- [Authentication](#authentication-methods)
 
 ####Methods
 
@@ -309,11 +315,89 @@ See [Design methods](#design-methods)
 
 [1] http://guide.couchdb.org/draft/design.html
 
+<a name="authentication-methods" />
+####Authentication methods
+
+__Overview__
+
+*Authentication methods are built-in to the database object. Access to all but the `login` method are restricted to database objects created with administrative privilege. The format of the `authentication` object is shown below:*
+
+<a name="authentication-object" />
+	// Authentication object
+	{ 'name': 'some-name', 'password': 'secret-password' };
+	
+*When a database object is created with an authentication object the authentication object remains hidden and available to the server for all subsequent requests. __There is no reason for the application to maintain the authorization object once a database object has been created.__ Once the `login` method is run the database object is updated with the users roles and access credentials. These credentials are used for controlling read/write access to documents on the system by various [update_handlers](http://wiki.apache.org/couchdb/Document_Update_Handlers).*
+
+*When a new user account is created using `signUp` the server [hashes the password](http://wiki.apache.org/couchdb/Security_Features_Overview) and stores it with the user document. __Thus the original password cannot be recovered from the server and a user who forgets his password will have to be prompted by the application to create a new password.__ The `updateUser` account method updates user document on the server.*
+
+> When creating a new user account, `signUp` will fail if the requested `name` in the authentication object is already existing by some other user. To limit the likelihood of name clashes, it is recommended to require a valid email address as the `name` for all user accounts.
+
+>When updating, `updateUser` by definition will update a user account with the new `password` and credentials. To confirm that the requesting user is the owner of the account, the application can check the existence of the old user account with `getUser`, update the user account with its own hashed `password` and email the new password to the user. Once the user re-enters the system with the hashed password he can change his password to his preference and the application can safely update the new `password` using `updateUser`.*
+
+*The `deleteUser` method removes user accounts from the system. __This operation is not reversible.__*
+
+> __With the exception of `login` all authentication methods require administrative privilege.__ 
+
+<a name="signUp" />
+####signUp(authObject, roles, callback)
+
+*Takes an [authorization object](#authentication-object) and an array of of application defined roles. Returns an error code `409` in the response object of the callback if the requested `name` is already taken. Otherwise proceeds to add the user to the system and returns the callback with the response and a database object.*
+
+	// Example
+	mydb = Boxspring.extend('mydb', {'auth': admin_auth_object });
+	mydb.signUp({'name': 'some-user', 'password': 'a-secret' }, [], function(err, response, newDb) {
+		if (err) {
+			if (response.code === 409) {
+				// name 'some-user' is already taken.
+			} else {
+				// some other error
+			}
+		}
+		// 'newDb' is a database object 
+		newDb.login(function(err, response) {
+			console.log(response.code);
+			// -> 200
+		});
+	});
+
+<a name="login" />
+####login(callback)
+
+*Logs a user into the system and updates her credentials for subsequent document read/write activity.* 
+
+> Unless there is an `http` error, the `err` object in the callback will always be `null`. A successful login will return code `200`. A bad username or password will return code `409`.
+
+<a name="getUser" />
+####getUser(name, callback)
+
+*Confirm the existence of `name` and returns the user document.*
+
+  	// Example
+	mydb.getUser('some-user', function(err, response, doc) {
+		if (err) {
+			// 401 unauthorized
+		}
+		console.log(doc.source().type, doc.source().name);
+		// -> 'user', 'some-user'
+	});
+
+<a name="updateUser" />	
+####updateUser(name, newAuth, newRoles, callback)
+
+*Use this method to change the `password` or `roles` for a user.*
+
+<a name="deleteUser" />
+####deleteUser(name, callback)
+
+*Use this method to remove a `name` from the system.*
+
+> __Caution: This operation cannot be reversed.__
+
 <a name="document-methods" />
 ###Document methods
 
 The document object, invoked from a [database object](https://github.com/rranauro/boxspringjs/blob/master/db.md#doc)
-provides ethods to manage document creation, updating, and removal of documents. Once the document is retrieved from the server, the object maintains the [revision id](http://wiki.apache.org/couchdb/HTTP_Document_API#Special_Fields) freeing the programmer to focus on managing the actual content of the document.
+provides methods to manage document creation, updating, and removal of documents. Once the document is retrieved from the server, the object maintains the [revision id](http://wiki.apache.org/couchdb/HTTP_Document_API#Special_Fields) freeing the programmer to focus on managing the actual content of the document.
 
 Some helper functions are provided so that other object can access information about the document without needing to know too much about the internal structure of a document.
 

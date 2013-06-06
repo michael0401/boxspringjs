@@ -28,22 +28,23 @@ var test = require('tape')
 	};
 }
 
-test('boxspringjs-1', function (t) {
+var users = Boxspring.extend('_users', { 'auth': thisauth.auth })('127.0.0.1')
+, db1 = Boxspring.extend('regress', { 'auth': thisauth.auth })('127.0.0.1')
+, db2 = Boxspring.extend('regress', { 'auth': badname.auth })()
+, db3 = Boxspring.extend('regress', { 'auth': badpass.auth })()
+, db4 = Boxspring.extend('regress', {'auth': alternate.auth })()
+, db5 = Boxspring.extend('regress')();
 
-	t.plan(6);
-	
-	var db1 = Boxspring.extend('regress', { 'auth': thisauth.auth })('127.0.0.1')
-	, db2 = Boxspring.extend('regress', { 'auth': badname.auth })()
-	, db3 = Boxspring.extend('regress', { 'auth': badpass.auth })()
-	, db4 = Boxspring.extend('regress', {'auth': alternate.auth })()
-	, db5 = Boxspring.extend('regress')();	
-	
+test('boxspring-auth-1', function (t) {
+
+	t.plan(4);
+		
 	var confirmSession = function(db, expected, name, count) {
 		count = typeof count === 'undefined' ? 0 : count;
 		
 		db.login(function(err, result) {
 			if (result.code === expected) {
-				t.equal(result.code, expected, name);				
+				t.equal(result.code, expected, name);
 			} else {
 				// retry until it works...
 				if (count < 3) {
@@ -62,15 +63,73 @@ test('boxspringjs-1', function (t) {
 	confirmSession(db3, 401, 'bad-password');
 	confirmSession(db4, 200, 'hashed-auth');
 	
-	// provide authentication argument to update the object
-	db5.login(alternate.auth, function(err, response) {
-		t.equal(response.code, 200, 'login-test1');
+});
+
+test('boxspring-auth-2', function(t) {
+	t.plan(9);
+
+
+	var signUpSequence3 = function () {
+		users.signUp({'name': 'ron', 'password': 'ran'}, [], function(err, response) {
+			t.equal(err, null,'signUp-3');
+			users.updateUser('ron', {'name': 'ron', 'password': 'run'}, 
+				[], function(err, response) {
+				t.equal(err, null, 'update-user-3');
+				users.deleteUser('ron', function(err, response) {
+					t.equal(response.code, 200, 'delete-updated-user-3');
+					users.login({'name': 'ron', 'password': 'run'}, function(err, response) {
+						t.equal(response.code, 401, 'login-deleted-3');
+					});
+				});
+			});
+		});
+	};
+
+	// test that a duplicate user name will fail
+	var signUpSequence2 = function () {
+		users.signUp({'name': 'ron', 'password': 'ran'}, [], function(err) {
+			t.equal(err, null, 'signUp-2');
+			users.signUp({'name': 'ron', 'password': 'ran'}, [], function(err, response) {
+				t.equal(response.code, 409, 'signUp-conflict-2');
+				users.deleteUser('ron', function(err, response) {
+					t.equal(response.code, 200, 'user-deleted-2');
+					if (response.code === 200) {
+						signUpSequence3();						
+					}
+				});
+			});		
+		});
+	};
+		
+	// test that a user name is created, and deleted.	
+	var signUpSequence1 = function () {
+		users.signUp({'name': 'ron', 'password': 'ran'}, [], function(err) {
+			t.equal(err, null, 'signUp-1');
+			users.deleteUser('ron', function(err, response) {
+				t.equal(response.code, 200, 'user-deleted-1');
+				if (response.code === 200) {
+					signUpSequence2();					
+				}
+			});
+		});		
+	};
+
+
+	users.getUser('ron', function(err, res) {
+		// if existing, remove it
+		if (!err) {
+			users.deleteUser('ron', function(err, res) {
+				if (err) {
+					return console.log('Unable to remove pre-existing user, aborting...', err);
+				}
+				console.log('Removed user before starting...');
+				signUpSequence1();
+			});
+		} else {
+			// otherwise, proceed
+			console.log('Nothing to remove before starting...');
+			signUpSequence1();
+		}
 	});
-	
-	// try to over-ride an existing credential
-	db1.login(alternate.auth, function(err, response) {
-		t.equal(response.code, 200, 'login-test2');
-	});
-	
 });
 
