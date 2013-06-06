@@ -142,7 +142,7 @@ if (typeof boxspring === 'undefined') {
 	};
 	
 	var db = function (name, options) {
-		var user = (options && options.auth) || {'name': '', 'paswword': ''}
+		var user = _.extend({'name': '', 'password': ''}, (options && options.auth));
 		, that = _.extend({}, _.defaults(options || {}, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
@@ -152,7 +152,10 @@ if (typeof boxspring === 'undefined') {
 		}));
 		
 		// extend the db object with the boxspring template;
-		that = _.extend(that, this);
+		that.Boxspring = Boxspring;
+		
+		// omit the 'auth' object from the interface
+		that = _.omit(that, 'auth');
 		
 		// include the maker object
 		that.Boxspring = Boxspring;
@@ -298,8 +301,8 @@ if (typeof boxspring === 'undefined') {
 		
 		var signUp = function(userAuth, roles, handler) {
 			var local = this
-			, users = this.Boxspring.extend('_users', { 'auth': user })(this.url)
-			, newUser = this.Boxspring.extend(this.name, {'auth': userAuth})(this.url)
+			, users = Boxspring.extend('_users', { 'auth': user })(this.url)
+			, newUser = Boxspring.extend(this.name, {'auth': userAuth})(this.url)
 			, taken;
 			
 			// fetch the _users database and check for the availability of the user 'name'
@@ -319,12 +322,14 @@ if (typeof boxspring === 'undefined') {
 						'data': {'error': 'signup failed', 'reason': 'name taken'}});
 				}
 				// create a document and add it to the _users database
-				users.doc(authFileUserDocName(userAuth.name)).source({
+				var d = users.doc(authFileUserDocName(userAuth.name)).source({
 					'type': 'user',
 					'name': userAuth.name,
 					'password': userAuth.password,
 					'roles': roles
-				}).save(function(err, r2) {					
+				});
+				
+				d.save(function(err, r2) {					
 					if (err) {
 						// something is wrong, return an error
 						return handler(err, r2);
@@ -396,18 +401,23 @@ if (typeof boxspring === 'undefined') {
 		var events = function(Obj) {
 			return _.extend(Obj || {}, _.clone(Backbone.Events));
 		};
-		that.events = events;		
+		that.events = events;
+		
+		var getAuth = function () {
+			return user;
+		};
+		that.getAuth = getAuth;
 		return that;		
 	};
 
 	global.db = function(name, options) {
-		var user = (options && options.auth) || { 'name': '', 'paswword': '' }
-		, object = db.call(this, name, options);
+		var object = db.call(this, name, options);
 		
 		return function (url) {
 			// all subsequent HTTP calls will use the supplied credentials.
 			object.url = url || '127.0.0.1'
-			object.HTTP = boxspring.UTIL.fileio.server('server', _.urlParse(object.url), user).get;
+			object.HTTP = boxspring
+				.UTIL.fileio.server('server', _.urlParse(object.url), object.getAuth()).get;
 			return _.extend({}, object);
 		};
 	}

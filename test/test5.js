@@ -108,7 +108,7 @@ test('boxspring-auth-2', function(t) {
 			users.deleteUser('ron', function(err, response) {
 				t.equal(response.code, 200, 'user-deleted-1');
 				if (response.code === 200) {
-					signUpSequence2();					
+				//	signUpSequence2();					
 				}
 			});
 		});		
