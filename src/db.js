@@ -143,7 +143,7 @@ if (typeof boxspring === 'undefined') {
 	
 	var db = function (name, options) {
 		var user = _.extend({'name': '', 'password': ''}, (options && options.auth))
-		, that = _.extend({}, _.defaults(options || {}, {
+		, that = _.extend({}, this, _.defaults(options || {}, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
 			'index': (options && options.index) || 'Index',
@@ -151,14 +151,8 @@ if (typeof boxspring === 'undefined') {
 			'designName': (options && options.designName) || '_design/default',
 		}));
 		
-		// extend the db object with the boxspring template;
-		that.Boxspring = Boxspring;
-		
 		// omit the 'auth' object from the interface
 		that = _.omit(that, 'auth');
-		
-		// include the maker object
-		that.Boxspring = Boxspring;
 		
 		// create the database linkages using the path object;
 		that.path = path(name);
@@ -304,7 +298,7 @@ if (typeof boxspring === 'undefined') {
 			, users = Boxspring.extend('_users', { 'auth': user })(this.url)
 			, newUser = Boxspring.extend(this.name, {'auth': userAuth})(this.url)
 			, taken;
-			
+						
 			// fetch the _users database and check for the availability of the user 'name'
 			users.all_docs(function(err, r1) {
 				if (err) {
@@ -322,14 +316,12 @@ if (typeof boxspring === 'undefined') {
 						'data': {'error': 'signup failed', 'reason': 'name taken'}});
 				}
 				// create a document and add it to the _users database
-				var d = users.doc(authFileUserDocName(userAuth.name)).source({
+				users.doc(authFileUserDocName(userAuth.name)).source({
 					'type': 'user',
 					'name': userAuth.name,
 					'password': userAuth.password,
 					'roles': roles
-				});
-				
-				d.save(function(err, r2) {					
+				}).save(function(err, r2) {					
 					if (err) {
 						// something is wrong, return an error
 						return handler(err, r2);
@@ -347,7 +339,7 @@ if (typeof boxspring === 'undefined') {
 		that.signUp = signUp;
 		
 		var getUser = function (name, handler) {
-			var users = this.Boxspring.extend('_users', { 'auth': user })(this.url)
+			var users = Boxspring.extend('_users', { 'auth': user })(this.url)
 			, doc = users.doc(authFileUserDocName(name)).retrieve(function(err, response) {
 				handler(err, response, doc);
 			});
@@ -355,7 +347,7 @@ if (typeof boxspring === 'undefined') {
 		that.getUser = getUser;
 		
 		var deleteUser = function (name, handler) {
-			var users = this.Boxspring.extend('_users', {'auth': user })(this.url);
+			var users = Boxspring.extend('_users', {'auth': user })(this.url);
 		
 			this.getUser(name, function(err, response, doc) {
 				if (err || response.code === 401) {

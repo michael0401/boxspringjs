@@ -40,14 +40,16 @@ boxspring.UTIL = UTIL;
 		return this;
 	}
 	
-	Boxspring.prototype.extend = function () {	
+	Boxspring.prototype.extend = function () {
+		var object = new Boxspring();
+		object = _.extend(object, template);
+			
 		// db.apply returns a new database object with the supplied arguments
-		return template.db.apply(template, arguments);
+		return template.db.apply(object, arguments);
 	};
 
 	// Current version.
 	Boxspring.prototype.VERSION = '0.0.1';
-	
 	
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = new Boxspring();
