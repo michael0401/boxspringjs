@@ -142,7 +142,7 @@ if (typeof boxspring === 'undefined') {
 	};
 	
 	var db = function (name, options) {
-		var user = _.extend({'name': '', 'password': ''}, (options && options.auth));
+		var user = _.extend({'name': '', 'password': ''}, (options && options.auth))
 		, that = _.extend({}, _.defaults(options || {}, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
