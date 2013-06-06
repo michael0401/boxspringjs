@@ -323,6 +323,7 @@ __Overview__
 *Authentication methods are built-in to the database object. Access to all but the `login` method are restricted to database objects created with administrative privilege. The format of the `authentication` object is shown below:*
 
 <a name="authentication-object" />
+
 	// Authentication object
 	{ 'name': 'some-name', 'password': 'secret-password' };
 	
