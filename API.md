@@ -14,12 +14,14 @@
 	* [doc](#doc) - instantiate a new document object
 	* [bulk](#bulk) - instantiate a new bulk document object
 	* [design](#design) - instantiate a new design document object
-	* [Authentication methods](#authentication-methods)
-		* [login](#login) - authenticate a user and update the credentials
-		* [getUser](#getUser) - determine if a `name` is already exists
-		* [signUp](#signUp) - create a new user account
-		* [updateUser](#updateUser) - update the `password` for a user account
-		* [deleteUser](#deleteUser) - remove a user account from the system
+	* [login](#login) - authenticate a user and update the credentials
+	* [logout](#login) - remove a user session
+
+* [User account methods](#authentication-methods)
+	* [get](#getUser) - determine if a `name` is already exists
+	* [signUp](#signUp) - create a new user account
+	* [update](#updateUser) - update the `password` for a user account
+	* [delete](#deleteUser) - remove a user account from the system
 
 * [Document methods](#document-methods)
 
@@ -218,9 +220,11 @@ Confirm the connection to the server with no authentication.
 Authenticate this user on the server.
 
 <a name="login" />
-#####login([auth], callback)
+####login(callback)
 
-Authenticate this user for this database. If you supply an `auth` object it will be used instead of any `name/password` provided when the object was created.
+Logs a user into the system and updates her credentials for subsequent document read/write activity. 
+
+> Unless there is an `http` error, the `err` object in the callback will always be `null`. A successful login will return code `200`. A bad username or password will return code `409` in the response object.
 
 <a name="all_dbs" />
 #####all_dbs(callback)
@@ -316,11 +320,27 @@ See [Design methods](#design-methods)
 [1] http://guide.couchdb.org/draft/design.html
 
 <a name="authentication-methods" />
-####Authentication methods
+####users(name, [adminDb])
+
+Create a `users` object for signing up new users `signUp`, removing them `remove`, and updating their `name`, `pasword`, and optional `roles`. 
+
+	// Example
+	var Mydb = Boxspring.extend('some-db')
+	, mydb = Mydb('127.0.0.1').users('new-username');
+	
+	mydb.signUp('some-password', [ 'roles' ], function(err, response, newDb) {
+		if (err) {
+			// handle the error
+		}
+		// newDb is an object with the logged in user just created.
+	});
+	
 
 __Overview__
 
 Authentication methods are built-in to the database object. Access to all but the `login` method are restricted to database objects created with administrative privilege. The format of the `authentication` object is shown below:
+
+> The `signUp` method can be run anonymously to allow users to create their own accounts. __Therefore there is no need for the application to store an administrative password that could be hacked__. The `get`, `update`, and `delete` methods require administrative privilege on the system to fulfill their requests.
 
 <a name="authentication-object" />
 
@@ -345,8 +365,8 @@ The `deleteUser` method removes user accounts from the system. __This operation 
 Takes an [authorization object](#authentication-object) and an array of of application defined roles. Returns an error code `409` in the response object of the callback if the requested `name` is already taken. Otherwise proceeds to add the user to the system and returns the callback with the response and a database object.
 
 	// Example
-	mydb = Boxspring.extend('mydb', {'auth': admin_auth_object });
-	mydb.signUp({'name': 'some-user', 'password': 'a-secret' }, [], function(err, response, newDb) {
+	mydb = Boxspring.extend('mydb')().users('newuser');
+	mydb.signUp('newuserpassword', [], function(err, response, newDb) {
 		if (err) {
 			if (response.code === 409) {
 				// name 'some-user' is already taken.
@@ -354,19 +374,10 @@ Takes an [authorization object](#authentication-object) and an array of of appli
 				// some other error
 			}
 		}
-		// 'newDb' is a database object 
-		newDb.login(function(err, response) {
-			console.log(response.code);
-			// -> 200
-		});
+		// 'newDb' is a database object already logged in
+		console.log(response.code);
+		// -> 200
 	});
-
-<a name="login" />
-####login(callback)
-
-Logs a user into the system and updates her credentials for subsequent document read/write activity. 
-
-> Unless there is an `http` error, the `err` object in the callback will always be `null`. A successful login will return code `200`. A bad username or password will return code `409`.
 
 <a name="getUser" />
 ####getUser(name, callback)
@@ -374,7 +385,7 @@ Logs a user into the system and updates her credentials for subsequent document 
 Confirm the existence of `name` and returns the user document.
 
   	// Example
-	mydb.getUser('some-user', function(err, response, doc) {
+	mydb.get('some-user', function(err, response, doc) {
 		if (err) {
 			// 401 unauthorized
 		}
@@ -383,16 +394,16 @@ Confirm the existence of `name` and returns the user document.
 	});
 
 <a name="updateUser" />	
-####updateUser(name, newAuth, newRoles, callback)
+####update(newPassword, newRoles, callback)
 
-Use this method to change the `password` or `roles` for a user.
+Use this method to change the `password` or `roles` for a user. __Requires administrative privilege.__
 
-<a name="deleteUser" />
-####deleteUser(name, callback)
+<a name="delete" />
+####deleteUser(callback)
 
-Use this method to remove a `name` from the system.
+Use this method to remove a `name` from the system. __Requires administrative privilege.__
 
-> __Caution: This operation cannot be reversed.__
+> Caution: This operation cannot be reversed.
 
 <a name="document-methods" />
 ###Document methods

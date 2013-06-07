@@ -122,7 +122,6 @@
 			this.queryHTTP('doc_head', 
 				_.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
 				function (err, response) {
-					//console.log('head:', responseOk(response), response.header);
 					if (!err) {
 						_.extend(local.updated_docinfo, { '_rev': local.getRev(response) });
 					} 
@@ -160,11 +159,13 @@
 
 		var remove = function (handler) {
 			var local = this;
+			//retrieve.call(this, function(err, response) {
 			head.call(this, function (err, response) {
 				if (err) {
 					handler(err, response);
+				} else {
+					local.queryHTTP('doc_remove', local.docId(), local.docRev(), handler);								
 				}				
-				local.queryHTTP('doc_remove', local.docId(), local.docRev(), handler);			
 			});
 			return this;
 		};

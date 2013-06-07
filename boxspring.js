@@ -275,105 +275,16 @@ if (typeof boxspring === 'undefined') {
 			
 			this.queryHTTP('login', { 
 				'body': user, 
-				'headers': {}}, {}, function(err, response) {
+				'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, 
+					function(err, response) {
 					if (err) {
 						return handler(err, response);
 					}
 					local.session(handler);
 				});
-// https?
-//				'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
 			return this;
-			
 		};
 		that.login = login;
-		
-		// used by userSignUp and userDelete
-		var authFileUserDocName = function(name) {
-			return 'org.couchdb.user:'+name;
-		};
-		
-		var signUp = function(userAuth, roles, handler) {
-			var local = this
-			, users = Boxspring.extend('_users', { 'auth': user })(this.url)
-			, newUser = Boxspring.extend(this.name, {'auth': userAuth})(this.url)
-			, taken;
-						
-			// fetch the _users database and check for the availability of the user 'name'
-			users.all_docs(function(err, r1) {
-				if (err) {
-					return handler(err, r1);
-				}
-				
-				// return error if name is taken
-				_.each(r1.data.rows, function(row) {
-					taken = taken || (row.id.split(':')[1] === userAuth.name);
-				});
-
-				if (taken) {
-					return handler(err, {
-						'code': 409,
-						'data': {'error': 'signup failed', 'reason': 'name taken'}});
-				}
-				// create a document and add it to the _users database
-				users.doc(authFileUserDocName(userAuth.name)).source({
-					'type': 'user',
-					'name': userAuth.name,
-					'password': userAuth.password,
-					'roles': roles
-				}).save(function(err, r2) {					
-					if (err) {
-						// something is wrong, return an error
-						return handler(err, r2);
-					}
-					// log in this new user and provide a new database handle in the callback
-					newUser.login(function(err, response) {
-						if (err || response.code === 401) {
-							return handler(err, response);
-						}
-						handler(null, response, newUser);
-					});
-				});
-			});		
-		};
-		that.signUp = signUp;
-		
-		var getUser = function (name, handler) {
-			var users = Boxspring.extend('_users', { 'auth': user })(this.url)
-			, doc = users.doc(authFileUserDocName(name)).retrieve(function(err, response) {
-				handler(err, response, doc);
-			});
-		};
-		that.getUser = getUser;
-		
-		var deleteUser = function (name, handler) {
-			var users = Boxspring.extend('_users', {'auth': user })(this.url);
-		
-			this.getUser(name, function(err, response, doc) {
-				if (err || response.code === 401) {
-					if (response.code === 401) {
-						return handler(new Error('User name not found.'), response);
-					} 
-					return handler(err, response);
-				}
-				// remove this user document from the _users
-				doc.remove(handler);
-			});
-		};
-		that.deleteUser = deleteUser;
-		
-		var updateUser = function(name, newAuth, newRoles, handler) {
-			var local = this
-			, users = this.Boxspring.extend('_users', {'auth': user })(this.url); 
-			
-			users.deleteUser(name, function(err, response) {
-				if (err) {
-					return handler(err, response);
-				}
-				users.signUp(newAuth, newRoles, handler);
-			});
-		};
-		that.updateUser = updateUser;
 
 		var remove = function (handler) {
 			var local = this;
@@ -413,6 +324,112 @@ if (typeof boxspring === 'undefined') {
 			return _.extend({}, object);
 		};
 	}
+})(boxspring);
+/* ===================================================
+ * db.js v0.01
+ * https://github.com/rranauro/boxspringjs
+ * ===================================================
+ * Copyright 2013 Incite Advisors, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+/*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
+/*global _: true, Boxspring: true, Backbone: true */
+"use strict";
+
+if (typeof boxspring === 'undefined') {
+	var boxspring = function () {};	
+}
+
+var thisauth = require('auth').auth;
+
+(function(global) {
+	
+	var users = function (name, admin) {
+		var that = _.extend({}, this)
+		, adminDb = Boxspring.extend('_users', {'auth': admin })(this.url);
+			
+		// used by userSignUp and userDelete
+		var authFileUserDocName = function() {
+			return 'org.couchdb.user:'+name;
+		};
+
+		var get = function (handler) {
+			var doc = adminDb
+				.doc(authFileUserDocName()).retrieve(function(err, response) {
+				handler(err, response, doc);
+			});
+		};
+		that.get = get;
+				
+		var signUp = function(password, roles, handler) {
+			var anonymous = Boxspring.extend('_users')(this.url)
+			, newUser = Boxspring.extend(this.name, {
+				'auth': {'name': name, 'password': password }})(this.url);
+						
+			// create a document and add it to the _users database
+			anonymous.doc(authFileUserDocName()).source({
+				'type': 'user',
+				'name': name,
+				'password': password,
+				'roles': roles
+			}).save(function(err, r2) {					
+				if (err) {
+					// something is wrong, return an error
+					return handler(err, r2);
+				}
+				// log in this new user and provide a new database handle in the callback
+				newUser.login(function(err, response) {
+					if (err || response.code === 401) {
+						return handler(err, response);
+					}
+					handler(null, response, newUser);
+				});
+			});				
+		};
+		that.signUp = signUp;
+		
+		var remove = function (handler) {
+			Boxspring.extend('_users', {'auth': thisauth.auth })()
+				.doc(authFileUserDocName())
+				.remove(function(err, response) {
+					if (err || response.code === 401) {
+						if (response.code === 401) {
+							return handler(new Error('User name document not found.'), response);
+						}
+					}
+					// if its not 401, let the caller handle the error
+					return handler(err, response);				
+				});
+		};
+		that.remove = remove;
+		
+		var update = function(newPassword, newRoles, handler) {
+			var local = this
+			
+			this.remove(function(err, response) {
+				if (err) {
+					return handler(err, response);
+				}
+				local.signUp(newPassword, newRoles, handler);
+			});
+		};
+		that.update = update;
+		return that;
+	};
+	
+	global.users = users;
 })(boxspring);
 /* ===================================================
  * doc.js v0.01
@@ -538,7 +555,6 @@ if (typeof boxspring === 'undefined') {
 			this.queryHTTP('doc_head', 
 				_.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
 				function (err, response) {
-					//console.log('head:', responseOk(response), response.header);
 					if (!err) {
 						_.extend(local.updated_docinfo, { '_rev': local.getRev(response) });
 					} 
@@ -576,11 +592,13 @@ if (typeof boxspring === 'undefined') {
 
 		var remove = function (handler) {
 			var local = this;
+			//retrieve.call(this, function(err, response) {
 			head.call(this, function (err, response) {
 				if (err) {
 					handler(err, response);
+				} else {
+					local.queryHTTP('doc_remove', local.docId(), local.docRev(), handler);								
 				}				
-				local.queryHTTP('doc_remove', local.docId(), local.docRev(), handler);			
 			});
 			return this;
 		};
@@ -5150,11 +5168,12 @@ if (typeof UTIL === 'undefined') {
 		, host = (server && server.host) || (server && server.hostname)
 		, port = server && server.port
 		, root = server && server.root
+		, timeOfLastGet
 		, that = {}
 
 		// Purpose: parses a JSON object with 'catch' 
 		// to just return the input if the parse fails.
-		, parse = function (s, responseType, requestType) {
+		, parse = function (s, responseType) {
 			var parsed = {}
 			, contentType = (typeof responseType !== 'undefined') 
 				? responseType.split(';')[0] 
@@ -5164,7 +5183,7 @@ if (typeof UTIL === 'undefined') {
 				return '';
 			} 
 			
-			if (contentType === 'application/json') {
+			if (contentType === 'application/json' || contentType === 'json') {
 				// ajax sometimes returns .html from the root directory
 				if (s.toUpperCase().substr(2,8) === "DOCTYPE") {
 					return s;
@@ -5177,6 +5196,15 @@ if (typeof UTIL === 'undefined') {
 				return parsed;
 			}
 			return s;					
+		}
+		// Couchdb sets a 10 minute expiration on cookies, so have to send with Basic to get another
+		, isTimeToRefresh = function () {
+			if (!timeOfLastGet || ((timeOfLastGet + 599900) < Date.now())) {
+				return true;
+			}		
+			// regardless, set the timer		
+			timeOfLastGet = Date.now();
+			return false;
 		};	
 
 		if (!server || (!root && !host)) {
@@ -5191,8 +5219,14 @@ if (typeof UTIL === 'undefined') {
 			//console.log('nodeGet, user:', user);
 			//console.log('file-utils nodeGet', opts, typeof callback);
 			var stream = ''
-			, requestType = (opts && opts.headers && opts.headers['Content-Type'])		
-			, req = http.request(opts, function(res) {
+			, req;
+			
+			// If time to refresh, or no cookie, then apply 'Basic' authentication;
+			if (isTimeToRefresh() || !Cookie) {
+				opts.auth = auth;
+			}
+						
+			req = http.request(opts, function(res) {
 				//console.log('nodeGet rquest', typeof res);				
 				res.setEncoding('ascii');
 				res.on('data', function (chunk) {
@@ -5206,7 +5240,7 @@ if (typeof UTIL === 'undefined') {
 								request: _.omit(opts, 'agent', 'auth'),
 								code: res.statusCode,
 								header: res.headers,
-								data: parse(stream, res.headers['content-type'], requestType)								
+								data: parse(stream, res.headers['content-type'])								
 							}, res);
 					}
 					if (_.has(res.headers, 'set-cookie')) {
@@ -5215,9 +5249,11 @@ if (typeof UTIL === 'undefined') {
 				});			
 			});
 
-//			if (Basic) {
-//				req.setHeader('Authorization', Basic);
-//			}
+			if (Cookie) {
+				req.setHeader('Authorization', Cookie);
+			} else if (Basic) {
+				req.setHeader('Authorization', Basic);
+			}
 
 			req.setHeader('Connection', 'keep-alive');
 			req.setHeader('Content-type', 'application/json');													
@@ -5239,27 +5275,19 @@ if (typeof UTIL === 'undefined') {
 processData: false _config, {dbname}, 
 save: before send fullcommit options
 */	
-	
-		// won't change from call to call
-		if (browser) {
-			$.ajaxSetup({
-				'accepts': {'json': 'application/json' },
-				'dataType': "json",
-				'username': user && user.name,
-				'password': user && user.password,
-				'converters': {
-					"text json": function( stream ) {
-						parse(stream, 'application/json');
-					}
-				}
-			});
-		}
 		
 		var jqueryGet = function (opts, callback) {
-			var defaultAjaxOpts = { // can change from call to call
+			var defaultAjaxOpts = { 
+					'accepts': {'json': 'application/json' },
+					'dataType': "json",			
 					'contentType': "application/json",
 					'headers': {
 						"Accept": "application/json"
+					},
+					'converters': {
+						"text json": function( stream ) {
+							parse(stream, 'application/json');
+						}
 					}
 				}
 			// Purpose: jQuery ajax call returns header string. 
@@ -5275,6 +5303,13 @@ save: before send fullcommit options
 				});
 				return (header);
 			};
+			
+			// if first time through, or haven't been here in almost 10 minutes
+			
+			if (isTimeToRefresh()) {
+				opts.username = user && user.name;
+				opts.password = user && user.password;				
+			}
 
 			// extend the options with the defaults, and the ajax logic
 			opts = _.extend(defaultAjaxOpts, opts, {	
@@ -5285,14 +5320,14 @@ save: before send fullcommit options
 		        },
 		        complete: function(jqXHR, xhrString) {
 					//var resp = httpData(req, "json");
-					//console.log(jqXHR.responseText);
+					//console.log('ajax', jqXHR.getAllResponseHeaders(), opts);
 					if (callback && typeof callback === 'function') {
 						callback(xhrStringValues[xhrString](jqXHR.status), {
 							request: _.omit(opts, 'agent', 'auth'),
 							method: opts.type,
 							code: jqXHR.status,
 							header: parseHdr(jqXHR.getAllResponseHeaders()),
-							data: parse(jqXHR.responseText, this.contentType)
+							data: parse(jqXHR.responseText, this.dataType)
 						});
 					}
 				}
@@ -5343,8 +5378,8 @@ save: before send fullcommit options
 					'path': opts === '' ? '' : opts && opts.path,
 					'headers': _.isObject(opts) ? opts.headers : {},
 					'method': (opts && opts.method) || 'GET',
-					'body': (opts && opts.body && JSON.stringify(opts.body)) || {},
-					'auth': auth }, callback);
+					'body': (opts && opts.body && JSON.stringify(opts.body)) || {}
+					/*'auth': auth*/ }, callback);
 			}				
 		};
 		that.get = get;

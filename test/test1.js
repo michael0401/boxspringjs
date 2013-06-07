@@ -32,7 +32,7 @@ var Boxspringjs = Maker
 // tests to verify db save/remove
 test('boxspring-create-db', function(t) {
 	var mydb = Boxspring.extend('phantomdb', {
-		'auth': { 'name': 'couchdb', 'password': 'couchdb' }})('127.0.0.1');
+		'auth': { 'name': 'couchdb', 'password': 'admin' }})('127.0.0.1');
 	
 	t.plan(1);
 	
