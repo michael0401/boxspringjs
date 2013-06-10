@@ -107,6 +107,7 @@ if (typeof boxspring === 'undefined') {
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
 				'login': [ '/_session','POST'],
+				'logout': [ '/_session','DELETE'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
 				'heartbeat': [ '','GET' ],
@@ -285,6 +286,11 @@ if (typeof boxspring === 'undefined') {
 			return this;
 		};
 		that.login = login;
+		
+		var logout = function(handler) {
+			this.dbQuery('logout', handler);
+		};
+		that.logout = logout;
 
 		var remove = function (handler) {
 			var local = this;

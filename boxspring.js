@@ -107,6 +107,7 @@ if (typeof boxspring === 'undefined') {
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
 				'login': [ '/_session','POST'],
+				'logout': [ '/_session','DELETE'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
 				'heartbeat': [ '','GET' ],
@@ -285,6 +286,11 @@ if (typeof boxspring === 'undefined') {
 			return this;
 		};
 		that.login = login;
+		
+		var logout = function(handler) {
+			this.dbQuery('logout', handler);
+		};
+		that.logout = logout;
 
 		var remove = function (handler) {
 			var local = this;
@@ -352,13 +358,11 @@ if (typeof boxspring === 'undefined') {
 	var boxspring = function () {};	
 }
 
-var thisauth = require('auth').auth;
-
 (function(global) {
 	
-	var users = function (name, admin) {
+	var users = function (name) {
 		var that = _.extend({}, this)
-		, adminDb = Boxspring.extend('_users', {'auth': admin })(this.url);
+		, userdb = Boxspring.extend('_users', {'auth': this.getAuth() })(this.url)
 			
 		// used by userSignUp and userDelete
 		var authFileUserDocName = function() {
@@ -366,12 +370,18 @@ var thisauth = require('auth').auth;
 		};
 
 		var get = function (handler) {
-			var doc = adminDb
-				.doc(authFileUserDocName()).retrieve(function(err, response) {
+			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
 				handler(err, response, doc);
 			});
 		};
 		that.get = get;
+		
+		var list = function (handler) {
+			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
+				handler(err, response, doc);
+			});
+		};
+		that.list = list;
 				
 		var signUp = function(password, roles, handler) {
 			var anonymous = Boxspring.extend('_users')(this.url)
@@ -391,38 +401,31 @@ var thisauth = require('auth').auth;
 				}
 				// log in this new user and provide a new database handle in the callback
 				newUser.login(function(err, response) {
-					if (err || response.code === 401) {
-						return handler(err, response);
-					}
-					handler(null, response, newUser);
+					handler(err, response, newUser);
 				});
 			});				
 		};
 		that.signUp = signUp;
 		
 		var remove = function (handler) {
-			Boxspring.extend('_users', {'auth': thisauth.auth })()
+			userdb
 				.doc(authFileUserDocName())
-				.remove(function(err, response) {
-					if (err || response.code === 401) {
-						if (response.code === 401) {
-							return handler(new Error('User name document not found.'), response);
-						}
-					}
-					// if its not 401, let the caller handle the error
-					return handler(err, response);				
-				});
+				.remove(handler);
 		};
 		that.remove = remove;
 		
-		var update = function(newPassword, newRoles, handler) {
-			var local = this
-			
-			this.remove(function(err, response) {
+		var update = function(newPassword, newRoles, handler) {			
+			this.get(function(err, response, doc) {
 				if (err) {
 					return handler(err, response);
 				}
-				local.signUp(newPassword, newRoles, handler);
+				// update the document.
+				doc.source(_.extend({
+					'type': 'user',
+					'name': name,
+					'password': newPassword,
+					'roles': newRoles
+				}, doc.source())).update(handler);
 			});
 		};
 		that.update = update;
@@ -430,7 +433,7 @@ var thisauth = require('auth').auth;
 	};
 	
 	global.users = users;
-})(boxspring);
+}(boxspring));
 /* ===================================================
  * doc.js v0.01
  * https://github.com/rranauro/boxspringjs
@@ -5132,6 +5135,7 @@ if (typeof UTIL === 'undefined') {
 	var  xhrStringValues = {
 		'success': function() { return null; },
 		'notmodified': function() { return null; },
+		'nocontent': function() { return null; },
 		'error': function(code) { return new Error('$ajax error ' + code); },
 		'timeout': function(code) { return new Error('$ajax timeout ' + code); }, 
 		'abort': function(code) { return new Error('$ajax abort ' + code); }, 
@@ -5211,15 +5215,16 @@ if (typeof UTIL === 'undefined') {
 			throw new Error('Bad server configuration - ' + JSON.stringify(server));
 		}
 
-		if (user && user.auth) {
-			Basic = "Basic " + new Buffer(user.auth, "ascii").toString("base64");
-		}
-
 		var nodeGet = function (opts, callback) {
 			//console.log('nodeGet, user:', user);
 			//console.log('file-utils nodeGet', opts, typeof callback);
 			var stream = ''
 			, req;
+		
+			// Calculate Basic authentication if needed.
+			if (user && user.auth) {
+				Basic = "Basic " + new Buffer(user.auth, "ascii").toString("base64");
+			}
 			
 			// If time to refresh, or no cookie, then apply 'Basic' authentication;
 			if (isTimeToRefresh() || !Cookie) {

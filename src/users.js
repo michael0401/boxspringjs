@@ -25,13 +25,11 @@ if (typeof boxspring === 'undefined') {
 	var boxspring = function () {};	
 }
 
-var thisauth = require('auth').auth;
-
 (function(global) {
 	
-	var users = function (name, admin) {
+	var users = function (name) {
 		var that = _.extend({}, this)
-		, adminDb = Boxspring.extend('_users', {'auth': admin })(this.url);
+		, userdb = Boxspring.extend('_users', {'auth': this.getAuth() })(this.url)
 			
 		// used by userSignUp and userDelete
 		var authFileUserDocName = function() {
@@ -39,12 +37,18 @@ var thisauth = require('auth').auth;
 		};
 
 		var get = function (handler) {
-			var doc = adminDb
-				.doc(authFileUserDocName()).retrieve(function(err, response) {
+			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
 				handler(err, response, doc);
 			});
 		};
 		that.get = get;
+		
+		var list = function (handler) {
+			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
+				handler(err, response, doc);
+			});
+		};
+		that.list = list;
 				
 		var signUp = function(password, roles, handler) {
 			var anonymous = Boxspring.extend('_users')(this.url)
@@ -64,38 +68,31 @@ var thisauth = require('auth').auth;
 				}
 				// log in this new user and provide a new database handle in the callback
 				newUser.login(function(err, response) {
-					if (err || response.code === 401) {
-						return handler(err, response);
-					}
-					handler(null, response, newUser);
+					handler(err, response, newUser);
 				});
 			});				
 		};
 		that.signUp = signUp;
 		
 		var remove = function (handler) {
-			Boxspring.extend('_users', {'auth': thisauth.auth })()
+			userdb
 				.doc(authFileUserDocName())
-				.remove(function(err, response) {
-					if (err || response.code === 401) {
-						if (response.code === 401) {
-							return handler(new Error('User name document not found.'), response);
-						}
-					}
-					// if its not 401, let the caller handle the error
-					return handler(err, response);				
-				});
+				.remove(handler);
 		};
 		that.remove = remove;
 		
-		var update = function(newPassword, newRoles, handler) {
-			var local = this
-			
-			this.remove(function(err, response) {
+		var update = function(newPassword, newRoles, handler) {			
+			this.get(function(err, response, doc) {
 				if (err) {
 					return handler(err, response);
 				}
-				local.signUp(newPassword, newRoles, handler);
+				// update the document.
+				doc.source(_.extend({
+					'type': 'user',
+					'name': name,
+					'password': newPassword,
+					'roles': newRoles
+				}, doc.source())).update(handler);
 			});
 		};
 		that.update = update;
@@ -103,4 +100,4 @@ var thisauth = require('auth').auth;
 	};
 	
 	global.users = users;
-})(boxspring);
+}(boxspring));
