@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, Boxspring: true */
 
 (function(global) {
 	"use strict";
@@ -28,7 +28,7 @@
 		var that = _.extend({}, currentRow, this.UTIL.hash());
 		that.columns = (owner && owner.columns) || [];
 		that.keys = (owner && owner.keys) || [];
-		that.visible = (owner && owner.visible) || boxspring.UTIL.hash();
+		that.visible = (owner && owner.visible) || this.UTIL.hash();
 		that.cell = (owner && owner.cell);
 
 		var getKey = function (index) {
@@ -151,9 +151,11 @@
 				local.set(key, value);
 				// if this key is in our display list, then save it in the visible list
 				if (_.found(local.columns, key)) {
-					// owner.visible is for remembering which keys had values for a collection of rows.
+					// owner.visible is for remembering keys having values for a collection of rows.
 					// useful when displaying tables to hide columns which have no values;
-					owner && owner.visible.set(key, true);
+					if (owner) {
+						owner.visible.set(key, true);
+					}
 				}
 			};					
 			// create a new hash for each access; fetch key-values by position
@@ -180,4 +182,4 @@
 	};
 	global.row = row;
 
-}(boxspring));
+}(Boxspring));

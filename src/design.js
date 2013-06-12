@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, boxspring: true, emit: true, sum: true */
+/*global _: true, Boxspring: true, emit: true, sum: true */
 
 (function(global) {
 	"use strict";
@@ -120,7 +120,7 @@
 		});
 
 		// system parameters to control the query behavior
-		that.system = boxspring.UTIL.hash({
+		that.system = this.UTIL.hash({
 			'asynch': false,
 			'cache-size': undefined, //10,
 			'page-size': undefined, //100,
@@ -192,30 +192,6 @@
 			return this;
 		}.call(that));
 
-		// Purpose: Emulates CouchDB view/emit functions on the "client"
-		// TBD: Not tested
-		var emulate = function (name) {
-			// When running in node.js, calling functions need to find 'emit' in its scope 
-			// On server side, will use couchdb's built-in emit()
-			var emitter = function(viewfunc) {
-				var tree = global.Btree()
-					, map = (viewfunc && viewfunc.map)
-					, reduce = (viewfunc && viewfunc.reduce);
-
-				var emit = function (key, value) {
-					tree.store(JSON.stringify(key), value);
-				};
-				tree.emit = emit;
-				tree.map = map;
-				tree.reduce = reduce;
-				return tree;
-			}
-			, e = emitter(this.maker().views[name]);
-			emit = e.emit;
-			return(e);
-		};
-		that.emulate = emulate;
-
 		// this update takes advantage of CouchDB 'updates' handlers. 
 		// The design document function specified in 'updateName' will execute on 
 		// the server, saving the round-trip to the client a enforcing consistent
@@ -263,7 +239,7 @@
 				res.on('data', function (r) {
 					// create a result object instrumented with row helpers 
 					// and design document info
-					var result = global.rows(r, local.maker(), local);	
+					var result = local.events(local.rows(r, local.maker(), local));	
 					if (callback && _.isFunction(callback)) {
 						if (system && system.asynch === false) {
 							// just write wrapped data to the calling program. 
@@ -284,13 +260,40 @@
 			return this;
 		};
 		that.get = get;
-
+		
+		that.superiorQuery = that.query;
 		var query = function(options) {
-			return this.boxspring.query.call(this, options);	
+			return this.superiorQuery(options);	
 		};
 		that.query = query;	
+		
+		
+		// Purpose: Emulates CouchDB view/emit functions on the "client"
+		// TBD: Not tested
+		var emulate = function (name) {
+			// When running in node.js, calling functions need to find 'emit' in its scope 
+			// On server side, will use couchdb's built-in emit()
+			var emitter = function(viewfunc) {
+				var tree = global.Btree()
+					, map = (viewfunc && viewfunc.map)
+					, reduce = (viewfunc && viewfunc.reduce);
+
+				var emit = function (key, value) {
+					tree.store(JSON.stringify(key), value);
+				};
+				tree.emit = emit;
+				tree.map = map;
+				tree.reduce = reduce;
+				return tree;
+			}
+			, e = emitter(this.maker().views[name]);
+			emit = e.emit;
+			return(e);
+		};
+		that.emulate = emulate;
+		
 		return that;	
 	};
 	global.design = design;
 	
-}(boxspring));
+}(Boxspring));

@@ -28,21 +28,19 @@ var test = require('tape')
 	};
 }
 
-var admin = Boxspring.extend('_users', {
+var admin = Boxspring({'name': '_users', 
 	'auth': {'name': 'couchdb', 'password': 'admin'}})('127.0.0.1')
-, user = Boxspring.extend('_user')().users('ron', thisauth.auth)	
-, db1 = Boxspring.extend('regress', { 'auth': thisauth.auth })('127.0.0.1')
-, db2 = Boxspring.extend('regress', { 'auth': badname.auth })()
-, db3 = Boxspring.extend('regress', { 'auth': badpass.auth })()
-, db4 = Boxspring.extend('regress', {'auth': alternate.auth })()
-, db5 = Boxspring.extend('regress')();
+// anonymous user
+, user = Boxspring('_users')().users('ron')	
+, db1 = Boxspring({'name': 'regress', 'auth': thisauth.auth })('127.0.0.1')
+, db2 = Boxspring({'name': 'regress', 'auth': badname.auth })()
+, db3 = Boxspring({'name': 'regress', 'auth': badpass.auth })()
+;
 
 
-
-/*
 test('boxspring-auth-1', function (t) {
 
-	t.plan(4);
+	t.plan(3);
 		
 	var confirmSession = function(db, expected, name, count) {
 		count = typeof count === 'undefined' ? 0 : count;
@@ -65,22 +63,23 @@ test('boxspring-auth-1', function (t) {
 		
 	confirmSession(db1, 200, 'couch-succeed');
 	confirmSession(db2, 401, 'bad-name');
-	confirmSession(db3, 401, 'bad-password');
-	confirmSession(db4, 200, 'hashed-auth');
-	
+	confirmSession(db3, 401, 'bad-password');	
 });
-*/
+
 test('boxspring-auth-2', function(t) {
 	t.plan(9);
 
 
 	var signUpSequence3 = function () {
-		user.signUp('ran', [], function(err, response) {
+		user.signUp('ran', [], function(err, response, user) {
 			t.equal(err, null,'signUp-3');
-			user.update('run', [], function(err, response) {
+			// use the created/logged in account to change the password
+			user.users('ron').update('run', [], function(err, response) {
 				t.equal(err, null, 'update-user-3');
-				user.remove(function(err, response) {
+				// remove using the admin account
+				admin.users('ron').remove(function(err, response) {
 					t.equal(response.code, 200, 'delete-updated-user-3');
+					// confirm the login fails
 					user.login(function(err, response) {
 						t.equal(response.code, 401, 'login-deleted-3');
 					});
@@ -95,7 +94,7 @@ test('boxspring-auth-2', function(t) {
 			t.equal(err, null, 'signUp-2');
 			user.signUp('ran', [], function(err, response) {
 				t.equal(response.code, 409, 'signUp-conflict-2');
-				user.remove(function(err, response) {
+				admin.users('ron').remove(function(err, response) {
 					t.equal(response.code, 200, 'user-deleted-2');
 					if (response.code === 200) {
 						signUpSequence3();						
@@ -107,14 +106,23 @@ test('boxspring-auth-2', function(t) {
 		
 	// test that a user name is created, and deleted.	
 	var signUpSequence1 = function () {
-		user.signUp('ran', [], function(err) {
+		user.signUp('ran', [], function(err, response, newUser) {
 			t.equal(err, null, 'signUp-1');
-			user.remove(function(err, response) {
-				t.equal(response.code, 200, 'user-deleted-1');
-				if (response.code === 200) {
-					signUpSequence2();					
+			newUser.users('ron').remove(function(err, response) {
+				if (err) {
+					t.equal(response.code, 404, 'expect-remove-fail');
+					// expect to fail, user can't remove their own
+					admin.users('ron').remove(function(err, response) {
+						t.equal(response.code, 200, 'user-deleted-1');
+						if (response.code === 200) {
+							signUpSequence2();					
+						}
+					});
+				} else {
+					t.equal(response.code, 404, 'expect-remove-fail');
 				}
 			});
+
 		});		
 	};
 

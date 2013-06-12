@@ -79,7 +79,7 @@
 			// does no checking for update conflicts. saving or removing docs without their _rev will fail
 			(function (handler) {
 				var doclist=_.clone(local.docs.docs)
-					, Queue= boxspring.UTIL.queue();
+					, Queue= local.UTIL.queue();
 
 				// Create a Queue to hold the slices of our list of docs
 				var doclistSlice = function (data) {
@@ -107,7 +107,6 @@
 		var remove = function (handler) {
 			var local = this
 			, doclist={ docs: [] }
-			, pathType = [ 'path', 'url', 'request']
 			, buffer = []
 			, eachDoc = function (headinfo) {
 				if (headinfo.data !== 'error') {
@@ -178,4 +177,4 @@
 	};
 	global.bulk = bulk;
 	
-}(boxspring));
+}(Boxspring));

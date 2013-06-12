@@ -1,5 +1,5 @@
 /* ===================================================
- * boxspring.js v0.01
+ * google-vis.js v0.01
  * https://github.com/rranauro/boxspringjs
  * ===================================================
  * Copyright 2013 Incite Advisors, Inc.
@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global $: true, jQuery: true, boxspring: true, _: true, window: true */
+/*global $: true, jQuery: true, Boxspring: true, _: true, window: true */
 
 /*global google: true, document: true, $:true */
 (function(global) {
@@ -53,18 +53,15 @@
 	*/
 	
 	var googleVis = function (options) {
-		var type = (options && options.type) || 'table-chart'
+		var type = (options && options.type) || 'Table'
 		, targetDiv = (options && options.targetDiv) || 'on-display'
-		, onSelection = (options && options.onSelection) || 'onSelection'
-		, onPage = (options && options.onPage) || 'onPage';
+		, onSelection = 'onSelection'
+		, onPage = 'onPage';
 		
 		var vis = {
 			'types': ['string', 'number', 'boolean', 'date', 'datetime', 'timeofday']
 		};
 		
-		onSelection = onSelection || 'selection-event';
-		onPage = onPage || 'page-event';
-				
 		var dataSource = (function () {
 			var local = this
 			, data;
@@ -96,7 +93,7 @@
 				for (i = data.getNumberOfRows()-1; i > -1; i -= 1) {				
 					for (j = data.getNumberOfColumns()-1; j > -1; j -= 1) {
 						data.setProperties(i, j, {
-							'className': 'googleCell' + this.columnWidth(cols[j])
+							'className': 'googleCell' + this.cell.columnWidth(cols[j])
 						});
 					}
 				}
@@ -111,7 +108,7 @@
 					cell.type = 'string';
 				}			
 				// 'chart' require their columns, except the 0 column to be 'number'
-				if (chartType === 'line-chart' && typeof index === 'number') {
+				if (chartType === 'LineChart' && typeof index === 'number') {
 					cell.type = index > 0 ? 'number' : cell.type;
 				}
 				return({
@@ -134,11 +131,11 @@
 			};
 			
 			var addRow = function (cols) {
-				var local = this;
+				var row = this;
 
 				data.addRow(_.map(cols, function(key, i) {
-					var val = this.select(key);
-					return(googleCell.call(this, this.newCell(key, val)));
+					var val = row.select(key);
+					return(googleCell.call(row, row.cell.newCell(key, val)));
 				}));
 			};
 			local.addRow = addRow;
@@ -157,8 +154,7 @@
 
 				// formats a column definition for google.vis
 				cols.forEach(function(label, index) {
-					data.addColumn('table-chart', 
-											local.googleColumn(first.newCell(label), index));				
+					data.addColumn(local.googleColumn(first.cell.newCell(label), index));							
 				});	
 				// formats each row in this view
 				_.each(this.each(), function(row) {
@@ -166,7 +162,7 @@
 				});
 				return googleStyle.call(this, data);
 			};
-			local['table-chart'] = Table;
+			local['Table'] = Table;
 			
 			var result2Array = function() {
 				// cols describes the incoming table columns. reset() the visibleColumns
@@ -214,9 +210,9 @@
 				data = google.visualization.arrayToDataTable(target);		
 				return data;
 			};
-			local['line-chart'] = result2Array;
+			local['LineChart'] = result2Array;
 			return local;
-		}());
+		}.call(vis));
 		
 		var visibleColumns = function() {
 			var rowdata = this.visible.setValues();
@@ -235,7 +231,7 @@
 		
 		var googleView = function (o) {
 			var local = this
-			, data = dataSource[o.type].apply(this)
+			, data = dataSource['Table'].apply(this)
 			, target = document.getElementById(targetDiv) 
 			// displayTable sets up the DOM; 
 			, displayTable = display(o.type, target)
@@ -272,13 +268,13 @@
 			
 			// Set up the table and draw it.
 			googleView.call(result, { 
-				'type': 'table-chart',
+				'type': 'Table',
 				'options': {
 					'showRowNumber': true,
 					'allowHtml': true,
 					'firstRowNumber': result.offset(),
 					'page': 'enable',
-					'pageSize': (result.getg('page_size') || result.getLength()),
+					'pageSize': (result.pageInfo().pageSize || result.getLength()),
 					'startPage': result.pageInfo().page || 0,
 					// delegating column sorting to the table, for now;
 					'sort': 'enable',
@@ -313,7 +309,7 @@
 		
 		var googleChart = function (result) {
 			googleView({
-				'type': 'line-chart',
+				'type': 'LineChart',
 				'options': {
 					'title': 'Line Chart',
 					'focusTarget': 'category',
@@ -332,7 +328,7 @@
 		};
 
 		// now return the render function to the caller
-		if (type === 'line-chart') {
+		if (type === 'LineChart') {
 			vis.render = googleChart;
 		} else {
 			vis.render = googleTable;
@@ -340,7 +336,7 @@
 		return vis;
 	};
 	global.googleVis = googleVis;
-}(boxspring));
+}(jQuery));
 
 /*
 used by googleCell:

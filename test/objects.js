@@ -1,21 +1,19 @@
 require('../index');
 var test = require('tape')
-, Bx = Boxspring.extend('regress', {'id': 'my-db'})
+, Bx = Boxspring({'name': 'regress', 'id': 'my-db'})
 , db = Bx('127.0.0.1')
-, Bx2 = Boxspring.extend('regress', {'id': 'your-db', 'designName': 'your-design' })
+, Bx2 = Boxspring({'name': 'regress', 'id': 'your-db', 'designName': 'your-design' })
 , db2 = Bx2('127.0.0.1')
 , newdoc = db.doc('sample-content').docinfo({'content': Date() })
 , newdoc1 = db.doc('write-file-test').docinfo({'content': Date() })
 ;
 
-var dbObject = [ 'boxspring',
-  'UTIL',
+var dbObject = [ 'UTIL',
   'db',
   'bulk',
   'doc',
   'design',
   'view',
-  'display',
   'row',
   'rows',
   'cell',
@@ -41,19 +39,23 @@ var dbObject = [ 'boxspring',
   'db_info',
   'save',
   'remove',
-  'events' ],
+  'events',
+  'Boxspring', 'VERSION', 'create', 'getAuth', 'logout', 'users' ],
 
 docObject = 	[ 'updated_docinfo',
-	  'boxspring',
+	  'Boxspring',
+	  'VERSION',
+	  'attachment',
+	  'getAuth',
+	  'logout',
+	  'users',
 	  'UTIL',
 	  'db',
 	  'bulk',
 	  'create',
-	  'delete',
 	  'doc',
 	  'design',
 	  'view',
-	  'display',
 	  'row',
 	  'rows',
 	  'cell',
@@ -94,14 +96,13 @@ docObject = 	[ 'updated_docinfo',
 	  'docinfo' ],
 
 bulkObject = 	[ 'status',
-	  'boxspring',
+	  'Boxspring', 'VERSION', 'create', 'getAuth', 'logout', 'users',  
 	  'UTIL',
 	  'db',
 	  'bulk',
 	  'doc',
 	  'design',
 	  'view',
-	  'display',
 	  'row',
 	  'rows',
 	  'cell',
@@ -199,7 +200,7 @@ cellObject = [ 'builtInColumns',
 	  'newCell',
 	  'newColumn' ],	
 
-queryObject = [ 'boxspring',
+queryObject = [ 
 	  'db',
 	  'bulk',
 	  'doc',
@@ -244,7 +245,7 @@ queryObject = [ 'boxspring',
 	  'keys',
 	  'filter',
 	  'pivot',
-	  'display',
+	  
 	  'vis',
 	  'server',
 	  'system',
@@ -271,17 +272,17 @@ viewObject = [ 'on',
 test('objects', function (t) {
 	t.plan(17);
 	
-	t.equal(Boxspring.VERSION, '0.0.1', 'version-check');
+	t.equal(db.VERSION, '0.0.1', 'version-check');
 	t.equal(db.id, 'my-db', 'db-options-check1');
 	t.equal(db2.id, 'your-db', 'db-options-check2');
+	t.equal(db2.name, 'regress', 'db-name');	
 	t.equal(newdoc===newdoc1, false, 'doc-check1');
 	t.equal(newdoc.docinfo()._id===newdoc1.docinfo()._id, false, 'doc-check2');
-	t.equal(typeof Boxspring, 'object', 'maker-object');
-	t.equal(typeof Boxspring.extend, 'function', 'extend-object');
+	t.equal(typeof Boxspring, 'function', 'maker-function');
 	t.equal(_.identical([ 'function', 'object', 'function', 'function', 'function' ],
 		[typeof Bx, typeof db, typeof db.doc, typeof db.design, typeof db.bulk]), true, 
 		'boxspring');
-		
+
 	var compare = function (actual, expected, testname) {
 		var intersection = _.intersection(actual, expected);
 
@@ -300,7 +301,7 @@ test('objects', function (t) {
 		}
 	}
 
-	compare(dbObject, _.keys(db), 'db'); 
+	compare(dbObject, _.keys(db), 'db'); 	
 	compare(docObject, _.keys(db.doc()), 'doc');
 	compare(bulkObject, _.keys(db.bulk()), 'bulk'); 	
 	compare(rowObject, _.keys(db.row()), 'row'); 

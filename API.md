@@ -69,14 +69,23 @@
 * [Display methods](#display-methods)
 
 <a name="create-db" />
-####Boxspring.extend([name, [options]])
+####Boxspring([options])
 
-Boxspring borrows from the [Backbone] inheritance model allowing you to __extend__ the base object with your own __options__ object to create new template database. Pass in a string `name` for the name of the database on the server. To instantiate a new database, invoke these objects with the __url__ string describing your database server.
+Returns a function that takes a `url` string to produce a database object. 
+
+Pass in a string `name` for the name of the database on the server, or supply an `object` with properties to define the object such as database `name`, `auth` credentials. Additional properties (see table below) include the `designName`, design document `maker` function, and the name of the view `index` to use for querying the database. 
+
+To instantiate a new database, invoke these objects with the __url__ string describing your database server.
+
+	Maker = Boxspring('mydb');
+	mydb = Maker('http://www.some-url.com');
+
+The `clone()` method generates create a copy of the object with a new `id`.  
 
 > Note: Creating a database object does not create the database on the server. For that use the `save()` method of the database object.
 
 		// create a new database template
-        var Mydb = Boxspring.extend('my-db', { 'auth': auth })
+        var Mydb = Boxspring({'name': 'my-db', 'auth': auth })
 		, dblocal = Mydb('127.0.0.1)
 		, dbpublic = Mydb('https://www.somwhere-out-there.com');
 		
@@ -325,7 +334,7 @@ See [Design methods](#design-methods)
 Create a `users` object for signing up new users `signUp`, removing them `remove`, and updating their `name`, `pasword`, and optional `roles`. 
 
 	// Example
-	var Mydb = Boxspring.extend('some-db')
+	var Mydb = Boxspring('some-db')
 	, mydb = Mydb('127.0.0.1').users('new-username');
 	
 	mydb.signUp('some-password', [ 'roles' ], function(err, response, newDb) {
@@ -365,7 +374,7 @@ The `deleteUser` method removes user accounts from the system. __This operation 
 Takes an [authorization object](#authentication-object) and an array of of application defined roles. Returns an error code `409` in the response object of the callback if the requested `name` is already taken. Otherwise proceeds to add the user to the system and returns the callback with the response and a database object.
 
 	// Example
-	mydb = Boxspring.extend('mydb')().users('newuser');
+	mydb = Boxspring('mydb')().users('newuser');
 	mydb.signUp('newuserpassword', [], function(err, response, newDb) {
 		if (err) {
 			if (response.code === 409) {

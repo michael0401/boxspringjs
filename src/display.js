@@ -34,24 +34,7 @@
 			throw new Error('[ display ] You must supply a query object with events.');
 		}
 		
-		// What it does: executes a client callback on a display event
-		var relay = function(context, eventStr, callback) {
-			this.on(eventStr, function() {
-				if (_.isFunction(callback)) {
-					callback.apply(context, [ eventStr ].concat(_.toArray(arguments)));
-				}
-			});
-		};
-		
-		var addEventListener = function (eventStr, callback) {
-			var context = this;
-			if (_.found(supportedEvents, eventStr)) {
-				relay.call(target.query, context, eventStr, callback);	
-			} else {
-				throw new Error('[ display ] Unrecognized event - ' + eventStr);
-			}
-		};
-		target.addEventListener = addEventListener;
+
 /*		
 		var TabularDisplay = Backbone.Model.extend({
 			initialize: function () {

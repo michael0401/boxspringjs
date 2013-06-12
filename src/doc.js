@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, Boxspring: true */
 
 (function(global) {
 	"use strict";
@@ -106,7 +106,7 @@
 		that.open = retrieve;
 
 		var attachment = function(name, handler) {
-			var local = this
+			var local = this;
 		
 			this.queryHTTP('doc_attachment', { 'id': this.docId().id, 'attachment': name }, {}, 
 			function (err, response) {
@@ -170,7 +170,6 @@
 			return this;
 		};
 		that.remove = remove;
-		that.delete = remove;
 
 		var info = function (handler) {
 			// set the 'revs_info' flag to true on retrieve;
@@ -194,4 +193,4 @@
 	};
 	global.doc = doc;
 
-}(boxspring));
+}(Boxspring));

@@ -63,21 +63,22 @@
 		// if system control parameters (page-size, cache-size, ...) were passed in,
 		// update them 
 		if (options && options.system) {
-				that.system.update(options.system);
+			that.system.update(options.system);
 		}
-		
+				
 		// Response Wrapper: wraps the response object with methods and helpers to manage 
 		// the flow of data from the server to the application
 		var result = function () {					
-			var queryPages = { 'pages': [] }
+			var owner = that 
+			, queryPages = { 'pages': [] }
 			, current_chunk = 0
 			, current_page = 0;	// zero-based
+
 
 			// wraps the response.data object with some helper methods
 			var data = function (response) {
 				// helpers						
-				response.query = that;						// owner
-				response.system = response.query.system;	// access to page-size downstream
+				response.query = owner;
 				response.rid = _.uniqueId('result-');
 
 				var pages = function () {
@@ -115,7 +116,7 @@
 					return ({ 
 						'completed': (local.total_rows() === (local.offset() + local.getLength())),
 						'totalRows': local.total_rows(),
-						'pageSize': (response.system.get('page-size') || this.totalRows),
+						'pageSize': (owner.system.get('page-size') || this.totalRows),
 						'cachedPages': queryPages.pages.length, 
 						'page': current_page         ,
 						'next': function() {
@@ -156,7 +157,7 @@
 
 					if (_.found(direction, 'next')) {
 						current_chunk += (current_chunk < queryPages.pages.length-1) ? 1 : 0;
-						this.pageInfo().next();					
+						this.pageInfo().next();	
 						this.query.trigger('result', page.apply(this));
 						// if we haven't cached all the pages, and we have one more page in
 						// cache before we run out, then cache another page from the server 
@@ -177,9 +178,9 @@
 				// updates the pages cache
 				queryPages.pages.push(response);	
 				// accumulates the rest of the pages for this result, if 'asynch'
-				//console.log('result', response.offset(), response.query.get('system'));
+				//console.log('result', response.offset(), response.system.get('asynch'), queryPages.pages.length);
 				// when asynch=true, relay the data to the listener
-				if (response.system.get('asynch') === true && 
+				if (owner.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
 			
 					if (response.pageInfo().completed) {
@@ -209,9 +210,30 @@
 			return this;						
 		};
 		that.server = get;
+		that.fetch = get;
+		
+		// What it does: executes a client callback on a display event
+		var relay = function(context, eventStr, callback) {
+			this.on(eventStr, function() {
+				if (_.isFunction(callback)) {
+					callback.apply(context, [ eventStr ].concat(_.toArray(arguments)));
+				}
+			});
+		};
+		
+		var addEventListener = function (eventStr, callback) {
+			var context = this
+			, supportedEvents = ['result', 'more-data', 'completed', 'onPage', 'onSelection'];
+			if (_.found(supportedEvents, eventStr)) {
+				relay.call(this, context, eventStr, callback);	
+			} else {
+				throw new Error('[ display ] Unrecognized event - ' + eventStr);
+			}
+		};
+		that.addEventListener = addEventListener;
 		return that;		
 	};
 	global.query = query;
-}(boxspring));	
+}(Boxspring));	
 
 

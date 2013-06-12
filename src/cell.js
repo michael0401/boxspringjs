@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, Boxspring: true */
 
 (function(global) {
 	"use strict";
@@ -28,7 +28,7 @@
 		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array']
 		, that = {};
 		
-		that.builtInColumns = boxspring.UTIL.hash({
+		that.builtInColumns = Boxspring.UTIL.hash({
 			'year': ['number',1],
 			'month': ['number',1],
 			'country': ['string',2],
@@ -51,12 +51,12 @@
 		that.formats = formats;
 		
 		var thisType = function (key) {
-			return key[0];
+			return _.isArray(key) ? key[0] : 'string';
 		};
 		that.thisType = thisType;
 
 		var thisWidth = function (key) {
-			return key[1];
+			return _.isArray(key) && key.length > 1 ? key[1] : 2;
 		};
 		that.thisWidth = thisWidth;
 
@@ -109,7 +109,9 @@
 		// What it does: Returns a 'cell' object with filled in missing pieces; Accepts either an object
 		// or name, value, type arguments
 		var newCell = function(name, value, type) {
-			var owner = this
+			var formats = (this.formats && _.isFunction(this.formats)) 
+				? this.formats 
+				: function() { return {}; }
 			, o = typeof name === 'object' ? name : {'name': name, 'value': value, 'type': type }
 			, cell = {
 				'name': o.name,
@@ -119,7 +121,7 @@
 				'properties': o.properties
 			};
 			// if there is a formatter function, then call it and return
-			if (this.formats()[cell.name]) {
+			if (formats && formats()[cell.name]) {
 				cell.type = 'string';
 				if (_.isString(cell.value)) {
 					cell.format = this.formats()[cell.name](cell.value).toString();
@@ -150,4 +152,4 @@
 	};
 	global.cell = cell;
 
-}(boxspring));
+}(Boxspring));

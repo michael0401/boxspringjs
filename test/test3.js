@@ -45,7 +45,8 @@ var test = require('tape')
 		}
 	};
 }
-, anotherdb = Boxspring.extend('regress', {
+, anotherdb = Boxspring({
+	'name': 'regress',
 	'id': 'anotherdb',
 	'index': 'my-view',
 	'designName': 'my-design',
@@ -202,8 +203,9 @@ var test = require('tape')
 			//console.log(response.facets('content'), 2);
 			t.equal(response.facets('content').length, 3);
 			t.equal(response.facets('find-nothing').length, 0);
-			t.equal(response.range().start, response.data.rows[0].key);
-			t.equal(response.range().end, response.last().key);				
+			t.equal(_.identical(response.range().start, 
+					[ response.data.rows[0].key ]), true, 'start-key');
+			t.equal(_.identical(response.range().end, [ response.last().key ]), true, 'last-key');				
 		});
 	});
 }());

@@ -18,10 +18,10 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, boxspring: true, Backbone: true */
+/*global _: true, Boxspring: true, Backbone: true */
 
-if (typeof boxspring === 'undefined') {
-	var boxspring = function () {};	
+if (typeof Boxspring === 'undefined') {
+	var Boxspring = function () { "use strict"; };	
 }
 
 (function(global) {
@@ -139,24 +139,54 @@ if (typeof boxspring === 'undefined') {
 			return(lookup(tag) && lookup(tag)[1] ? lookup(tag)[1] : 'GET');
 		};
 		that.method = method;
+		
+		var clone = function () {
+			var object = _.clone(this);
+
+			if (object.hasOwnProperty('id')) {
+				if (object.id.split('-').length > 1) {
+					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
+				} else {
+					object.id = _.uniqueId(object.id+'-clone');					
+				}
+			}
+			return object;
+		};
+		that.clone = clone;
 		return that;
 	};
 	
-	var db = function (name, options) {
-		var user = _.extend({'name': '', 'password': ''}, (options && options.auth))
-		, that = _.extend({}, this, _.defaults(options || {}, {
+	var db = function (name) {
+		var user
+		, options
+		, that;
+		
+		// allow either 'name' or {options} but not both arguments
+		if (_.isObject(name)) {
+			options = name;
+		} else {
+			options = {'name': name };
+		}
+		
+		// format the the user 'auth' object; note user is not visible on the interface
+		user = _.extend({'name': '', 'password': ''}, (options && options.auth));
+		
+		// populate the object with default, exclude 'auth' from the interface.
+		that = _.extend({}, _.defaults(options, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
 			'index': (options && options.index) || 'Index',
 			'maker': (options && options.maker) || undefined,
 			'designName': (options && options.designName) || '_design/default',
-		}));
+			'UTIL': Boxspring.UTIL,
+			'Boxspring': Boxspring
+		}, this));
 		
 		// omit the 'auth' object from the interface
 		that = _.omit(that, 'auth');
 		
 		// create the database linkages using the path object;
-		that.path = path(name);
+		that.path = path(that.name);
 
 		var queryHTTP = function (service, options, query, callback) {
 			var viewOrUpdate = options.view || options.update || options.attachment || ''
@@ -255,10 +285,10 @@ if (typeof boxspring === 'undefined') {
 
 			db_info.call(local, function (err, response) {
 				if (err && !exists(response)) {
-					local.queryHTTP('db_save', function (err) { 
+					local.queryHTTP('db_save', function (err, response) { 
 						// save it, then call the handler with the db_info
 						if (err) {
-							handler(err);
+							handler(err, response);
 						}
 						db_info.call(local, handler);
 					});					
@@ -297,7 +327,7 @@ if (typeof boxspring === 'undefined') {
 
 			this.db_info(function (err, response) {
 				if (exists(response)) {
-					this.queryHTTP('db_remove', { 
+					local.queryHTTP('db_remove', { 
 						'headers': { 'content-type':'application/x-www-form-urlencoded'}}, {}, handler);
 				} else {
 					handler(err, response);
@@ -319,15 +349,15 @@ if (typeof boxspring === 'undefined') {
 		return that;		
 	};
 
-	global.db = function(name, options) {
-		var object = db.call(this, name, options);
+	global.db = function(options) {
+		var object = db.call(this, options);
 		
 		return function (url) {
 			// all subsequent HTTP calls will use the supplied credentials.
-			object.url = url || '127.0.0.1'
-			object.HTTP = boxspring
-				.UTIL.fileio.server('server', _.urlParse(object.url), object.getAuth()).get;
+			object.url = url || '127.0.0.1';
+			object.HTTP = object.UTIL.fileio
+				.server('server', _.urlParse(object.url), object.getAuth()).get;
 			return _.extend({}, object);
 		};
-	}
-})(boxspring);
+	};
+}(Boxspring));

@@ -21,15 +21,11 @@
 /*global _: true, Boxspring: true, Backbone: true */
 "use strict";
 
-if (typeof boxspring === 'undefined') {
-	var boxspring = function () {};	
-}
-
 (function(global) {
 	
 	var users = function (name) {
 		var that = _.extend({}, this)
-		, userdb = Boxspring.extend('_users', {'auth': this.getAuth() })(this.url)
+		, userdb = this.db({'name': '_users', 'auth': this.getAuth() })(this.url);
 			
 		// used by userSignUp and userDelete
 		var authFileUserDocName = function() {
@@ -51,8 +47,8 @@ if (typeof boxspring === 'undefined') {
 		that.list = list;
 				
 		var signUp = function(password, roles, handler) {
-			var anonymous = Boxspring.extend('_users')(this.url)
-			, newUser = Boxspring.extend(this.name, {
+			var anonymous = this.db('_users')(this.url)
+			, newUser = this.db({'name': this.name,
 				'auth': {'name': name, 'password': password }})(this.url);
 						
 			// create a document and add it to the _users database
@@ -100,4 +96,4 @@ if (typeof boxspring === 'undefined') {
 	};
 	
 	global.users = users;
-}(boxspring));
+}(Boxspring));

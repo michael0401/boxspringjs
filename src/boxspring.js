@@ -18,43 +18,44 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-if (typeof boxspring === 'undefined') {
-	boxspring = {};
-}
+/*global Boxspring: true, UTIL: true, _: true */
 
 if (typeof UTIL === 'undefined') {
-	throw new Error('boxspring.js mut define a UTIL variable.');
+	throw new Error('Boxspring.js must define a UTIL variable.');
 }
 
 // Inherit the UTIL objects 
-boxspring.UTIL = UTIL;
+Boxspring.UTIL = UTIL;
 
+// Include the boxspring-models if node.js
+if (typeof module !== 'undefined') {
+	_.extend(Boxspring, require('boxspring-models'));
+}
 
 (function(template) {
 	"use strict";
 		
+	// Current version.
+	template.VERSION = '0.0.1';
 	// add 'boxspring' to the template
-	template.boxspring = template;
+	template.Boxspring = template;	
 		
 	var Boxspring = function () {
 		return this;
 	}
 	
-	Boxspring.prototype.extend = function () {
+	Boxspring.prototype.create = function () {
 		var object = new Boxspring();
 		object = _.extend(object, template);
 			
 		// db.apply returns a new database object with the supplied arguments
 		return template.db.apply(object, arguments);
 	};
-
-	// Current version.
-	Boxspring.prototype.VERSION = '0.0.1';
 	
 	if (typeof module !== 'undefined' && module.exports) {
-		module.exports = new Boxspring();
+		module.exports = new Boxspring().create;
 	} else {
-		this.Boxspring = new Boxspring();
+		this.Boxspring = new Boxspring().create;
 	}
 
-}).call(this, boxspring);
+}).call(this, Boxspring);

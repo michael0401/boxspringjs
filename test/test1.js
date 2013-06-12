@@ -31,15 +31,14 @@ var Boxspringjs = Maker
 
 // tests to verify db save/remove
 test('boxspring-create-db', function(t) {
-	var mydb = Boxspring.extend('phantomdb', {
-		'auth': { 'name': 'couchdb', 'password': 'admin' }})('127.0.0.1');
+	var mydb = Boxspring({'name': 'phantomdb', 'auth': auth.auth })();
 	
 	t.plan(1);
 	
 	var create = function(db) {
 		db.save(function(err, response) {
 			if (err) {
-				console.log('could not create database - ', db.name);
+				console.log('could not create database - ', db.name, response);
 				throw err;
 			} else {
 				console.log(db.name, 'successfully created.');
@@ -52,7 +51,6 @@ test('boxspring-create-db', function(t) {
 	
 	mydb.db_info(function(err, response) {
 		if (err) {
-			console.log('database not found, creating...');
 			create(mydb);
 		} else {
 			console.log('database already exists, removing...');
@@ -73,11 +71,12 @@ test('boxspringjs-1', function (t) {
 
 	t.plan(8);
 	
-	var anotherdb = Boxspring.extend('regress', {
+	var anotherdb = Boxspring({'name': 'regress',
 		'id': 'anotherdb',
 		'index': 'my-view',
 		'designName': 'my-design',
-		'maker': ddoc}, {'auth': { 'name': 'couchdb', 'password': 'couchdb' }})('127.0.0.1');
+		'maker': ddoc, 
+		'auth': { 'name': 'couchdb', 'password': 'couchdb' }})('127.0.0.1');
 						
 	boxspringjs.heartbeat(function(err, data) {
 		t.equal(data.code, 200, 'heartbeat');

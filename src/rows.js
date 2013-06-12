@@ -18,16 +18,16 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, Boxspring: true */
 
 (function(global) {
 	"use strict";
 	
-	var rows = function (response, ddoc, design) {		
+	var rows = function (response, ddoc) {		
 		// Object for adding methods and data to rows of a 
 		// response data object based on information about the design
-		var that = _.extend({}, response)
-		// initialize 'selected' rows
+		var design = this
+		, that = _.extend({}, response)
 		, thisSelected = [];
 		
 		if (ddoc && ddoc.views && ddoc.views[design.index]) {
@@ -43,11 +43,11 @@
 		that.displayColumns = that.columns;
 
 		// initialize the 'cell' object methods to allow typing and formatting individual cells
-		that.cell = boxspring.cell(design && design.types, design && design.formats);
+		that.cell = this.Boxspring.cell(design && design.types, design && design.formats);
 
 		// What it does: Provides methods for updating the state of a collection of rows;
 		var collection = function () {
-			var that = boxspring.UTIL.hash()
+			var that = design.UTIL.hash()
 			, local = this;	
 			// What it does: set/get property names for the values that exist for a given row;
 			// When called over a collection of rows, provides the existence of a value for a column
@@ -87,7 +87,7 @@
 		if (response) {
 			that.response = response;
 			response.data.rows = _.map (response.data.rows, function (row) {
-				return boxspring.row(that, row, design);
+				return design.row(that, row);
 			});			
 		}
 		
@@ -119,9 +119,8 @@
 			if (index > -1) {
 				if (index < this.getLength()) {
 					return this.data.rows[index];
-				} else {
-					return this.last();
-				}
+				} 
+				return this.last();
 			}
 			return this.first(); 
 		};
@@ -183,8 +182,8 @@
 		// setter/getter for indicating a list of rows is 'selected'
 		var getSelected = function (selectedRows) {
 			var selectedRowData = _.clone(response)
-			, local = this
-			, selectedRowsIndexes;
+			, selectedRowList = []
+			, local = this;
 			
 			// if argument supplied, update the selected list
 			if (selectedRows) {
@@ -203,7 +202,8 @@
 		};
 		that.getSelected = getSelected;
 
-		// What it does: returns the index of the column requested, or 'sortColumn', or 0 if not found
+		// What it does: returns the index of the column requested, 
+		// or 'sortColumn', or 0 if not found
 		var column2Index = function (c) {
 			var column = c || this.getSortColumn()
 			, activeColumns = this.columns2Display || this.columns;
@@ -242,4 +242,4 @@
 	};
 	global.rows = rows;
 	
-}(boxspring));
+}(Boxspring));

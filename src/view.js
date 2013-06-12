@@ -18,7 +18,7 @@
  * ========================================================== */
 
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
-/*global _: true, bx: true */
+/*global _: true, Boxspring: true */
 
 (function(global) {
 	"use strict";
@@ -67,7 +67,7 @@
 		that.emitter = emitter;
 		that.query = translateQuery(_.omit(options, 'system'));
 		that.system = (that.db && that.db.system && that.db.system.post()) ||
-			{ 	'asynch': false,
+			{	'asynch': false,
 				'cache-size': undefined, //10,
 				'page-size': undefined, //100,
 				'delay': 0.5 };
@@ -163,6 +163,7 @@
 							} 
 							tRows += response.data.rows.length; 
 						}
+						//console.log('moving to chunk data', response.data.total_rows);
 						events.trigger('chunk-data', response);
 					}
 				});
@@ -215,7 +216,8 @@
 		var couch = function () {
 			var events = this;
 
-			events.on('chunk-data', function (res) {									
+			events.on('chunk-data', function (res) {	
+				//console.log('got this chunk data', res.data.total_rows);								
 				events.trigger('view-data', res);
 			});
 			this.fetch(this);
@@ -250,4 +252,4 @@
 	};
 	global.view = view;
 
-}(boxspring));	
+}(Boxspring));	
