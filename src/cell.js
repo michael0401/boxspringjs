@@ -28,7 +28,7 @@
 		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array']
 		, that = {};
 		
-		that.builtInColumns = Boxspring.UTIL.hash({
+		that.builtInColumns = this.UTIL.hash({
 			'year': ['number',1],
 			'month': ['number',1],
 			'country': ['string',2],

@@ -43,7 +43,7 @@
 		that.displayColumns = that.columns;
 
 		// initialize the 'cell' object methods to allow typing and formatting individual cells
-		that.cell = this.Boxspring.cell(design && design.types, design && design.formats);
+		that.cell = this.cell(design && design.types, design && design.formats);
 
 		// What it does: Provides methods for updating the state of a collection of rows;
 		var collection = function () {

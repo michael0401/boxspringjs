@@ -20,7 +20,12 @@
 /*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
 /*global $: true, jQuery: true, Boxspring: true, _: true, window: true */
 
-/*global google: true, document: true, $:true */
+/*global google: true, document: true, jQuery:true */
+
+if (typeof jQuery === 'undefined') {
+	jQuery = {};
+}
+
 (function(global) {
 	"use strict";
 	

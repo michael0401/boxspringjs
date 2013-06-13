@@ -4698,7 +4698,7 @@ if (typeof Boxspring === 'undefined') {
 		that.displayColumns = that.columns;
 
 		// initialize the 'cell' object methods to allow typing and formatting individual cells
-		that.cell = this.Boxspring.cell(design && design.types, design && design.formats);
+		that.cell = this.cell(design && design.types, design && design.formats);
 
 		// What it does: Provides methods for updating the state of a collection of rows;
 		var collection = function () {
@@ -5113,7 +5113,7 @@ if (typeof Boxspring === 'undefined') {
 		var validTypes = ['string','number','boolean','date','datetime','timeofday','object','array']
 		, that = {};
 		
-		that.builtInColumns = Boxspring.UTIL.hash({
+		that.builtInColumns = this.UTIL.hash({
 			'year': ['number',1],
 			'month': ['number',1],
 			'country': ['string',2],
@@ -5477,6 +5477,207 @@ if (typeof Boxspring === 'undefined') {
 }(Boxspring));	
 
 
+/* ===================================================
+ * boxspring-models.js v0.01
+ * https://github.com/rranauro/boxspringjs
+ * ===================================================
+ * Copyright 2013 Incite Advisors, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+/*jslint newcap: false, node: true, vars: true, white: true, nomen: true  */
+/*global _: true, Boxspring: true, Backbone: true, $: true */
+"use strict";
+
+(function (global) {
+	
+	// What it does: Provides methods to 'fetch' from the server and relay 'completed', 'result', 
+	// and 'more-data' events to clients. 
+	var Query = Backbone.Model.extend({
+		'defaults': {
+			'result': -1,
+			'more-data': -1,
+			'completed': -1,
+			'data': undefined,
+			'options': {}
+		},
+		'initialize': function (query, options) {
+			this.query = query;
+			this.set('options', options || {});
+		}, 
+		'fetch': function() {
+			var model = this;
+									
+			this.query.on('all', function(str, result) {
+				model.set('data', result);
+				model.set(str, model.get(str)+1);
+			});
+			this.query.fetch.apply(this.query, this.get('options'));
+		}
+	});
+	global = _.extend(global, { 'Query': Query });
+	
+	// What it does: Methods for asynchronous Queries and separating page-previous/page-next from the
+	// browser and the server.
+	// Invoke with: ( new Query(), { 'type': 'chart' or 'table', 'targetDiv': 'id' })
+	var Display = Backbone.Model.extend({
+		'defaults': {
+			'type': 'Table',
+			'targetDiv': 'on-display',
+			'result': undefined,
+			'render': undefined,
+			'selected': []
+		},
+		// provides the 'View' a method to initiate paging mechanism. 
+		// direction is 'next' or 'previous' 
+		'nextPrev': function(direction) {
+			this.query.get('data').nextPrev(direction);			
+		},
+		'fetch': function () {
+			// apply the fetch from the higher level query Model
+			this.query.fetch.apply(this.query, arguments);
+		},
+		'initialize': function(query, options) {
+			var display = this;
+			
+			// inherit the Query model
+			query = new Query(query);
+			this.query = query;
+			
+			if (options) {
+				this.set('type', (options.type || this.get('type')));
+				this.set('targetDiv', options.targetDiv || this.get('targetDiv'));
+				
+			} else {
+				options = this.defaults;
+			}
+						
+			// instantiate the vis in this model
+			display.vis = $.googleVis({
+				'type': this.get('type'), 'targetDiv': this.get('targetDiv')});
+			
+			// events from the vis or browser are triggered on the 'result' object of our query.
+			query.on('change:result', function() {
+				// when new data is set on result, call the render function for the vis
+				display.vis.render(query.get('data'));
+
+				// page next/previous can come from the vis, or from the 'View', 
+				// so delegate to 'nextPrev'
+				// "result" object from query is stored in the 'data' attribute of the query
+				query.get('data').on('onPage', function() {
+					display.nextPrev.apply(display, arguments);					
+				});
+				// row selections come from the vis; Views should watch for changes on 'onSelection'
+				query.get('data').on('onSelection', function(selected) {
+					display.set('selected', selected);
+				});
+			});
+		}	
+	});
+	global = _.extend(global, { 'Display': Display });
+	
+	// helper function to form db object
+	var dbhelper = function(name, auth) {
+		return({'name': name, 'auth': auth });
+	};
+		
+	var Users = Backbone.Model.extend({
+		defaults: {
+			'name': '',
+			'password': '',
+			'db_name': '',
+			'roles': [],
+			'userDb': {},
+			'loggedIn': false,
+			'error': {}
+		},
+		auth: function() {
+			return ({'auth': {
+				'name': this.get('name'), 'password': this.get('password') }});
+		},
+		error: function(err, response) {
+			return this.set('error', {'err': err, 'response': response });			
+		},
+		signup: function() {
+			var mydb = this.db().users(this.get('name'))
+			, model = this;
+			
+			mydb.signUp(this.get('password'), this.get('roles'), function(err, response, userDb) {
+				if (err) {
+					return model.error(err, response);
+				}
+				model.set('userDb', userDb);
+				model.set('loggedIn', true);
+			});
+		},
+		login: function() {
+			var model = this;
+			
+			this.set('userDb', this.db(_.extend({ 'name': this.get('db_name') }, this.auth()))()
+				.users(this.get('name')));
+			
+			this.get('userDb').login(function(err, response) {
+				if (err) {
+					return model.error(err, response);
+				}
+				model.set('loggedIn', response.code === 200);
+			});
+		},
+		logout: function() {
+			var model = this;
+			
+			// only if we're already logged in. otherwise do nothing.
+			if (this.get('loggedIn')) {
+				this.get('userDb').logout(function(err, response) {
+					if (err) {
+						model.error(err, response);
+					}
+					model.set('loggedIn', (response.code !== 200));
+				});				
+			}
+		},
+		update: function(newPassword) {
+			var model = this
+			, db = this.db(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
+			
+			if (this.get('loggedIn')) {	
+				db.update(newPassword, [], function(err, res) {
+					if (err) {
+						return (model.error(err, res));
+					}
+					model.logout();
+				});					
+			} else {
+				console.log('you must be logged in!');
+			}
+		},
+		remove: function(userName) {
+			var model = this 
+			, db = this.db(_.extend({
+				'name': this.get('db_name') }, this.auth()))().users(userName); 
+			
+			db.remove(function(err, res) {
+				// this operation doesn't change the login status of the administrator
+				// set the variable and let the application decide what to do with the results.
+				model.set('removed', {'err': err, 'response': res });
+			});
+		}
+	});
+	// make this Model visible to the outside world
+	global = _.extend(global, { 'Users': Users });
+	
+}(Boxspring));
 /* ===================================================
  * boxspring.js v0.01
  * https://github.com/rranauro/base-utilsjs
