@@ -3369,11 +3369,11 @@ if (typeof Boxspring === 'undefined') {
 
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
+				'heartbeat': [ '','GET' ],
 				'login': [ '/_session','POST'],
 				'logout': [ '/_session','DELETE'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
-				'heartbeat': [ '','GET' ],
 				'db_save': [ dbname,'PUT' ],
 				'db_remove': [ dbname,'DELETE'],
 				'db_info': [ dbname,'GET'],
@@ -3382,10 +3382,10 @@ if (typeof Boxspring === 'undefined') {
 				'doc_save': [ dbname + '/' + docId,'PUT'], 
 				'doc_update': [ dbname + '/' + docId,'PUT'], 
 				'doc_retrieve': [dbname + '/' + docId,'GET'],  
-				'doc_attachment': [dbname + '/' + docId + '/' + viewOrUpdate,'GET'],  
 				'doc_info': [ dbname + '/' + docId,'GET'],
 				'doc_head': [ dbname + '/' + docId,'HEAD'],  
 				'doc_remove': [ dbname + '/' + docId,'DELETE'],  
+				'doc_attachment': [dbname + '/' + docId + '/' + viewOrUpdate,'GET'],  
 				'view': [ dbname + '/' + docId + '/_view' + '/' + viewOrUpdate,'GET' ],
 				'update': [ dbname+'/'+docId+'/_update'+'/'+viewOrUpdate +'/'+ target,'PUT'] 
 			};
@@ -3676,7 +3676,7 @@ if (typeof Boxspring === 'undefined') {
 			var anonymous = this.db('_users')(this.url)
 			, newUser = this.db({'name': this.name,
 				'auth': {'name': name, 'password': password }})(this.url);
-						
+					
 			// create a document and add it to the _users database
 			anonymous.doc(authFileUserDocName()).source({
 				'type': 'user',
@@ -3749,30 +3749,69 @@ if (typeof Boxspring === 'undefined') {
 	"use strict";
 
 	var doc = function(id) {
-		var that = {
-			'updated_docinfo': { '_id': id }
-		};
-		
 		// inherit from the caller object, in this case a db object
-		_.extend(that, this);
+		var that = _.clone(this)
+		, headers = this.UTIL.hash()
+		, content = this.UTIL.hash({ '_id': id });
+		
+		var set = function () {
+			content.set.apply(content, arguments);
+		};
+		that.set = set;
+		
+		var get = function () {
+			content.get.apply(content, arguments);
+		};
+		that.get = get;
+		
+		var post = function () {
+			content.post.apply(content);
+		};
+		that.post = post;
+		
+		// Purpose: takes an object and updates the state of the document hash
+		var docinfo = function (docinfo) {
+			
+			if (docinfo) {
+				_.each(docinfo, function(item, key) {
+					content.set(key, item);
+				});		
+			}
+			return this;
+		};
+		that.docinfo = docinfo;
+		that.source = docinfo;
 		
 		// Purpose: internal function to keep docinfo up-to-date
 		var sync = function (err, response) {
 			
 			// if a doc, then update all fields
 			if (!err) {
-				this.updated_docinfo = _.extend(this.updated_docinfo, response.data);
+				this.source(response.data);
 			}
 			return(response);
 		};
-		that.sync = sync;
 
 		// Purpose: helper function used by most methods
 		var docId = function () {
-			return({ 'id': this.updated_docinfo._id });
+			return({ 'id': content.get('_id') });
 		};
 		that.docId = docId;
 		
+		var docRev = function () {
+			return(content.get('_rev') ? { 'rev': content.get('_rev') } : {});
+		};
+		that.docRev = docRev;
+
+		var docHdr = function (name, value) {
+			if (typeof name === 'object') {
+				headers = this.UTIL.hash(name);
+			} else {
+				headers.set(name, value);				
+			}
+			return ({'headers': headers.post() });
+		};
+		that.docHdr = docHdr;	
 		
 		// What it does: helper to convert a URL into a valid docId
 		var url2Id = function (host, reverse) {
@@ -3786,18 +3825,6 @@ if (typeof Boxspring === 'undefined') {
 			return(_.urlParse(host).host.replace(/\./g, '-'));
 		};
 		that.url2Id = url2Id;
-
-		var docRev = function () {
-			return(this.updated_docinfo._rev ? { 'rev': this.updated_docinfo._rev } : {});
-		};
-		that.docRev = docRev;
-
-		var docHdr = function (name, value) {
-			var hdr = {};
-			hdr[name] = value;
-			return((name && value) ? { 'headers': hdr } : {});
-		};
-		that.docHdr = docHdr;
 		
 		var exists = function () {
 			return (_.has(this.updated_docinfo, '_rev'));
@@ -3809,8 +3836,8 @@ if (typeof Boxspring === 'undefined') {
 		var save = function (handler) {
 			var local = this;
 			this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
-				'body': local.updated_docinfo }), {}, function (err, response) {
-				handler(err, local.sync(err, response));
+				'body': content.post() }), {}, function (err, response) {
+				handler(err, sync.call(local, err, response));
 			});
 			return this;
 		};
@@ -3823,19 +3850,26 @@ if (typeof Boxspring === 'undefined') {
 			
 			this.queryHTTP('doc_retrieve', this.docId(), options, 
 			function (err, response) {
-				handler(err, local.sync(err, response));
+				handler(err, sync.call(local, err, response));
 			});
 			return this;
 		};
 		that.retrieve = retrieve;
-		that.open = retrieve;
+		that.read = retrieve;
+		
+		var info = function (handler) {
+			// set the 'revs_info' flag to true on retrieve;
+			this.retrieve(handler, true);
+			return this;
+		};
+		that.info = info;
 
 		var attachment = function(name, handler) {
 			var local = this;
 		
 			this.queryHTTP('doc_attachment', { 'id': this.docId().id, 'attachment': name }, {}, 
 			function (err, response) {
-				handler(err, local.sync(err, response));
+				handler(err, sync.call(local, err, response));
 			});
 			return this;			
 		};
@@ -3848,7 +3882,8 @@ if (typeof Boxspring === 'undefined') {
 				_.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
 				function (err, response) {
 					if (!err) {
-						_.extend(local.updated_docinfo, { '_rev': local.getRev(response) });
+						local.source(response.data);
+						content.set('_rev', local.getRev(response));
 					} 
 					
 					if (handler && typeof handler === 'function') {
@@ -3864,17 +3899,17 @@ if (typeof Boxspring === 'undefined') {
 		var update = function (handler, data) {
 			var local = this;
 			
-			// extend the local docinfo with the data already in docinfo and any new data coming
-			// retrieve will over-write our recent updates with the content from the server;
-			data = _.extend({}, local.source(), data || {});
+			// retrieve will over-write our in memory updates with the content from the server;
+			if (data && _.isObject(data)) {
+				data = this.source(data).post();
+			}
 			
 			retrieve.call(this, function(err, response) {
 				// when updating, we might get an error if the doc doesn't exist
 				// otherwise just keep going
 				if (!err || response.code === 404) {
 					// now add back data to update from above and save
-					local.updated_docinfo = _.extend(local.source(), data);
-					return save.call(local, handler);	
+					return local.source(data).save.call(local, handler);	
 				}
 				handler(err, response);
 			});
@@ -3895,25 +3930,7 @@ if (typeof Boxspring === 'undefined') {
 			return this;
 		};
 		that.remove = remove;
-
-		var info = function (handler) {
-			// set the 'revs_info' flag to true on retrieve;
-			this.retrieve(handler, true);
-			return this;
-		};
-		that.info = info;
-
-		// Purpose: takes a document object as input, 
-		// or returns an existing document object.
-		var docinfo = function (docinfo) {
-			if (docinfo) {
-				_.extend(this.updated_docinfo, docinfo);
-				return this;
-			}
-			return(this.updated_docinfo);
-		};
-		that.docinfo = docinfo;
-		that.source = docinfo;
+		that.delete = remove;
 		return that;		
 	};
 	global.doc = doc;
@@ -3944,7 +3961,7 @@ if (typeof Boxspring === 'undefined') {
 (function(global) {
 	"use strict";
 	// Purpose: routines for bulk saving and removing
-	var bulk = function (doclist) {
+	var bulk = function (doclist, prohibit) {
 		var that
 		, lastResponse = [];
 		
@@ -3954,6 +3971,17 @@ if (typeof Boxspring === 'undefined') {
 		that.Max = undefined;
 		that.headers = { 'X-Couch-Full-Commit': false };
 		that.options = { 'batch': 'ok' };
+		
+		var checkSource = function (doc) {
+			// if doc is an object, then use post() to get the contents
+			if (!prohibit) {
+				if (_.isFunction(doc.get) && doc.get('_id')) {
+					return doc.post();
+				}				
+			}
+			// otherwise return the doc
+			return doc;			
+		} 
 
 		// What it does: Returns and array to the caller with false at the index
 		// of the doc if it succeeded, and the document information if it failed
@@ -4071,7 +4099,7 @@ if (typeof Boxspring === 'undefined') {
 
 		var push = function (item, handler) {
 			if (item) {
-				this.docs.docs.push(item);
+				this.docs.docs.push(checkSource(item));
 				if (handler && 
 					_.isFunction(handler) && 
 					this.docs.docs.length===this.Max) {
@@ -4094,6 +4122,11 @@ if (typeof Boxspring === 'undefined') {
 			return this;
 		};
 		that.fullCommit = fullCommit;
+		
+		// check to see if doclist objects are 'doc' objects or source objects and convert if nec.
+		that.docs.docs.forEach(function(doc, index) {
+			that.docs.docs[index] = checkSource(doc);
+		});
 		return that;
 	};
 	global.bulk = bulk;
@@ -5418,7 +5451,7 @@ if (typeof Boxspring === 'undefined') {
 				// updates the pages cache
 				queryPages.pages.push(response);	
 				// accumulates the rest of the pages for this result, if 'asynch'
-				//console.log('result', response.offset(), response.system.get('asynch'), queryPages.pages.length);
+				//console.log('result', response.offset(), owner.system.get('asynch'), queryPages.pages.length);
 				// when asynch=true, relay the data to the listener
 				if (owner.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
@@ -5512,9 +5545,8 @@ if (typeof Boxspring === 'undefined') {
 			'data': undefined,
 			'options': {}
 		},
-		'initialize': function (query, options) {
+		'initialize': function (query) {
 			this.query = query;
-			this.set('options', options || {});
 		}, 
 		'fetch': function() {
 			var model = this;
@@ -5523,10 +5555,15 @@ if (typeof Boxspring === 'undefined') {
 				model.set('data', result);
 				model.set(str, model.get(str)+1);
 			});
-			this.query.fetch.apply(this.query, this.get('options'));
+			
+			model.on('change:result', function() {
+				console.log('model', model.get('result'));
+			});
+			console.log('model', this.query.system.post());
+			this.query.server.call(this.query);
 		}
 	});
-	global = _.extend(global, { 'Query': Query });
+	global.Query = Query;
 	
 	// What it does: Methods for asynchronous Queries and separating page-previous/page-next from the
 	// browser and the server.
@@ -5585,7 +5622,7 @@ if (typeof Boxspring === 'undefined') {
 			});
 		}	
 	});
-	global = _.extend(global, { 'Display': Display });
+	global.Display = Display;
 	
 	// helper function to form db object
 	var dbhelper = function(name, auth) {
@@ -5602,6 +5639,9 @@ if (typeof Boxspring === 'undefined') {
 			'loggedIn': false,
 			'error': {}
 		},
+		initialize: function (db) {
+			this.owner = db;
+		},
 		auth: function() {
 			return ({'auth': {
 				'name': this.get('name'), 'password': this.get('password') }});
@@ -5610,7 +5650,7 @@ if (typeof Boxspring === 'undefined') {
 			return this.set('error', {'err': err, 'response': response });			
 		},
 		signup: function() {
-			var mydb = this.db().users(this.get('name'))
+			var mydb = this.owner.users(this.get('name'))
 			, model = this;
 			
 			mydb.signUp(this.get('password'), this.get('roles'), function(err, response, userDb) {
@@ -5624,7 +5664,8 @@ if (typeof Boxspring === 'undefined') {
 		login: function() {
 			var model = this;
 			
-			this.set('userDb', this.db(_.extend({ 'name': this.get('db_name') }, this.auth()))()
+			this.set('userDb', 
+				this.owner.db(_.extend({ 'name': this.get('db_name') }, this.auth()))()
 				.users(this.get('name')));
 			
 			this.get('userDb').login(function(err, response) {
@@ -5649,7 +5690,7 @@ if (typeof Boxspring === 'undefined') {
 		},
 		update: function(newPassword) {
 			var model = this
-			, db = this.db(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
+			, db = this.owner.db(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
 			
 			if (this.get('loggedIn')) {	
 				db.update(newPassword, [], function(err, res) {
@@ -5675,7 +5716,7 @@ if (typeof Boxspring === 'undefined') {
 		}
 	});
 	// make this Model visible to the outside world
-	global = _.extend(global, { 'Users': Users });
+	global.Users = Users;
 	
 }(Boxspring));
 /* ===================================================
@@ -5707,10 +5748,6 @@ if (typeof UTIL === 'undefined') {
 // Inherit the UTIL objects 
 Boxspring.UTIL = UTIL;
 
-// Include the boxspring-models if node.js
-if (typeof module !== 'undefined') {
-	_.extend(Boxspring, require('boxspring-models'));
-}
 
 (function(template) {
 	"use strict";

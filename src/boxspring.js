@@ -27,10 +27,6 @@ if (typeof UTIL === 'undefined') {
 // Inherit the UTIL objects 
 Boxspring.UTIL = UTIL;
 
-// Include the boxspring-models if node.js
-if (typeof module !== 'undefined') {
-	_.extend(Boxspring, require('boxspring-models'));
-}
 
 (function(template) {
 	"use strict";

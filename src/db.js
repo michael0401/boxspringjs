@@ -106,11 +106,11 @@ if (typeof Boxspring === 'undefined') {
 
 		var lookup = function (tag, docId, viewOrUpdate, target) {
 			var uri_lookup = {
+				'heartbeat': [ '','GET' ],
 				'login': [ '/_session','POST'],
 				'logout': [ '/_session','DELETE'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
-				'heartbeat': [ '','GET' ],
 				'db_save': [ dbname,'PUT' ],
 				'db_remove': [ dbname,'DELETE'],
 				'db_info': [ dbname,'GET'],
@@ -119,10 +119,10 @@ if (typeof Boxspring === 'undefined') {
 				'doc_save': [ dbname + '/' + docId,'PUT'], 
 				'doc_update': [ dbname + '/' + docId,'PUT'], 
 				'doc_retrieve': [dbname + '/' + docId,'GET'],  
-				'doc_attachment': [dbname + '/' + docId + '/' + viewOrUpdate,'GET'],  
 				'doc_info': [ dbname + '/' + docId,'GET'],
 				'doc_head': [ dbname + '/' + docId,'HEAD'],  
 				'doc_remove': [ dbname + '/' + docId,'DELETE'],  
+				'doc_attachment': [dbname + '/' + docId + '/' + viewOrUpdate,'GET'],  
 				'view': [ dbname + '/' + docId + '/_view' + '/' + viewOrUpdate,'GET' ],
 				'update': [ dbname+'/'+docId+'/_update'+'/'+viewOrUpdate +'/'+ target,'PUT'] 
 			};

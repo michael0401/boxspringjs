@@ -9,6 +9,9 @@ var test = require('tape')
 ;
 
 var dbObject = [ 'UTIL',
+  'Users',
+  'Display',
+  'Query',
   'db',
   'bulk',
   'doc',
@@ -42,8 +45,7 @@ var dbObject = [ 'UTIL',
   'events',
   'Boxspring', 'VERSION', 'create', 'getAuth', 'logout', 'users' ],
 
-docObject = 	[ 'updated_docinfo',
-	  'Boxspring',
+docObject = 	[ 'Boxspring',
 	  'VERSION',
 	  'attachment',
 	  'getAuth',
@@ -61,7 +63,6 @@ docObject = 	[ 'updated_docinfo',
 	  'cell',
 	  'query',
 	  'name',
-	  'open',
 	  'source',
 	  'id',
 	  'index',
@@ -84,7 +85,6 @@ docObject = 	[ 'updated_docinfo',
 	  'save',
 	  'remove',
 	  'events',
-	  'sync',
 	  'docId',
 	  'url2Id',
 	  'docRev',
@@ -93,9 +93,17 @@ docObject = 	[ 'updated_docinfo',
 	  'head',
 	  'update',
 	  'info',
-	  'docinfo' ],
+	  'docinfo',
+	  'Display',
+	  'Query',
+	  'Users',
+	  'delete',
+	  'original',
+	  'read',
+	  'values' ],
 
 bulkObject = 	[ 'status',
+ 	  'Display', 'Query', 'Users',
 	  'Boxspring', 'VERSION', 'create', 'getAuth', 'logout', 'users',  
 	  'UTIL',
 	  'db',
@@ -277,7 +285,7 @@ test('objects', function (t) {
 	t.equal(db2.id, 'your-db', 'db-options-check2');
 	t.equal(db2.name, 'regress', 'db-name');	
 	t.equal(newdoc===newdoc1, false, 'doc-check1');
-	t.equal(newdoc.docinfo()._id===newdoc1.docinfo()._id, false, 'doc-check2');
+	t.equal(newdoc.docinfo().get('_id')===newdoc1.docinfo().get('_id'), false, 'doc-check2');
 	t.equal(typeof Boxspring, 'function', 'maker-function');
 	t.equal(_.identical([ 'function', 'object', 'function', 'function', 'function' ],
 		[typeof Bx, typeof db, typeof db.doc, typeof db.design, typeof db.bulk]), true, 

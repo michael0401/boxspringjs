@@ -23,7 +23,7 @@
 (function(global) {
 	"use strict";
 	// Purpose: routines for bulk saving and removing
-	var bulk = function (doclist) {
+	var bulk = function (doclist, prohibit) {
 		var that
 		, lastResponse = [];
 		
@@ -33,6 +33,17 @@
 		that.Max = undefined;
 		that.headers = { 'X-Couch-Full-Commit': false };
 		that.options = { 'batch': 'ok' };
+		
+		var checkSource = function (doc) {
+			// if doc is an object, then use post() to get the contents
+			if (!prohibit) {
+				if (_.isFunction(doc.get) && doc.get('_id')) {
+					return doc.post();
+				}				
+			}
+			// otherwise return the doc
+			return doc;			
+		} 
 
 		// What it does: Returns and array to the caller with false at the index
 		// of the doc if it succeeded, and the document information if it failed
@@ -150,7 +161,7 @@
 
 		var push = function (item, handler) {
 			if (item) {
-				this.docs.docs.push(item);
+				this.docs.docs.push(checkSource(item));
 				if (handler && 
 					_.isFunction(handler) && 
 					this.docs.docs.length===this.Max) {
@@ -173,6 +184,11 @@
 			return this;
 		};
 		that.fullCommit = fullCommit;
+		
+		// check to see if doclist objects are 'doc' objects or source objects and convert if nec.
+		that.docs.docs.forEach(function(doc, index) {
+			that.docs.docs[index] = checkSource(doc);
+		});
 		return that;
 	};
 	global.bulk = bulk;

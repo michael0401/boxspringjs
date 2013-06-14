@@ -178,7 +178,7 @@
 				// updates the pages cache
 				queryPages.pages.push(response);	
 				// accumulates the rest of the pages for this result, if 'asynch'
-				//console.log('result', response.offset(), response.system.get('asynch'), queryPages.pages.length);
+				//console.log('result', response.offset(), owner.system.get('asynch'), queryPages.pages.length);
 				// when asynch=true, relay the data to the listener
 				if (owner.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {

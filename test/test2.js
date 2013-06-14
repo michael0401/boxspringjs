@@ -12,8 +12,8 @@ var test = require('tape')
 		
 		var bulkPushTest = function () {
 			var bulk = boxspringjs.bulk()
-				.push(doc1.docinfo())
-				.push(doc2.docinfo());
+				.push(doc1.post())
+				.push(doc2);
 			t.equal(bulk.getLength(), 2, 'bulk-getLength');
 			bulk.save(function(err, result) {
 				t.equal(result.code, 201, 'bulk-push-save');
@@ -22,11 +22,11 @@ var test = require('tape')
 				});
 			});	
 		}
-		, bulk = boxspringjs.bulk([ doc1.docinfo(), doc2.docinfo() ]);
+		, bulk = boxspringjs.bulk([ doc1, doc2.post() ]);
 
-		t.equal(typeof bulk, 'object');
-		t.equal(typeof bulk.save, 'function');
-		t.equal(typeof bulk.queryHTTP, 'function');
+		t.equal(typeof bulk, 'object', 'is-object');
+		t.equal(typeof bulk.save, 'function', 'is-function');
+		t.equal(typeof bulk.queryHTTP, 'function','is-another-function');
 		// bulk tests
 		bulk.save(function(err, result) {
 			t.equal(result.code, 201, 'bulk-save');

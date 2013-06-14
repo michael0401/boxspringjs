@@ -467,14 +467,14 @@ By persisting this information about the document you can use the same document 
 
 __Alias: docinfo()__
 
-<a name="save" />
+<a name="create" />
 #####save(callback)
 
 Save the contents of a document object to the server.
 
-Alias: create(callback)
+Alias: save(callback)
 
-<a name="retrieve" />
+<a name="read" />
 ######retrieve(callback)
 
 Read the contents of a document from the server, and update the document object with it.
@@ -486,6 +486,8 @@ Read the contents of a document from the server, and update the document object 
 		console.log(mydoc.source());
 		// -> contents document from the server, including _id and _rev information
 	});
+
+Alias: retrieve(callback)
 
 <a name="update" />
 #####update(callback)
@@ -524,7 +526,7 @@ Use this method to update the contents of a document existing on the server.
 	//Over-writing the contents of a document on the server.
 	var mydoc2 = mydb.doc('mydoc1');
 	
-	mydoc2.retrieve(function(err, response) {
+	mydoc2.read(function(err, response) {
 		if (err) {
 			// handle error
 		}
@@ -533,7 +535,7 @@ Use this method to update the contents of a document existing on the server.
 				if (err) {
 					// handle error
 				}
-				console.log(mydoc2.source());
+				console.log(mydoc2.post());
 				/* ->
 				{ 	'_id': ...,
 					'_rev': ...,
@@ -542,12 +544,12 @@ Use this method to update the contents of a document existing on the server.
 			});
 	});  
 
-<a name="remove" />
+<a name="delete" />
 #####remove(callback)
 
 Remove a document from the database server.
 
-Alias: delete(callback)
+Alias: remove(callback)
 
 <a name="info" />
 #####info(callback)
@@ -562,6 +564,10 @@ Get the http request header for a document.
 > Use head when you only need to test the existence of a document on the server. 
 
 ####Helper functions
+
+#####Document Hash
+
+Document content can be manipulated by the full set of [object hash functions](https://github.com/rranauro/js-hash/blob/master/README.md) available in `js-hash`. 
 
 <a name="exists" />
 #####exists()
@@ -588,9 +594,9 @@ Helper function, returns an object containing the latest revision of the documen
 > Only useful after `head()` or `retrieve()` or `save()`
 
 <a name="docHdr" />
-#####docHdr(name, value)
+#####docHdr(object or name, value)
 
-Helper function, returns an object with `headers` property whose value is an object with property `name=value`
+Set/get the header hash for a document object. If the argument is an object, it replaces the header with the object. Incrementally update the header by calling `docHdr` repeatedly with `name/value`. Returns an object with `headers` property whose value is the a collection of `name=value`.
 
 <a name="url2Id" />
 #####url2Id(url, reverse)
@@ -620,6 +626,17 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 			}
 		});
 	});
+
+> By default, Boxspring bulk processing methods will detect if a member of the list of documents is a document object and convert it to a document source as required by the databases bulk processor. Over-ride this behavior by setting the `prohibit` option when instantiating the bulk object.
+
+	// Prohibit automatic conversion of doc objects to doc sources
+	mydb.bulk([mydb.doc('some-doc').source({'some':'data'}), ...], true);
+	mydb.save(function(err, response) {
+		if (err) {
+			console.log(err);
+			// -> bad argument
+		}
+	})
 
 ####Summary
 - [max](#max)

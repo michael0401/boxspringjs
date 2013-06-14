@@ -50,7 +50,7 @@
 			var anonymous = this.db('_users')(this.url)
 			, newUser = this.db({'name': this.name,
 				'auth': {'name': name, 'password': password }})(this.url);
-						
+					
 			// create a document and add it to the _users database
 			anonymous.doc(authFileUserDocName()).source({
 				'type': 'user',
