@@ -98,9 +98,8 @@ docObject = 	[ 'Boxspring',
 	  'Query',
 	  'Users',
 	  'delete',
-	  'original',
 	  'read',
-	  'values' ],
+	  'get', 'set', 'post' ],
 
 bulkObject = 	[ 'status',
  	  'Display', 'Query', 'Users',
@@ -284,7 +283,7 @@ test('objects', function (t) {
 	t.equal(db.id, 'my-db', 'db-options-check1');
 	t.equal(db2.id, 'your-db', 'db-options-check2');
 	t.equal(db2.name, 'regress', 'db-name');	
-	t.equal(newdoc===newdoc1, false, 'doc-check1');
+	t.equal(newdoc===newdoc1, false, 'doc-check1');	
 	t.equal(newdoc.docinfo().get('_id')===newdoc1.docinfo().get('_id'), false, 'doc-check2');
 	t.equal(typeof Boxspring, 'function', 'maker-function');
 	t.equal(_.identical([ 'function', 'object', 'function', 'function', 'function' ],

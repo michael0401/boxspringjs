@@ -64,8 +64,6 @@ var test = require('tape')
 		display.on('change:more-data change:completed', function(attributes, changes) {
 			var result = attributes.get('data');
 			
-			//console.log('more-data, page', page, 'completed', result.pageInfo().completed,
-			//result.query.qid); 
 			if (result.pageInfo().completed) {
 				result.nextPrev('next');					
 				while (result.pageInfo().page > 0) {

@@ -38,7 +38,7 @@
 		, that = _.extend({'db': this }, this && this.events());
 		
 		// create a query id for this, mostly for debugging 
-		that.qid = _.uniqueId('query-');
+		that.qid = _.uniqueId('q');
 		
 		// extend it with these options.	
 		that = _.extend(that, _.defaults(options || {}, {
@@ -53,8 +53,6 @@
 			'keys': undefined
 // list function			'filter': {},
 // list function			'pivot': false,
-//move			'display': false,
-//move			'vis': 'table'
 		}));
 
 		// inherit the system cache from the owner
@@ -69,7 +67,7 @@
 		// Response Wrapper: wraps the response object with methods and helpers to manage 
 		// the flow of data from the server to the application
 		var result = function () {					
-			var owner = that 
+			var owner = this || {} 
 			, queryPages = { 'pages': [] }
 			, current_chunk = 0
 			, current_page = 0;	// zero-based
@@ -79,7 +77,7 @@
 			var data = function (response) {
 				// helpers						
 				response.query = owner;
-				response.rid = _.uniqueId('result-');
+				response.rid = _.uniqueId('r');
 
 				var pages = function () {
 					return _.clone(queryPages.pages);
@@ -178,15 +176,15 @@
 				// updates the pages cache
 				queryPages.pages.push(response);	
 				// accumulates the rest of the pages for this result, if 'asynch'
-				//console.log('result', response.offset(), owner.system.get('asynch'), queryPages.pages.length);
+				//console.log(response.query.qid, owner.system.get('asynch'), queryPages.pages.length);
 				// when asynch=true, relay the data to the listener
 				if (owner.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
 			
 					if (response.pageInfo().completed) {
-						response.query.trigger('completed', response);																
+						owner.trigger('completed', response);																
 					} else {
-						response.query.trigger('more-data', response);																
+						owner.trigger('more-data', response);																
 					}
 				}
 				return response;
@@ -206,7 +204,7 @@
 				}	
 				// set result and call down to nextPrev with this result and no argument
 				local.trigger('result', result);		
-			}, result());
+			}, result.apply(local));
 			return this;						
 		};
 		that.server = get;

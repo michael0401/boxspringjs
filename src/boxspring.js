@@ -27,7 +27,6 @@ if (typeof UTIL === 'undefined') {
 // Inherit the UTIL objects 
 Boxspring.UTIL = UTIL;
 
-
 (function(template) {
 	"use strict";
 		

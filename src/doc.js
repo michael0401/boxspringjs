@@ -31,22 +31,22 @@
 		
 		var set = function () {
 			content.set.apply(content, arguments);
+			return this;
 		};
 		that.set = set;
 		
 		var get = function () {
-			content.get.apply(content, arguments);
+			return content.get.apply(content, arguments);
 		};
 		that.get = get;
 		
 		var post = function () {
-			content.post.apply(content);
+			return content.post.apply(content);
 		};
 		that.post = post;
 		
 		// Purpose: takes an object and updates the state of the document hash
 		var docinfo = function (docinfo) {
-			
 			if (docinfo) {
 				_.each(docinfo, function(item, key) {
 					content.set(key, item);

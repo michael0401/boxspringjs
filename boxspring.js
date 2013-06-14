@@ -3756,22 +3756,22 @@ if (typeof Boxspring === 'undefined') {
 		
 		var set = function () {
 			content.set.apply(content, arguments);
+			return this;
 		};
 		that.set = set;
 		
 		var get = function () {
-			content.get.apply(content, arguments);
+			return content.get.apply(content, arguments);
 		};
 		that.get = get;
 		
 		var post = function () {
-			content.post.apply(content);
+			return content.post.apply(content);
 		};
 		that.post = post;
 		
 		// Purpose: takes an object and updates the state of the document hash
 		var docinfo = function (docinfo) {
-			
 			if (docinfo) {
 				_.each(docinfo, function(item, key) {
 					content.set(key, item);
@@ -5311,7 +5311,7 @@ if (typeof Boxspring === 'undefined') {
 		, that = _.extend({'db': this }, this && this.events());
 		
 		// create a query id for this, mostly for debugging 
-		that.qid = _.uniqueId('query-');
+		that.qid = _.uniqueId('q');
 		
 		// extend it with these options.	
 		that = _.extend(that, _.defaults(options || {}, {
@@ -5326,8 +5326,6 @@ if (typeof Boxspring === 'undefined') {
 			'keys': undefined
 // list function			'filter': {},
 // list function			'pivot': false,
-//move			'display': false,
-//move			'vis': 'table'
 		}));
 
 		// inherit the system cache from the owner
@@ -5342,7 +5340,7 @@ if (typeof Boxspring === 'undefined') {
 		// Response Wrapper: wraps the response object with methods and helpers to manage 
 		// the flow of data from the server to the application
 		var result = function () {					
-			var owner = that 
+			var owner = this || {} 
 			, queryPages = { 'pages': [] }
 			, current_chunk = 0
 			, current_page = 0;	// zero-based
@@ -5352,7 +5350,7 @@ if (typeof Boxspring === 'undefined') {
 			var data = function (response) {
 				// helpers						
 				response.query = owner;
-				response.rid = _.uniqueId('result-');
+				response.rid = _.uniqueId('r');
 
 				var pages = function () {
 					return _.clone(queryPages.pages);
@@ -5451,15 +5449,15 @@ if (typeof Boxspring === 'undefined') {
 				// updates the pages cache
 				queryPages.pages.push(response);	
 				// accumulates the rest of the pages for this result, if 'asynch'
-				//console.log('result', response.offset(), owner.system.get('asynch'), queryPages.pages.length);
+				//console.log(response.query.qid, owner.system.get('asynch'), queryPages.pages.length);
 				// when asynch=true, relay the data to the listener
 				if (owner.system.get('asynch') === true && 
 					queryPages.pages.length > 1) {
 			
 					if (response.pageInfo().completed) {
-						response.query.trigger('completed', response);																
+						owner.trigger('completed', response);																
 					} else {
-						response.query.trigger('more-data', response);																
+						owner.trigger('more-data', response);																
 					}
 				}
 				return response;
@@ -5479,7 +5477,7 @@ if (typeof Boxspring === 'undefined') {
 				}	
 				// set result and call down to nextPrev with this result and no argument
 				local.trigger('result', result);		
-			}, result());
+			}, result.apply(local));
 			return this;						
 		};
 		that.server = get;
@@ -5539,28 +5537,22 @@ if (typeof Boxspring === 'undefined') {
 	// and 'more-data' events to clients. 
 	var Query = Backbone.Model.extend({
 		'defaults': {
-			'result': -1,
-			'more-data': -1,
-			'completed': -1,
-			'data': undefined,
-			'options': {}
+			'data': undefined
 		},
 		'initialize': function (query) {
 			this.query = query;
 		}, 
 		'fetch': function() {
 			var model = this;
-									
-			this.query.on('all', function(str, result) {
-				model.set('data', result);
-				model.set(str, model.get(str)+1);
-			});
 			
-			model.on('change:result', function() {
-				console.log('model', model.get('result'));
+			// when we see an event on the query, propagate a change event on the model.
+			['result', 'more-data', 'completed'].forEach(function(tag) {
+				model.query.on(tag, function(result) {
+					model.set('data', result);
+					model.set(tag, result);
+				});				
 			});
-			console.log('model', this.query.system.post());
-			this.query.server.call(this.query);
+			this.query.server();
 		}
 	});
 	global.Query = Query;
@@ -5747,7 +5739,6 @@ if (typeof UTIL === 'undefined') {
 
 // Inherit the UTIL objects 
 Boxspring.UTIL = UTIL;
-
 
 (function(template) {
 	"use strict";
