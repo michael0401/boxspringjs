@@ -3402,20 +3402,6 @@ if (typeof Boxspring === 'undefined') {
 			return(lookup(tag) && lookup(tag)[1] ? lookup(tag)[1] : 'GET');
 		};
 		that.method = method;
-		
-		var clone = function () {
-			var object = _.clone(this);
-
-			if (object.hasOwnProperty('id')) {
-				if (object.id.split('-').length > 1) {
-					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
-				} else {
-					object.id = _.uniqueId(object.id+'-clone');					
-				}
-			}
-			return object;
-		};
-		that.clone = clone;
 		return that;
 	};
 	
@@ -3609,6 +3595,20 @@ if (typeof Boxspring === 'undefined') {
 			return user;
 		};
 		that.getAuth = getAuth;
+		
+		var clone = function () {
+			var object = _.clone(this);
+
+			if (object.hasOwnProperty('id')) {
+				if (object.id.split('-').length > 1) {
+					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
+				} else {
+					object.id = _.uniqueId(object.id+'-clone');					
+				}
+			}
+			return object;
+		};
+		that.clone = clone;
 		return that;		
 	};
 
@@ -4011,7 +4011,7 @@ if (typeof Boxspring === 'undefined') {
 			var local = this;
 			// updates is the design document containing update methods	
 			if (_.isFunction(this.maker)) {
-				var funcs = this.maker()().updates || { 'dummy': function() {} };
+				var funcs = this.maker().updates || { 'dummy': function() {} };
 				// iterate the update functions to run before posting
 				_.each(this.docs.docs, function (doc) { 
 					_.each(funcs, function (update_method) {
@@ -5533,6 +5533,19 @@ if (typeof Boxspring === 'undefined') {
 
 (function (global) {
 	
+	var Db = Backbone.Model.extend({
+		'db': new Boxspring,
+		'initialize': function(options) {
+			var model = this;
+			model.set('options', options);
+			
+			// if there is a design name, then create the object with the design
+			if (options.hasOwnProperty('designName')) {
+				model.db = model.db(options).design()
+			}
+		}
+	});
+	
 	// What it does: Provides methods to 'fetch' from the server and relay 'completed', 'result', 
 	// and 'more-data' events to clients. 
 	var Query = Backbone.Model.extend({
@@ -5657,7 +5670,7 @@ if (typeof Boxspring === 'undefined') {
 			var model = this;
 			
 			this.set('userDb', 
-				this.owner.db(_.extend({ 'name': this.get('db_name') }, this.auth()))()
+				this.owner.createdb(_.extend({ 'name': this.get('db_name') }, this.auth()))()
 				.users(this.get('name')));
 			
 			this.get('userDb').login(function(err, response) {
@@ -5682,7 +5695,7 @@ if (typeof Boxspring === 'undefined') {
 		},
 		update: function(newPassword) {
 			var model = this
-			, db = this.owner.db(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
+			, db = this.owner.createdb(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
 			
 			if (this.get('loggedIn')) {	
 				db.update(newPassword, [], function(err, res) {
@@ -5697,7 +5710,7 @@ if (typeof Boxspring === 'undefined') {
 		},
 		remove: function(userName) {
 			var model = this 
-			, db = this.db(_.extend({
+			, db = this.createdb(_.extend({
 				'name': this.get('db_name') }, this.auth()))().users(userName); 
 			
 			db.remove(function(err, res) {
@@ -5757,7 +5770,7 @@ Boxspring.UTIL = UTIL;
 		object = _.extend(object, template);
 			
 		// db.apply returns a new database object with the supplied arguments
-		return template.db.apply(object, arguments);
+		return template.createdb.apply(object, arguments);
 	};
 	
 	if (typeof module !== 'undefined' && module.exports) {
