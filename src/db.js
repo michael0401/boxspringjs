@@ -139,20 +139,6 @@ if (typeof Boxspring === 'undefined') {
 			return(lookup(tag) && lookup(tag)[1] ? lookup(tag)[1] : 'GET');
 		};
 		that.method = method;
-		
-		var clone = function () {
-			var object = _.clone(this);
-
-			if (object.hasOwnProperty('id')) {
-				if (object.id.split('-').length > 1) {
-					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
-				} else {
-					object.id = _.uniqueId(object.id+'-clone');					
-				}
-			}
-			return object;
-		};
-		that.clone = clone;
 		return that;
 	};
 	
@@ -346,10 +332,24 @@ if (typeof Boxspring === 'undefined') {
 			return user;
 		};
 		that.getAuth = getAuth;
+		
+		var clone = function () {
+			var object = _.clone(this);
+
+			if (object.hasOwnProperty('id')) {
+				if (object.id.split('-').length > 1) {
+					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
+				} else {
+					object.id = _.uniqueId(object.id+'-clone');					
+				}
+			}
+			return object;
+		};
+		that.clone = clone;
 		return that;		
 	};
 
-	global.db = function(options) {
+	global.createdb = function(options) {
 		var object = db.call(this, options);
 		
 		return function (url) {
