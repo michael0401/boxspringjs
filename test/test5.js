@@ -127,7 +127,7 @@ test('boxspring-auth-2', function(t) {
 	};
 
 	admin.login(function(e, r) {
-		admin.users('ron', admin).get(function(err, res) {
+		admin.users('ron', admin).fetch(function(err, res) {
 			// if existing, remove it
 			if (!err) {
 				admin.users('ron', admin).remove(function(err, res) {

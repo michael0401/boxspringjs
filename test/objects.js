@@ -12,7 +12,7 @@ var dbObject = [ 'UTIL',
   'Users',
   'Display',
   'Query',
-  'db',
+  'createdb',
   'bulk',
   'doc',
   'design',
@@ -53,7 +53,7 @@ docObject = 	[ 'Boxspring',
 	  'logout',
 	  'users',
 	  'UTIL',
-	  'db',
+	  'createdb',
 	  'bulk',
 	  'create',
 	  'doc',
@@ -101,13 +101,14 @@ docObject = 	[ 'Boxspring',
 	  'delete',
 	  'read',
 	  'clone',
-	  'get', 'set', 'post' ],
+	  'original',
+	  'values' ],
 
 bulkObject = 	[ 'status',
  	  'Display', 'Query', 'Users',
 	  'Boxspring', 'VERSION', 'create', 'getAuth', 'logout', 'users',  
 	  'UTIL',
-	  'db',
+	  'createdb',
 	  'bulk',
 	  'doc',
 	  'design',
@@ -211,7 +212,7 @@ cellObject = [ 'builtInColumns',
 	  'newColumn' ],	
 
 queryObject = [ 
-	  'db',
+	  'createdb',
 	  'bulk',
 	  'doc',
 	  'design',
@@ -259,12 +260,13 @@ queryObject = [
 	  'system',
 	  'qid' ],
 	
-viewObject = [ 'on',
+viewObject = [
+      'db', 
+      'on',
 	  'off',
 	  'trigger',
 	  'bind',
 	  'unbind',
-	  'db',
 	  'design',
 	  'index',
 	  'views',
@@ -276,7 +278,8 @@ viewObject = [ 'on',
 	  'node',
 	  'couch',
 	  'end' ];			
-	
+
+
 test('objects', function (t) {
 	t.plan(17);
 	
@@ -309,14 +312,14 @@ test('objects', function (t) {
 		}
 	}
 
-	compare(dbObject, _.keys(db), 'db'); 	
+	compare(dbObject, _.keys(db), 'createdb'); 	
 	compare(docObject, _.keys(db.doc()), 'doc');
 	compare(bulkObject, _.keys(db.bulk()), 'bulk'); 	
 	compare(rowObject, _.keys(db.row()), 'row'); 
 	compare(rowsObject, _.keys(db.rows()), 'rows'); 
 	compare(cellObject, _.keys(db.cell()), 'cell');
 	compare(queryObject, _.keys(db['query'](db)), 'query');
-	t.equal(typeof db.design().query().system, 'object', 'system-object');
+	t.equal(typeof db.design().query().system, 'object', 'system-object');	
 	compare(viewObject, _.keys(db['view'](db)), 'view');
 	
 });

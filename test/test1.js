@@ -149,12 +149,12 @@ test('boxspringjs-3', function (t) {
 			t.equal(update.code, 201, 'newdoc1 update');
 			// get all docs using map views on the server (default)
 			boxspringjs
-				.design().get({ 'index': 'all_docs' }, function(err, couch) {
+				.design().fetch({ 'index': 'all_docs' }, function(err, couch) {
 				t.equal(couch.code, 200, 'all_docs');
 
 				// get all docs using map views FUTURE running in node
 				boxspringjs
-					.design().get({ 'index': 'all_docs', 'server': 'node' }, 
+					.design().fetch({ 'index': 'all_docs', 'server': 'node' }, 
 					function(err, node) {
 					var found;
 					_.each(node.data.rows, function(d) {

@@ -219,7 +219,7 @@
 		// 'asynch: false' (or undefined) executes the callback each time and the 
 		// application has to manage the data
 
-		var get = function (options, callback, callerDataCatcher) {
+		var fetch = function (options, callback, callerDataCatcher) {
 			var local = this 
 			, triggered = false
 			, system = this.system.post()
@@ -259,7 +259,7 @@
 			});
 			return this;
 		};
-		that.get = get;
+		that.fetch = fetch;
 		
 		that.superiorQuery = that.query;
 		var query = function(options) {

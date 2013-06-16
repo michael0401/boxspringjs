@@ -25,31 +25,18 @@
 
 	var doc = function(id) {
 		// inherit from the caller object, in this case a db object
-		var that = _.clone(this)
-		, headers = this.UTIL.hash()
-		, content = this.UTIL.hash({ '_id': id });
+		var that = this.UTIL.hash()
+		, headers = this.UTIL.hash();
 		
-		var set = function () {
-			content.set.apply(content, arguments);
-			return this;
-		};
-		that.set = set;
-		
-		var get = function () {
-			return content.get.apply(content, arguments);
-		};
-		that.get = get;
-		
-		var post = function () {
-			return content.post.apply(content);
-		};
-		that.post = post;
-		
+		_.extend(that, this);
+		that.set('_id', id);
+
 		// Purpose: takes an object and updates the state of the document hash
 		var docinfo = function (docinfo) {
+			var local = this;
 			if (docinfo) {
 				_.each(docinfo, function(item, key) {
-					content.set(key, item);
+					local.set(key, item);
 				});		
 			}
 			return this;
@@ -69,12 +56,12 @@
 
 		// Purpose: helper function used by most methods
 		var docId = function () {
-			return({ 'id': content.get('_id') });
+			return({ 'id': this.get('_id') });
 		};
 		that.docId = docId;
 		
 		var docRev = function () {
-			return(content.get('_rev') ? { 'rev': content.get('_rev') } : {});
+			return(this.get('_rev') ? { 'rev': this.get('_rev') } : {});
 		};
 		that.docRev = docRev;
 
@@ -111,7 +98,7 @@
 		var save = function (handler) {
 			var local = this;
 			this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
-				'body': content.post() }), {}, function (err, response) {
+				'body': local.post() }), {}, function (err, response) {
 				handler(err, sync.call(local, err, response));
 			});
 			return this;
@@ -158,7 +145,7 @@
 				function (err, response) {
 					if (!err) {
 						local.source(response.data);
-						content.set('_rev', local.getRev(response));
+						local.set('_rev', local.getRev(response));
 					} 
 					
 					if (handler && typeof handler === 'function') {

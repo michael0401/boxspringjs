@@ -18,7 +18,7 @@
 	* [logout](#login) - remove a user session
 
 * [User account methods](#authentication-methods)
-	* [get](#getUser) - determine if a `name` is already exists
+	* [fetch](#getUser) - determine if a `name` is already exists
 	* [signUp](#signUp) - create a new user account
 	* [update](#updateUser) - update the `password` for a user account
 	* [delete](#deleteUser) - remove a user account from the system
@@ -55,7 +55,7 @@
 	* [commit](#commit) - add properties to and update a document without fetching it from the server
 	* [system](#design-system) - system properties to define asynchronous query behavior
 	* [query](#design-query) - master query method
-	* [get](#design-get) - lower-level query method
+	* [fetch](#design-get) - lower-level query method
 
 * [Query/Result methods](#query-result-methods)
 	* [query events](#query-events)
@@ -349,7 +349,7 @@ __Overview__
 
 Authentication methods are built-in to the database object. Access to all but the `login` method are restricted to database objects created with administrative privilege. The format of the `authentication` object is shown below:
 
-> The `signUp` method can be run anonymously to allow users to create their own accounts. __Therefore there is no need for the application to store an administrative password that could be hacked__. The `get`, `update`, and `delete` methods require administrative privilege on the system to fulfill their requests.
+> The `signUp` method can be run anonymously to allow users to create their own accounts. __Therefore there is no need for the application to store an administrative password that could be hacked__. The `fetch`, `update`, and `delete` methods require administrative privilege on the system to fulfill their requests.
 
 <a name="authentication-object" />
 
@@ -362,7 +362,7 @@ When a new user account is created using `signUp` the server [hashes the passwor
 
 > When creating a new user account, `signUp` will fail if the requested `name` in the authentication object is already existing by some other user. To limit the likelihood of name clashes, it is recommended to require a valid email address as the `name` for all user accounts.
 
->When updating, `updateUser` by definition will update a user account with the new `password` and credentials. To confirm that the requesting user is the owner of the account, the application can check the existence of the old user account with `getUser`, update the user account with its own hashed `password` and email the new password to the user. Once the user re-enters the system with the hashed password he can change his password to his preference and the application can safely update the new `password` using `updateUser`.
+>When updating, `updateUser` by definition will update a user account with the new `password` and credentials. To confirm that the requesting user is the owner of the account, the application can check the existence of the old user account with `fetch`, update the user account with its own hashed `password` and email the new password to the user. Once the user re-enters the system with the hashed password he can change his password to his preference and the application can safely update the new `password` using `updateUser`.
 
 The `deleteUser` method removes user accounts from the system. __This operation is not reversible.__
 
@@ -813,7 +813,7 @@ The design document object, invoked from a [database object](#design) allows you
 - [commit](#commit)
 - [system](#design-system)
 - [query](#design-query)
-- [get](#design-get)
+- [fetch](#design-get)
 
 #####Defining a design document
 
@@ -942,7 +942,7 @@ The `design.system` object is a hash used to control the asynchronous behavior o
     <td>asynch</td>
     <td>Boolean</td>
 	<td>false</td>
-    <td>If true and the `get` request specifies a `page-size` option, BoxspringJS will continue to fetch rows of data up to the `cache-limit` and deposit them using the `moreData` callback. When `false`, the `get` request will return only the first quantity of rows to the callback, regardless of whether `page-size` is set or not.</td>
+    <td>If true and the `fetch` request specifies a `page-size` option, BoxspringJS will continue to fetch rows of data up to the `cache-limit` and deposit them using the `moreData` callback. When `false`, the `fetch` request will return only the first quantity of rows to the callback, regardless of whether `page-size` is set or not.</td>
   </tr>
   <tr>
     <td>page-size</td>
@@ -979,10 +979,10 @@ To update the system hash variables, use the following:
 
 Query the server, using the `view` defined by the current design document object. The `options` arguments are taken directly from the [CouchDB View API](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options).
 
-> The `query()` method of the design object relies on `get()` to complete its work. Observe that `query()` takes no `callback` argument, instead it uses events to communicate its status. The details of the events `query()` uses to indicate its status are described in the [Query/Result methods](#query-result-methods) section.
+> The `query()` method of the design object relies on `fetch()` to complete its work. Observe that `query()` takes no `callback` argument, instead it uses events to communicate its status. The details of the events `query()` uses to indicate its status are described in the [Query/Result methods](#query-result-methods) section.
 
 <a name="design-get" />
-#####get(options, callback, moreDataCallback)
+#####fetch(options, callback, moreDataCallback)
 
 Fetch row data from the server using the `view` defined by the current design document object. `options` are the same as used by [`query()`](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options). When data is returned from the server, `callback` function is executed with the [`response` object](#response-object) and some [helper methods](#rows-methods) to streamline downstream processing and rendering the data.
 
@@ -1007,7 +1007,7 @@ The `moreDataCallback` function is executed with the [response](#response-object
 	};
 	
 	// get some data;
-	mydesign.get({}, function(err, response) {
+	mydesign.fetch({}, function(err, response) {
 		if (!err) {
 			console.log(response.offset());
 			// -> 0
@@ -1063,7 +1063,7 @@ As depicted in the example above, the `query()` object will trigger the __result
 <a name="result-helper-methods" />
 #####result helper methods
 
-The result object comes wrapped with methods so that the application can navigate the cache. A `nextPrev()` method provides access to the next or previous "page" of rows available in memory, or if the application has reached the last page available it will increase the `cache-size` by one and on its own will initiate another `get()` request to get the next page from the server. __At present, BoxspringJS will accumulate more pages rather than shift the earliest page out of memory.__
+The result object comes wrapped with methods so that the application can navigate the cache. A `nextPrev()` method provides access to the next or previous "page" of rows available in memory, or if the application has reached the last page available it will increase the `cache-size` by one and on its own will initiate another `fetch()` request to get the next page from the server. __At present, BoxspringJS will accumulate more pages rather than shift the earliest page out of memory.__
 
 ######unPaginate()
 
@@ -1126,7 +1126,7 @@ Returns an object used by the data views to control the session.
 <a name="rows-methods" />
 ###Rows/Row/Cell methods
 
-The `rows(), row(), and cell() methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively. First, the [response object](#response-object) from a `get()` is wrapped by the `rows()` object, then each individual row is wrapped by `row()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.
+The `rows(), row(), and cell() methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively. First, the [response object](#response-object) from a `fetch()` is wrapped by the `rows()` object, then each individual row is wrapped by `row()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.
 
 A `visible` hash object keeps track of key/values requested and found across all rows. For example, when displaying tabular data, if a there is never a value for a key, then it may be possible to hide that column from the display.
 

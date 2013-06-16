@@ -61,14 +61,14 @@ var test = require('tape')
 
 		var design = boxspringjs.design();
 		t.equal(typeof design, 'object');
-		t.equal(typeof design.get, 'function');
+		t.equal(typeof (design && design.fetch), 'function');
 		t.equal(anotherdb.design().designName, '_design/my-design', 'design-name-test');
 		
 		var anotherdbDesignTests = function () {
 			anotherdb.design().ddoc.update(function(err, response) {
 				t.equal(response.code, 201, 'anotherdb-design');
-				anotherdb.design().get({}, function (err, c) {
-					anotherdb.design('_design/my-design', ddoc).get({'index': 'my-view' }, 
+				anotherdb.design().fetch({}, function (err, c) {
+					anotherdb.design('_design/my-design', ddoc).fetch({'index': 'my-view' }, 
 					function(e, n) {	
 						t.equal(c.data.rows.length, n.data.total_rows, 'my-view-respnose');
 					});
@@ -83,9 +83,9 @@ var test = require('tape')
 			// a local update handler 'my-commit'. After the last completion, it asserts the test
 			// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
 			// running in node.js and not on the server.
-			design.get({'index': 'Index'}, function(e, r) {
+			design.fetch({'index': 'Index'}, function(e, r) {
 
-				design.get({ 'index': 'Index' }, function(e, n) {
+				design.fetch({ 'index': 'Index' }, function(e, n) {
 					t.equal(r.data.rows.length, n.data.rows.length, 'view-tests');
 					design.commit('base_test_suite', 'in-place', { 'random': Date.now() }, 
 					function(e, commit) {
@@ -115,7 +115,7 @@ var test = require('tape')
 		t.plan(17);
 		console.log('Running row-tests: 17');
 
-		anotherdb.design().get({}, function(err, response) {
+		anotherdb.design().fetch({}, function(err, response) {
 			var first = response.data.rows[0]
 			, selected
 			, selected1
@@ -174,7 +174,7 @@ var test = require('tape')
 		t.plan(23);
 		console.log('Running rows-tests: 23');
 		
-		anotherdb.design().get({}, function(err, response) {
+		anotherdb.design().fetch({}, function(err, response) {
 			t.equal((response.each()).length, response.data.rows.length);
 			t.equal(response.column2Index('doc'), 1);
 			t.equal(response.column2Index('dfdfaf'), 0);

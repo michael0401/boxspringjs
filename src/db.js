@@ -145,7 +145,7 @@ if (typeof Boxspring === 'undefined') {
 	var db = function (name) {
 		var user
 		, options
-		, that;
+		, that = {};
 		
 		// allow either 'name' or {options} but not both arguments
 		if (_.isObject(name)) {
@@ -158,7 +158,7 @@ if (typeof Boxspring === 'undefined') {
 		user = _.extend({'name': '', 'password': ''}, (options && options.auth));
 		
 		// populate the object with default, exclude 'auth' from the interface.
-		that = _.extend({}, _.defaults(options, {
+		that = _.extend(that, _.defaults(options, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
 			'index': (options && options.index) || 'Index',

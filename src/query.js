@@ -195,10 +195,10 @@
 
 		// What it does: fetches data from the server
 		// NOTE: RESULT is a Result() object
-		var get = function () {	
+		var fetch = function () {	
 			var local = this;
 
-			this.db.get(_.pick(this, queryParameters), function(err, result) {
+			this.db.fetch(_.pick(this, queryParameters), function(err, result) {
 				if (err) {
 					console.log(err);
 				}	
@@ -207,8 +207,8 @@
 			}, result.apply(local));
 			return this;						
 		};
-		that.server = get;
-		that.fetch = get;
+		that.server = fetch;
+		that.fetch = fetch;
 		
 		// What it does: executes a client callback on a display event
 		var relay = function(context, eventStr, callback) {

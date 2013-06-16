@@ -44,7 +44,7 @@ Boxspring.UTIL = UTIL;
 		object = _.extend(object, template);
 			
 		// db.apply returns a new database object with the supplied arguments
-		return template.db.apply(object, arguments);
+		return template.createdb.apply(object, arguments);
 	};
 	
 	if (typeof module !== 'undefined' && module.exports) {

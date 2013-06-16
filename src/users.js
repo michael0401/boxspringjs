@@ -25,19 +25,19 @@
 	
 	var users = function (name) {
 		var that = _.extend({}, this)
-		, userdb = this.db({'name': '_users', 'auth': this.getAuth() })(this.url);
+		, userdb = this.createdb({'name': '_users', 'auth': this.getAuth() })(this.url);
 			
 		// used by userSignUp and userDelete
 		var authFileUserDocName = function() {
 			return 'org.couchdb.user:'+name;
 		};
 
-		var get = function (handler) {
+		var fetch = function (handler) {
 			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
 				handler(err, response, doc);
 			});
 		};
-		that.get = get;
+		that.fetch = fetch;
 		
 		var list = function (handler) {
 			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
@@ -47,10 +47,10 @@
 		that.list = list;
 				
 		var signUp = function(password, roles, handler) {
-			var anonymous = this.db('_users')(this.url)
-			, newUser = this.db({'name': this.name,
+			var anonymous = this.createdb('_users')(this.url)
+			, newUser = this.createdb({'name': this.name,
 				'auth': {'name': name, 'password': password }})(this.url);
-					
+
 			// create a document and add it to the _users database
 			anonymous.doc(authFileUserDocName()).source({
 				'type': 'user',
@@ -78,17 +78,17 @@
 		that.remove = remove;
 		
 		var update = function(newPassword, newRoles, handler) {			
-			this.get(function(err, response, doc) {
+			this.fetch(function(err, response, doc) {
 				if (err) {
 					return handler(err, response);
 				}
 				// update the document.
-				doc.source(_.extend({
+				doc.source({
 					'type': 'user',
 					'name': name,
 					'password': newPassword,
 					'roles': newRoles
-				}, doc.source())).update(handler);
+				}).update(handler);
 			});
 		};
 		that.update = update;

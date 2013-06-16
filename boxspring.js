@@ -3408,7 +3408,7 @@ if (typeof Boxspring === 'undefined') {
 	var db = function (name) {
 		var user
 		, options
-		, that;
+		, that = {};
 		
 		// allow either 'name' or {options} but not both arguments
 		if (_.isObject(name)) {
@@ -3421,7 +3421,7 @@ if (typeof Boxspring === 'undefined') {
 		user = _.extend({'name': '', 'password': ''}, (options && options.auth));
 		
 		// populate the object with default, exclude 'auth' from the interface.
-		that = _.extend({}, _.defaults(options, {
+		that = _.extend(that, _.defaults(options, {
 			'name': name,
 			'id': (options && options.id) || _.uniqueId('db-'),
 			'index': (options && options.index) || 'Index',
@@ -3612,7 +3612,7 @@ if (typeof Boxspring === 'undefined') {
 		return that;		
 	};
 
-	global.db = function(options) {
+	global.createdb = function(options) {
 		var object = db.call(this, options);
 		
 		return function (url) {
@@ -3651,19 +3651,19 @@ if (typeof Boxspring === 'undefined') {
 	
 	var users = function (name) {
 		var that = _.extend({}, this)
-		, userdb = this.db({'name': '_users', 'auth': this.getAuth() })(this.url);
+		, userdb = this.createdb({'name': '_users', 'auth': this.getAuth() })(this.url);
 			
 		// used by userSignUp and userDelete
 		var authFileUserDocName = function() {
 			return 'org.couchdb.user:'+name;
 		};
 
-		var get = function (handler) {
+		var fetch = function (handler) {
 			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
 				handler(err, response, doc);
 			});
 		};
-		that.get = get;
+		that.fetch = fetch;
 		
 		var list = function (handler) {
 			var doc = userdb.doc(authFileUserDocName()).retrieve(function(err, response) {
@@ -3673,10 +3673,10 @@ if (typeof Boxspring === 'undefined') {
 		that.list = list;
 				
 		var signUp = function(password, roles, handler) {
-			var anonymous = this.db('_users')(this.url)
-			, newUser = this.db({'name': this.name,
+			var anonymous = this.createdb('_users')(this.url)
+			, newUser = this.createdb({'name': this.name,
 				'auth': {'name': name, 'password': password }})(this.url);
-					
+
 			// create a document and add it to the _users database
 			anonymous.doc(authFileUserDocName()).source({
 				'type': 'user',
@@ -3704,17 +3704,17 @@ if (typeof Boxspring === 'undefined') {
 		that.remove = remove;
 		
 		var update = function(newPassword, newRoles, handler) {			
-			this.get(function(err, response, doc) {
+			this.fetch(function(err, response, doc) {
 				if (err) {
 					return handler(err, response);
 				}
 				// update the document.
-				doc.source(_.extend({
+				doc.source({
 					'type': 'user',
 					'name': name,
 					'password': newPassword,
 					'roles': newRoles
-				}, doc.source())).update(handler);
+				}).update(handler);
 			});
 		};
 		that.update = update;
@@ -3750,31 +3750,18 @@ if (typeof Boxspring === 'undefined') {
 
 	var doc = function(id) {
 		// inherit from the caller object, in this case a db object
-		var that = _.clone(this)
-		, headers = this.UTIL.hash()
-		, content = this.UTIL.hash({ '_id': id });
+		var that = this.UTIL.hash()
+		, headers = this.UTIL.hash();
 		
-		var set = function () {
-			content.set.apply(content, arguments);
-			return this;
-		};
-		that.set = set;
-		
-		var get = function () {
-			return content.get.apply(content, arguments);
-		};
-		that.get = get;
-		
-		var post = function () {
-			return content.post.apply(content);
-		};
-		that.post = post;
-		
+		_.extend(that, this);
+		that.set('_id', id);
+
 		// Purpose: takes an object and updates the state of the document hash
 		var docinfo = function (docinfo) {
+			var local = this;
 			if (docinfo) {
 				_.each(docinfo, function(item, key) {
-					content.set(key, item);
+					local.set(key, item);
 				});		
 			}
 			return this;
@@ -3794,12 +3781,12 @@ if (typeof Boxspring === 'undefined') {
 
 		// Purpose: helper function used by most methods
 		var docId = function () {
-			return({ 'id': content.get('_id') });
+			return({ 'id': this.get('_id') });
 		};
 		that.docId = docId;
 		
 		var docRev = function () {
-			return(content.get('_rev') ? { 'rev': content.get('_rev') } : {});
+			return(this.get('_rev') ? { 'rev': this.get('_rev') } : {});
 		};
 		that.docRev = docRev;
 
@@ -3836,7 +3823,7 @@ if (typeof Boxspring === 'undefined') {
 		var save = function (handler) {
 			var local = this;
 			this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
-				'body': content.post() }), {}, function (err, response) {
+				'body': local.post() }), {}, function (err, response) {
 				handler(err, sync.call(local, err, response));
 			});
 			return this;
@@ -3883,7 +3870,7 @@ if (typeof Boxspring === 'undefined') {
 				function (err, response) {
 					if (!err) {
 						local.source(response.data);
-						content.set('_rev', local.getRev(response));
+						local.set('_rev', local.getRev(response));
 					} 
 					
 					if (handler && typeof handler === 'function') {
@@ -4353,7 +4340,7 @@ if (typeof Boxspring === 'undefined') {
 		// 'asynch: false' (or undefined) executes the callback each time and the 
 		// application has to manage the data
 
-		var get = function (options, callback, callerDataCatcher) {
+		var fetch = function (options, callback, callerDataCatcher) {
 			var local = this 
 			, triggered = false
 			, system = this.system.post()
@@ -4393,7 +4380,7 @@ if (typeof Boxspring === 'undefined') {
 			});
 			return this;
 		};
-		that.get = get;
+		that.fetch = fetch;
 		
 		that.superiorQuery = that.query;
 		var query = function(options) {
@@ -5468,10 +5455,10 @@ if (typeof Boxspring === 'undefined') {
 
 		// What it does: fetches data from the server
 		// NOTE: RESULT is a Result() object
-		var get = function () {	
+		var fetch = function () {	
 			var local = this;
 
-			this.db.get(_.pick(this, queryParameters), function(err, result) {
+			this.db.fetch(_.pick(this, queryParameters), function(err, result) {
 				if (err) {
 					console.log(err);
 				}	
@@ -5480,8 +5467,8 @@ if (typeof Boxspring === 'undefined') {
 			}, result.apply(local));
 			return this;						
 		};
-		that.server = get;
-		that.fetch = get;
+		that.server = fetch;
+		that.fetch = fetch;
 		
 		// What it does: executes a client callback on a display event
 		var relay = function(context, eventStr, callback) {
@@ -5670,7 +5657,7 @@ if (typeof Boxspring === 'undefined') {
 			var model = this;
 			
 			this.set('userDb', 
-				this.owner.createdb(_.extend({ 'name': this.get('db_name') }, this.auth()))()
+				this.owner.db(_.extend({ 'name': this.get('db_name') }, this.auth()))()
 				.users(this.get('name')));
 			
 			this.get('userDb').login(function(err, response) {
@@ -5695,7 +5682,7 @@ if (typeof Boxspring === 'undefined') {
 		},
 		update: function(newPassword) {
 			var model = this
-			, db = this.owner.createdb(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
+			, db = this.owner.db(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
 			
 			if (this.get('loggedIn')) {	
 				db.update(newPassword, [], function(err, res) {
@@ -5710,7 +5697,7 @@ if (typeof Boxspring === 'undefined') {
 		},
 		remove: function(userName) {
 			var model = this 
-			, db = this.createdb(_.extend({
+			, db = this.db(_.extend({
 				'name': this.get('db_name') }, this.auth()))().users(userName); 
 			
 			db.remove(function(err, res) {
