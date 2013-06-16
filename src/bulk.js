@@ -73,7 +73,7 @@
 			var local = this;
 			// updates is the design document containing update methods	
 			if (_.isFunction(this.maker)) {
-				var funcs = this.maker()().updates || { 'dummy': function() {} };
+				var funcs = this.maker().updates || { 'dummy': function() {} };
 				// iterate the update functions to run before posting
 				_.each(this.docs.docs, function (doc) { 
 					_.each(funcs, function (update_method) {
