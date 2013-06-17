@@ -85,8 +85,7 @@
 	var design = function (id, custom, index) {
 		// extend this object with the db methods from the caller
 		var that = _.extend({}, this) 
-		, designName = id || this.designName || _.uniqueId('_design/design-')
-		, doc;
+		, designName = id || this.designName || _.uniqueId('_design/design-');
 		
 		// design documents are '_design/' + name. If '_design' is not provided with the id then prepend
 		if (designName.indexOf('_design/') !== 0) {
@@ -95,28 +94,26 @@
 				
 		// update the object.designName
 		that.designName = designName;
-				
-		// create a document object
-		doc = this.doc(designName);
-				
+								
 		// set the view index for this design
 		that.index = arguments.length === 3 ? index : this.index; 
 		// custom maker or configged maker, or defaultDesign; default headers
 		that.maker = (custom || this.maker || defaultDesign);
-		that.headers = { 'X-Couch-Full-Commit': false };
 		that.views = that.maker().views;
 		
 		/*jslint unparam: true */
-		that.ddoc = _.extend({}, doc, {
-			'owner': this,
-			'ddoc': {
-				'language': 'javascript',
-				'updates': {},
-				'types': {},
-				'views': {},
-				'shows': {},
-				'lists': {}
-			}
+		// create a document object
+		that.ddoc = this.doc(designName);
+		
+		// update the document object with 
+		that.ddoc.headers.set( 'X-Couch-Full-Commit', false );
+		that.ddoc.set('ddoc', {
+			'language': 'javascript',
+			'updates': {},
+			'types': {},
+			'views': {},
+			'shows': {},
+			'lists': {}
 		});
 
 		// system parameters to control the query behavior
@@ -129,16 +126,17 @@
 
 		// What it does: provides the first map view as the default
 		this['default-index'] = _.fetch(that.views, 'default-index');
-		that.dateFilter = _.fetch(that.views, 'dateFilter');
 		that.lib = _.fetch(that.views, 'lib');
-		that.doc = _.fetch(that.views, 'doc');
 		that.types = that.maker() && that.maker().types;
 		that.formats = that.views && that.views.lib && that.views.lib.formats;
 
 		(function (libs) {
-			var ddoc = this.ddoc
+			var ddoc = {}
 			, views = this.views
 			, libSrc = '\n';
+
+			ddoc.ddoc = this.ddoc.get('ddoc')
+
 
 			if (views && views.hasOwnProperty('lib')) {
 				_.each(views.lib, function(lib, name) {
@@ -183,11 +181,11 @@
 
 			// add the 'types' structure, if it exists
 			if (this.maker().hasOwnProperty('types')) {
-				this.ddoc.ddoc.types = this.maker().types;
+				this.ddoc.set('types', this.maker().types);
 			}
 
 			// finally update the design document content using .docinfo() method
-			this.ddoc.docinfo(this.ddoc.ddoc);
+			this.ddoc.source(ddoc.ddoc);
 			
 			return this;
 		}.call(that));
@@ -196,19 +194,13 @@
 		// The design document function specified in 'updateName' will execute on 
 		// the server, saving the round-trip to the client a enforcing consistent
 		// attributing of the documents on the server for a corpus.
-
-		var full = function (fc) {
-			this.headers['X-Couch-Full-Commit'] = fc;
-			return this;
-		};
-		that.full = full;
-
 		var commit = function (targetId, updateName, newProperties, handler) {
-			var properties = _.extend({}, { 'batch': 'ok' }, newProperties);
-			this.ddoc.queryHTTP('update', _.extend(this.ddoc.docId(), {
-				'update': updateName, 
-				'target': targetId,
-				'headers': this.headers }), properties, handler);
+			var commitDoc = this.doc([ this.designName, '_update', updateName, targetId ].join('/'))
+				.source(newProperties);
+				
+				
+			commitDoc.options.set('batch', 'ok');
+			commitDoc.save(handler);
 			return this;			
 		};
 		that.commit = commit;
@@ -220,6 +212,7 @@
 		// application has to manage the data
 
 		var fetch = function (options, callback, callerDataCatcher) {
+			
 			var local = this 
 			, triggered = false
 			, system = this.system.post()
@@ -227,9 +220,8 @@
 			// _.item just returns the the item passed in
 			, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) ? 
 				callerDataCatcher : _.item
-			, view = global.view(this, 
-				_.extend({'index': this.index, 'system': system }, options), 
-										this.ddoc.docId().id, this.ddoc.views);
+			, view = this.view(_.extend({'index': this.index }, options), 
+																this.designName, this.views);									
 
 			view.on('error', function (err) {
 				throw new Error(err || 'Invalid request.');

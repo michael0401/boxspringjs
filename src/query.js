@@ -63,7 +63,6 @@
 		if (options && options.system) {
 			that.system.update(options.system);
 		}
-				
 		// Response Wrapper: wraps the response object with methods and helpers to manage 
 		// the flow of data from the server to the application
 		var result = function () {					
@@ -197,7 +196,7 @@
 		// NOTE: RESULT is a Result() object
 		var fetch = function () {	
 			var local = this;
-
+						
 			this.db.fetch(_.pick(this, queryParameters), function(err, result) {
 				if (err) {
 					console.log(err);

@@ -29,6 +29,7 @@ var Boxspringjs = Maker
 , newdoc = boxspringjs.doc('sample-content').docinfo({'content': Date() })
 , newdoc1 = boxspringjs.doc('write-file-test').docinfo({'content': Date() });
 
+
 // tests to verify db save/remove
 test('boxspring-create-db', function(t) {
 	var mydb = Boxspring({'name': 'phantomdb', 'auth': auth.auth })();
@@ -36,7 +37,7 @@ test('boxspring-create-db', function(t) {
 	t.plan(1);
 	
 	var create = function(db) {
-		db.save(function(err, response) {
+		db.doc().save(function(err, response) {
 			if (err) {
 				console.log('could not create database - ', db.name, response);
 				throw err;
@@ -54,7 +55,7 @@ test('boxspring-create-db', function(t) {
 			create(mydb);
 		} else {
 			console.log('database already exists, removing...');
-			mydb.remove(function(err, response) {
+			mydb.doc().remove(function(err, response) {
 				if (err) {
 					console.log('unable to remove - ', mydb.name);
 					throw err;
@@ -120,7 +121,7 @@ test('boxspringjs-2', function (t) {
 				newdoc.head(function(err, head) {
 					t.equal(err, null, 'head');
 					newdoc.remove(function(err, result) {
-						t.equal(err, null, 'remove');
+						t.equal(err, null, 'remove:' + (err && err.message));
 					});								
 				});
 			});
@@ -149,12 +150,12 @@ test('boxspringjs-3', function (t) {
 			t.equal(update.code, 201, 'newdoc1 update');
 			// get all docs using map views on the server (default)
 			boxspringjs
-				.design().fetch({ 'index': 'all_docs' }, function(err, couch) {
+				.design().fetch({ 'index': '_all_docs' }, function(err, couch) {
 				t.equal(couch.code, 200, 'all_docs');
 
 				// get all docs using map views FUTURE running in node
 				boxspringjs
-					.design().fetch({ 'index': 'all_docs', 'server': 'node' }, 
+					.design().fetch({ 'index': '_all_docs', 'server': 'node' }, 
 					function(err, node) {
 					var found;
 					_.each(node.data.rows, function(d) {

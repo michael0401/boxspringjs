@@ -57,16 +57,84 @@
 		return target;
 	};
 	
-	var view = function (db, options, design, views, emitter) {	
-		var that = _.extend({}, db.events());
+	// Validates the query parameters for a CouchDB query;
+	var isValidQuery = function (s) {
+		var target = {} 
+		, validCouchProperties = [
+		'reduce', 'limit', 
+		'startkey', 'endkey', 
+		'group_level', 'group', 
+		'key', 'keys',
+		'rev' ]
+		, formatKey = function(target, key, exclude) {
+			if (_.has(target, key) && typeof target[key] !== 'undefined') {
+				target[key] = JSON.stringify(target[key]);
+				target = _.omit(target, exclude);
+			}
+			return(target);
+		};
+
+		// remove residual application parameters
+		target = _.extend(_.pick(_.clean(s), validCouchProperties));
+
+		// couchdb needs properly formatted JSON string
+		if (_.has(target, 'key')) {
+			target = formatKey(target, 'key', ['keys', 'endkey', 'startkey']);
+		} else if (_.has(target,'keys')) {
+			target = formatKey(target, 'keys', ['endkey', 'startkey']);					
+		} else if (_.has(target, 'startkey')) {
+			target = formatKey(target, 'startkey');
+			if (_.has(target, 'endkey')) {
+				target = formatKey(target, 'endkey');
+			}
+		}
+		try {
+			// reduce has to be true or false, not 'true' or 'false'
+			if (_.has(target, 'reduce') && typeof target.reduce === 'string') {
+				target.reduce = _.coerce('boolean', target.reduce);
+				throw 'reduce value must be a boolean, converting string to boolean';
+			}
+
+			// Enforces rule: if group_level specified, then reduce must be true
+			if (typeof target.group_level === 'number' && 
+				typeof target.reduce === 'boolean' && 
+				target.reduce === false) {
+				target.reduce = true;
+				throw 'reduce must be true when specifying group_level';
+			}
+			// 'limit' and 'group_level' must be integers
+			['limit', 'group_level'].forEach(function(key) {
+				if (_.has(target, key)) {
+					target[key] = _.toInt(target[key]);
+					if (!_.isNumber(target[key])) {
+						throw key + ' value must be a number';
+					}
+				}
+			});
+			// if reduce=true, then include_docs can't be true
+			if (typeof target.include_docs !== 'undefined'&& 
+				target.include_docs === true && 
+				typeof target.reduce !== undefined && 
+				target.reduce === true) {
+				target = _.omit(target, 'include_docs');
+				throw 'unable to apply include_docs parameter for reduced views';
+			}					
+		} catch (e) {
+			throw new Error('[ db isValidQuery] - ' + JSON.stringify(s));
+		}				
+		return target;
+	};
+	
+	var view = function (options, design, views, emitter) {	
+		var that = _.extend({}, this.events());
 			
-		that.db = db;
+		that.db = this;
 		that.design = design;
-		that.index = (options && options.index) || (db && db.index);
+		that.index = (options && options.index) || (this && this.index);
 		that.views = views;
 		that.emitter = emitter;
 		that.query = translateQuery(_.omit(options, 'system'));
-		that.system = (that.db && that.db.system && that.db.system.post()) ||
+		that.system = (this && this.system && this.system.post()) ||
 			{	'asynch': false,
 				'cache-size': undefined, //10,
 				'page-size': undefined, //100,
@@ -119,8 +187,8 @@
 			};
 
 			var chunk = function (startkey) {
-				var queryMethod = (index === 'all_docs') ? 'all_docs' : 'view';
-
+				var view;
+				
 				// remaining cache-size get smaller on each successive fetch
 				system['cache-size'] = _.isNumber(system['cache-size']) 
 					? system['cache-size']-1 
@@ -128,18 +196,27 @@
 
 				query = nextQuery(query, startkey);
 				query = nextLimit(query, system['page-size']);
+				
+				// _all_docs is a special case view; 
+				if (index === '_all_docs') {
+					// use the built-in all_docs method
+					view = db;
+					view.read = db.all_docs;
+				} else {
+					// use the view machinery
+					view = db.doc([ design, '_view', index ].join('/'));
+					// update the query options;
+					view.options.update(isValidQuery(query));
+				}
+								
 				// execute the query and process the response
-				//console.log('db.query', design, index, query);
-				db.queryHTTP(queryMethod, 
-					_.extend({ 'id': design }, {'view': index }), query,
-					function (err, response) {
-						
+				view.read(function(err, response) {
+					//console.log('got response!', response.code, response.request, response.data);
 					if (err) {
 						events.trigger('view-error', new Error('error: ' + response.data.error + 
 							' reason: '+response.data.reason));
 							
 					} else {
-						//console.log('got response!', response.code, response.request);
 						//console.log('db.query after', design, index, query);
 						if (system.asynch && response.data && _.has(response.data, 'rows')) {	
 							response.data.nextkey = 

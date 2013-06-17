@@ -106,7 +106,6 @@ var test = require('tape')
 
 (function() {
 	test('query-paging-tests', function (t) {
-		console.log('!!!');
 		var pages
 		, page
 		, query = boxspringjs.design().query({

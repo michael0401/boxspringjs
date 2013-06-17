@@ -22,17 +22,28 @@
 
 (function(global) {
 	"use strict";
+	
 
 	var doc = function(id) {
 		// inherit from the caller object, in this case a db object
 		var that = this.UTIL.hash()
-		, headers = this.UTIL.hash();
-		
+		// configure the url for this resource; if called without an id, then this is a database document
+		, url = '/' + (typeof id !== 'undefined' ? (this.name + '/' + id) : this.name);		
+
+		// expose the headers and options for this doc object
+		that.headers = this.UTIL.hash({ 'X-Couch-Full-Commit': true });
+		that.options = this.UTIL.hash();
+
 		_.extend(that, this);
-		that.set('_id', id);
+		
+		// if the document is not a reserved id, then create an _id attribute
+		if (id && id.charAt(0) !== '_') {
+			that.set('_id', id);
+		}
+		that.set('id', id);
 
 		// Purpose: takes an object and updates the state of the document hash
-		var docinfo = function (docinfo) {
+		var source = function (docinfo) {
 			var local = this;
 			if (docinfo) {
 				_.each(docinfo, function(item, key) {
@@ -41,40 +52,22 @@
 			}
 			return this;
 		};
-		that.docinfo = docinfo;
-		that.source = docinfo;
+		that.docinfo = source;
+		that.source = source;
 		
-		// Purpose: internal function to keep docinfo up-to-date
-		var sync = function (err, response) {
+		// Purpose: internal function to keep document attributes up-to-date
+		var sync = function (handler) {
+			var local = this;
 			
-			// if a doc, then update all fields
-			if (!err) {
-				this.source(response.data);
-			}
-			return(response);
+			return function(err, response) {
+				// if a doc, then update all fields
+				if (!err) {
+					local.source(response.data);
+				}
+				return handler(err, response);
+			};
 		};
 
-		// Purpose: helper function used by most methods
-		var docId = function () {
-			return({ 'id': this.get('_id') });
-		};
-		that.docId = docId;
-		
-		var docRev = function () {
-			return(this.get('_rev') ? { 'rev': this.get('_rev') } : {});
-		};
-		that.docRev = docRev;
-
-		var docHdr = function (name, value) {
-			if (typeof name === 'object') {
-				headers = this.UTIL.hash(name);
-			} else {
-				headers.set(name, value);				
-			}
-			return ({'headers': headers.post() });
-		};
-		that.docHdr = docHdr;	
-		
 		// What it does: helper to convert a URL into a valid docId
 		var url2Id = function (host, reverse) {
 
@@ -89,69 +82,77 @@
 		that.url2Id = url2Id;
 		
 		var exists = function () {
-			return (_.has(this.updated_docinfo, '_rev'));
+			return (this.contains('_rev'));
 		};
 		that.exists = exists;
 
 		// Purpose: Method for saving to the database
-		// Arguments: { docinfo: document object, oncompletion: string or function }
 		var save = function (handler) {
-			var local = this;
-			this.queryHTTP('doc_save', _.extend(local.docId(), docHdr('X-Couch-Full-Commit', true), {
-				'body': local.post() }), {}, function (err, response) {
-				handler(err, sync.call(local, err, response));
-			});
+			this.queryHTTP({
+					'url': url,
+					'method': 'PUT',
+					'headers': this.headers.post(),
+					'query': this.options.post(),
+					'body': id && this.post() }, sync.call(this, handler));
 			return this;
 		};
-		that.save = save;
-		that.create = save;
+		
+		// Bulk document save
+		var bulkSave = function (handler) {
+			// set headers and options
+			this.headers.set('X-Couch-Full-Commit', false);
+			this.options.set('batch', 'ok');
+			this.queryHTTP({
+				'url': url,
+				'method': 'POST',
+				'body': this.post(),
+				'headers': this.headers.post(),
+				'query': this.options.post()
+			}, handler);
+			return this;
+		};
+		
+		if (id === '_bulk_docs') {
+			that.save = bulkSave;
+		} else {
+			that.save = save;
+			that.create = save;
+		}
 
-		var retrieve = function (handler, revs_info) {
-			var local = this
-			, options = revs_info ? { 'revs_info': true } : {};
-			
-			this.queryHTTP('doc_retrieve', this.docId(), options, 
-			function (err, response) {
-				handler(err, sync.call(local, err, response));
-			});
+		var retrieve = function (handler) {		
+			this.queryHTTP({
+				'url': url,
+				'headers': this.headers.post(),
+				'query': this.options.post() 
+				}, sync.call(this, handler));
 			return this;
 		};
 		that.retrieve = retrieve;
 		that.read = retrieve;
 		
-		var info = function (handler) {
-			// set the 'revs_info' flag to true on retrieve;
-			this.retrieve(handler, true);
-			return this;
+		// Purpose: helper to get the 'rev' code from documents. used by doc and bulk requests
+		var getRev = function (o) {				
+			if (o && o.header && o.header.etag) {
+				return o.header.etag.replace(/\"/g, '').replace(/\r/g,'');
+			}
 		};
-		that.info = info;
-
-		var attachment = function(name, handler) {
-			var local = this;
-		
-			this.queryHTTP('doc_attachment', { 'id': this.docId().id, 'attachment': name }, {}, 
-			function (err, response) {
-				handler(err, sync.call(local, err, response));
-			});
-			return this;			
-		};
-		that.attachment = attachment;
+		that.getRev = getRev;
 		
 		var head = function (handler) {
 			var local = this;
 
-			this.queryHTTP('doc_head', 
-				_.extend(this.docId(), docHdr('X-Couch-Full-Commit', true)), {}, 
-				function (err, response) {
+			this.queryHTTP({
+					'url': url,
+					'method': 'HEAD',
+					'headers': this.headers.post()
+				}, function (err, response) {
 					if (!err) {
-						local.source(response.data);
 						local.set('_rev', local.getRev(response));
 					} 
-					
 					if (handler && typeof handler === 'function') {
 						handler(err, response);						
 					}
-			});
+				});
 			return this;
 		};
 		that.head = head;
@@ -161,17 +162,16 @@
 		var update = function (handler, data) {
 			var local = this;
 			
-			// retrieve will over-write our in memory updates with the content from the server;
+			// cache the data since read will over-write with stale content from the server;
 			if (data && _.isObject(data)) {
 				data = this.source(data).post();
 			}
 			
-			retrieve.call(this, function(err, response) {
+			this.read(function(err, response) {
 				// when updating, we might get an error if the doc doesn't exist
-				// otherwise just keep going
 				if (!err || response.code === 404) {
 					// now add back data to update from above and save
-					return local.source(data).save.call(local, handler);	
+					return local.source(data).save(handler);	
 				}
 				handler(err, response);
 			});
@@ -181,18 +181,41 @@
 
 		var remove = function (handler) {
 			var local = this;
-			//retrieve.call(this, function(err, response) {
-			head.call(this, function (err, response) {
-				if (err) {
-					handler(err, response);
-				} else {
-					local.queryHTTP('doc_remove', local.docId(), local.docRev(), handler);								
-				}				
-			});
+						
+			// remove differs depending on whether its a 'db' or 'doc'
+			if (!id) {
+				// its a 'db'
+				this.headers.set('content-type','application/x-www-form-urlencoded');
+				this.queryHTTP({
+						'url': url,
+						'method': 'DELETE', 
+						'headers': this.headers.post() }, handler);
+			} else {
+				// its a 'doc'
+				this.head(function(err) {
+					local.queryHTTP({
+						'url': url,
+						'method': 'DELETE',
+						'query': {'rev': local.get('_rev') }}, handler);					
+				});
+			}
 			return this;
 		};
 		that.remove = remove;
 		that.delete = remove;
+		
+		var attachment = function(attach, handler) {
+			this.doc(id + '/' + attach).read(handler);			
+		};
+		that.attachment = attachment;
+		
+		var info = function (handler) {
+			// set the 'revs_info' flag to true on retrieve;
+			this.options.set('revs_info', true);
+			this.read(handler);
+			return this;
+		};
+		that.info = info;
 		return that;		
 	};
 	global.doc = doc;

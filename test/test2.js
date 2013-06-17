@@ -26,7 +26,7 @@ var test = require('tape')
 
 		t.equal(typeof bulk, 'object', 'is-object');
 		t.equal(typeof bulk.save, 'function', 'is-function');
-		t.equal(typeof bulk.queryHTTP, 'function','is-another-function');
+		t.equal(typeof bulk.bulk, 'function','is-another-object-1');
 		// bulk tests
 		bulk.save(function(err, result) {
 			t.equal(result.code, 201, 'bulk-save');

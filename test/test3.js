@@ -69,8 +69,8 @@ var test = require('tape')
 				t.equal(response.code, 201, 'anotherdb-design');
 				anotherdb.design().fetch({}, function (err, c) {
 					anotherdb.design('_design/my-design', ddoc).fetch({'index': 'my-view' }, 
-					function(e, n) {	
-						t.equal(c.data.rows.length, n.data.total_rows, 'my-view-respnose');
+					function(e, n) {
+						t.equal(c.getLength(), n.getLength(), 'my-view-response');
 					});
 				});
 			});
@@ -109,6 +109,8 @@ var test = require('tape')
 		});		
 	});	
 }());
+
+return;
 
 (function() {
 	test('row-tests', function (t) {

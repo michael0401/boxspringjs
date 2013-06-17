@@ -24,15 +24,13 @@
 	"use strict";
 	// Purpose: routines for bulk saving and removing
 	var bulk = function (doclist, prohibit) {
-		var that
+		var that = this.doc('_bulk_docs')
 		, lastResponse = [];
 		
 		// extend the bulk object with the owner db object
-		that = _.extend({}, this);
+//		that = _.extend({}, this);
 		that.docs = { 'docs': doclist || [] };
 		that.Max = undefined;
-		that.headers = { 'X-Couch-Full-Commit': false };
-		that.options = { 'batch': 'ok' };
 		
 		var checkSource = function (doc) {
 			// if doc is an object, then use post() to get the contents
@@ -55,17 +53,14 @@
 		that.status = status;
 
 		var exec = function (docsObj, callback) {
-
-			this.queryHTTP('bulk', { 
-				'body': docsObj,
-				'headers': this.headers 
-				}, this.options, function (err, response) {
+			this.source(docsObj)
+				.superiorSave(function(err, response) {
 					if (!err) {
 						lastResponse = response && response.data;						
 					}
 					response.status = status;
-					callback(err, response);
-				});
+					callback(err, response);				
+			});
 		};
 		that.exec = exec;
 
@@ -113,6 +108,8 @@
 			}(handler));
 			return this;
 		};
+		// we use the 'doc' object to do the actual save, so keep it in 'superiorSave'
+		that.superiorSave = that.save;
 		that.save = save;
 
 		var remove = function (handler) {
@@ -177,13 +174,6 @@
 			return this.docs.docs.length;
 		};
 		that.getLength = getLength;
-
-		var fullCommit = function (fc) {
-			this.headers = fc;
-			this.options = {};
-			return this;
-		};
-		that.fullCommit = fullCommit;
 		
 		// check to see if doclist objects are 'doc' objects or source objects and convert if nec.
 		that.docs.docs.forEach(function(doc, index) {
