@@ -28,7 +28,7 @@ var test = require('tape')
 	};
 }
 
-var admin = Boxspring({'name': '_users', 
+var Admin = admin = Boxspring({'name': '_users', 
 	'auth': {'name': 'couchdb', 'password': 'admin'}})('127.0.0.1')
 // anonymous user
 , user = Boxspring('_users')().users('ron')	
@@ -67,7 +67,48 @@ test('boxspring-auth-1', function (t) {
 });
 
 test('boxspring-auth-2', function(t) {
-	t.plan(9);
+	t.plan(15);
+	
+	var signUpSequence4 = function () {
+		var model = new user.Users(user)
+		, expected = true;
+		
+		
+		model.set('auth', {'name': 'couchdb', 'password': 'admin'});
+
+		model.on('change:loggedIn', function() {
+			t.equal(this.get('loggedIn'), expected, 'loggedIn');
+			expected = !expected;
+		});
+		
+		model.on('change:removed', function() {
+			t.equal(this.get('removed'), 200, 'changed');
+		})
+		
+		model.on('change:updated', function() {
+			t.equal(this.get('error'), null, 'updated');
+			model.set('auth', {'name': 'couchdb', 'password': 'admin'});
+			model.login();
+		});
+		
+		model.login();
+		_.wait(2, function() {
+			model.logout();
+		});
+		
+		_.wait(4, function() {
+			model.set('auth', {'name': 'ron', 'password': 'ran'});
+			model.signup();
+		});
+		
+		_.wait(6, function() {
+			model.update('ran');
+		});
+		
+		_.wait(8, function() {
+			model.remove('ron');
+		});
+	}
 
 
 	var signUpSequence3 = function () {
@@ -82,6 +123,7 @@ test('boxspring-auth-2', function(t) {
 					// confirm the login fails
 					user.login(function(err, response) {
 						t.equal(response.code, 401, 'login-deleted-3');
+						signUpSequence4();
 					});
 				});
 			});

@@ -5535,20 +5535,19 @@ if (typeof Boxspring === 'undefined') {
 			'roles': [],
 			'userDb': {},
 			'loggedIn': false,
-			'error': {}
+			'error': null
 		},
 		initialize: function (db) {
-			this.owner = db;
+			this.owner = db.clone();
 		},
 		auth: function() {
-			return ({'auth': {
-				'name': this.get('name'), 'password': this.get('password') }});
+			return (this.get('auth') || {'name': this.get('name'), 'password': this.get('password') });
 		},
 		error: function(err, response) {
 			return this.set('error', {'err': err, 'response': response });			
 		},
 		signup: function() {
-			var mydb = this.owner.users(this.get('name'))
+			var mydb = this.owner.users(this.get('auth').name)
 			, model = this;
 			
 			mydb.signUp(this.get('password'), this.get('roles'), function(err, response, userDb) {
@@ -5560,16 +5559,17 @@ if (typeof Boxspring === 'undefined') {
 			});
 		},
 		login: function() {
-			var model = this;
-			
-			this.set('userDb', 
-				this.owner.db(_.extend({ 'name': this.get('db_name') }, this.auth()))()
-				.users(this.get('name')));
-			
-			this.get('userDb').login(function(err, response) {
+			var model = this
+			, userDb = this.owner.createdb({
+				'name': model.owner.name,
+				'auth': this.auth()
+			})();
+
+			userDb.login(function(err, response) {
 				if (err) {
 					return model.error(err, response);
 				}
+				model.set('userDb', userDb);
 				model.set('loggedIn', response.code === 200);
 			});
 		},
@@ -5583,18 +5583,21 @@ if (typeof Boxspring === 'undefined') {
 						model.error(err, response);
 					}
 					model.set('loggedIn', (response.code !== 200));
+					model.set('userDb', undefined);
 				});				
 			}
 		},
 		update: function(newPassword) {
 			var model = this
-			, db = this.owner.db(dbhelper(this.get('name'), this.auth()))().users(this.get('name'));
+			, userDb = this.get('userDb')
+			, name = this.get('auth').name;
 			
 			if (this.get('loggedIn')) {	
-				db.update(newPassword, [], function(err, res) {
+				userDb.users(name).update(newPassword, [], function(err, res) {
 					if (err) {
 						return (model.error(err, res));
 					}
+					model.set('updated', true);
 					model.logout();
 				});					
 			} else {
@@ -5602,15 +5605,17 @@ if (typeof Boxspring === 'undefined') {
 			}
 		},
 		remove: function(userName) {
-			var model = this 
-			, db = this.db(_.extend({
-				'name': this.get('db_name') }, this.auth()))().users(userName); 
+			var model = this
+			, userDb = this.get('userDb')
 			
-			db.remove(function(err, res) {
-				// this operation doesn't change the login status of the administrator
-				// set the variable and let the application decide what to do with the results.
-				model.set('removed', {'err': err, 'response': res });
-			});
+			if (this.get('loggedIn')) {
+				userDb.users(userName).remove(function(err, res) {
+					// this operation doesn't change the login status of the administrator
+					// set the variable and let the application decide what to do with the results.
+					model.error(err, res);
+					model.set('removed', res.code);
+				});				
+			}
 		}
 	});
 	// make this Model visible to the outside world
