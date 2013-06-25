@@ -37,18 +37,30 @@ if (typeof Boxspring === 'undefined') {
 		}
 		
 		// format the the user 'auth' object; note user is not visible on the interface
-		user = _.extend({'name': '', 'password': ''}, (options && options.auth));
+		user = {
+			'name': (options.auth && options.auth.name) || '', 
+			'password': (options.auth && options.auth.password) || ''
+		};
 		
 		// populate the object with default, exclude 'auth' from the interface.
 		that = _.extend(that, _.defaults(options, {
 			'name': options.name,
 			'id': (options && options.id) || _.uniqueId('db-'),
-			'index': (options && options.index) || 'Index',
+			'dbid': _.uniqueId('db-'),
 			'maker': (options && options.maker) || undefined,
-			'designName': (options && options.designName) || '_design/default',
+			'_design': (options && options._design) || '_design/default',
+			'_view': (options && options._view) || '_view/default',
+			'_update': (options && options._update) || '_update/default',
 			'UTIL': Boxspring.UTIL,
 			'Boxspring': Boxspring
 		}, this));
+		
+		// prepend the reserved words _design, _view, _update if needed
+		['_design', '_view', '_update'].forEach(function(option) {
+			if (that[option].indexOf(option) === -1) {
+				that[option] = [ option, that[option] ].join('/');
+			}
+		});
 		
 		// omit the 'auth' object from the interface
 		that = _.omit(that, 'auth');
@@ -61,7 +73,6 @@ if (typeof Boxspring === 'undefined') {
 				'logout': [ '/_session','DELETE'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
-
 				'db_save': [ '/' + dbname,'PUT' ],
 				'doc_save': [ '/' + dbname + '/' + docId,'PUT'], 
 				'db_remove': [ '/' + dbname,'DELETE'],
@@ -78,6 +89,7 @@ if (typeof Boxspring === 'undefined') {
 			};	
 		*/
 		var queryHTTP = function (options, callback) {
+			var local = this;
 			this.HTTP({
 				'path': ((options && options.url) || '') + _.formatQuery((options && options.query) || {}),
 				'method': ((options && options.method) || 'GET'),
@@ -85,7 +97,7 @@ if (typeof Boxspring === 'undefined') {
 				'headers': ((options && options.headers) || {})
 			}, function (err, res) {
 				if ((callback && typeof callback) === 'function') {
-					callback(err, res);
+					callback.call(local, err, res);
 				}
 			});
 		};
@@ -115,7 +127,9 @@ if (typeof Boxspring === 'undefined') {
 			this.queryHTTP({
 				'url': '/_session',
 				'method': 'POST',
-				'headers': {'content-type': 'application/x-www-form-urlencoded'},
+				'headers': {
+					'Content-Type': 'application/x-www-form-urlencoded'
+				},
 				'body': user }, function(err, response) {
 					if (err) {
 						return handler(err, response);
@@ -134,18 +148,6 @@ if (typeof Boxspring === 'undefined') {
 		};
 		that.logout = logout;
 		
-		var all_docs = function (handler) {
-			this.doc('_all_docs').read(handler);
-			return this;
-		};
-		that.all_docs = all_docs;
-
-		var db_info = function (handler) {
-			this.doc().read(handler);
-			return this;
-		};
-		that.db_info = db_info;
-		
 		var events = function(Obj) {
 			return _.extend(Obj || {}, _.clone(Backbone.Events));
 		};
@@ -158,28 +160,21 @@ if (typeof Boxspring === 'undefined') {
 		
 		var clone = function () {
 			var object = _.clone(this);
-
-			if (object.hasOwnProperty('id')) {
-				if (object.id.split('-').length > 1) {
-					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
-				} else {
-					object.id = _.uniqueId(object.id+'-clone');					
-				}
-			}
-			return object;
+			object.dbid = _.uniqueId('db');
+			return _.extend(object, options);
 		};
 		that.clone = clone;
-		return that;		
+		return that.doc();
 	};
 
 	global.createdb = function(options) {
 		var object = db.call(this, options);
 		
-		return function (url) {
+		return function (urlRoot) {
 			// all subsequent HTTP calls will use the supplied credentials.
-			object.url = url || '127.0.0.1';
+			object.urlRoot = urlRoot || '127.0.0.1';
 			object.HTTP = object.UTIL.fileio
-				.server('server', _.urlParse(object.url), object.getAuth()).get;
+				.server('server', _.urlParse(object.url()), object.getAuth()).get;
 			return _.extend({}, object);
 		};
 	};

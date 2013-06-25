@@ -5,38 +5,16 @@ badname = require('auth').badname;
 badpass = require('auth').badpass;
 
 // Documentation: https://npmjs.org/package/tape
-var test = require('tape')
-, ddoc = function () {
-	return {
-		"updates": {
-			"my-commit": function (doc, req) {
-				doc['last-updated'] = Date();
-				doc.size = JSON.stringify(doc).length;
-				doc.junk = 'another-try';
-				return [doc, JSON.stringify(doc) ];
-			}
-		},
-		"views": {
-			'my-view': {
-				'map': function (doc) {
-					if (doc && doc._id) {
-						emit(doc._id, null);
-					}
-				}
-			}
-		}
-	};
-}
+var test = require('tape');
 
 var Admin = admin = Boxspring({'name': '_users', 
 	'auth': {'name': 'couchdb', 'password': 'admin'}})('127.0.0.1')
 // anonymous user
 , user = Boxspring('_users')().users('ron')	
-, db1 = Boxspring({'name': 'regress', 'auth': thisauth.auth })('127.0.0.1')
+, db1 = Boxspring({'name': 'regress', 'auth': {'name': 'ron', 'password': 'ran'} })('127.0.0.1')
 , db2 = Boxspring({'name': 'regress', 'auth': badname.auth })()
 , db3 = Boxspring({'name': 'regress', 'auth': badpass.auth })()
 ;
-
 
 test('boxspring-auth-1', function (t) {
 
@@ -54,7 +32,7 @@ test('boxspring-auth-1', function (t) {
 					console.log('Retrying...');
 					confirmSession(db, expected, name, count+1);						
 				} else {
-					console.log('Retry failed...', result.code, result.data, db.auth);
+					console.log('Retry failed...', result.code, result.data);
 					t.equal(result.code, expected, name);
 				}
 			}
@@ -67,12 +45,11 @@ test('boxspring-auth-1', function (t) {
 });
 
 test('boxspring-auth-2', function(t) {
-	t.plan(15);
+	t.plan(17);
 	
 	var signUpSequence4 = function () {
 		var model = new user.Users(user)
 		, expected = true;
-		
 		
 		model.set('auth', {'name': 'couchdb', 'password': 'admin'});
 
@@ -83,7 +60,12 @@ test('boxspring-auth-2', function(t) {
 		
 		model.on('change:removed', function() {
 			t.equal(this.get('removed'), 200, 'changed');
-		})
+		});
+		
+		model.on('change:error', function(source, e) {
+			console.log('error', e.err);
+			t.equal(0, 1, e.err);
+		});
 		
 		model.on('change:updated', function() {
 			t.equal(this.get('error'), null, 'updated');
@@ -102,10 +84,18 @@ test('boxspring-auth-2', function(t) {
 		});
 		
 		_.wait(6, function() {
-			model.update('ran');
+			model.logout();
 		});
 		
 		_.wait(8, function() {
+			model.login();
+		});
+				
+		_.wait(10, function() {
+			model.update('ran');
+		});
+		
+		_.wait(12, function() {
 			model.remove('ron');
 		});
 	}

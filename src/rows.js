@@ -23,17 +23,18 @@
 (function(global) {
 	"use strict";
 	
-	var rows = function (response, ddoc) {		
+	var rows = function (response) {		
 		// Object for adding methods and data to rows of a 
 		// response data object based on information about the design
 		var design = this
+		, ddoc = this.views
 		, that = _.extend({}, response)
 		, thisSelected = [];
 		
-		if (ddoc && ddoc.views && ddoc.views[design.index]) {
-			that.sortColumn = _.fetch(ddoc.views[design.index], 'sortColumn') || []; 
-			that.columns = _.fetch(ddoc.views[design.index], 'columns') || [];
-			that.keys = _.fetch(ddoc.views[design.index], 'keys') || [];
+		if (ddoc && ddoc[design._view]) {
+			that.sortColumn = _.fetch(ddoc[design._view], 'sortColumn') || []; 
+			that.columns = _.fetch(ddoc[design._view], 'columns') || [];
+			that.keys = _.fetch(ddoc[design._view], 'keys') || [];
 		} else {
 			that.columns = [];
 			that.keys = [];

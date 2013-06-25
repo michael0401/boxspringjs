@@ -105,17 +105,16 @@ if (typeof jQuery === 'undefined') {
 				return data;				
 			};
 			
-			var googleColumn = function (chartType, cell, index, id) {
-
+			var googleColumn = function (cell, index, id) {				
 				// don't allow ineligible column types. 
 				// or else google vis will throw an error if an object passes through		
 				if (!_.found(vis.types, cell.type)) {
 					cell.type = 'string';
 				}			
 				// 'chart' require their columns, except the 0 column to be 'number'
-				if (chartType === 'LineChart' && typeof index === 'number') {
-					cell.type = index > 0 ? 'number' : cell.type;
-				}
+				//if (chartType === 'LineChart' && typeof index === 'number') {
+				//	cell.type = index > 0 ? 'number' : cell.type;
+				//}
 				return({
 					'label': cell.name,
 					'type': cell.type || 'string',

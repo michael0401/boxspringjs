@@ -1,27 +1,6 @@
 require('../index');
 // Documentation: https://npmjs.org/package/tape
-var test = require('tape')
-, ddoc = function () {
-	return {
-		"updates": {
-			"my-commit": function (doc, req) {
-				doc['last-updated'] = Date();
-				doc.size = JSON.stringify(doc).length;
-				doc.junk = 'another-try';
-				return [doc, JSON.stringify(doc) ];
-			}
-		},
-		"views": {
-			'my-view': {
-				'map': function (doc) {
-					if (doc && doc._id) {
-						emit(doc._id, null);
-					}
-				}
-			}
-		}
-	};
-}
+var test = require('tape');
 
 
 var Boxspringjs = Maker
@@ -99,7 +78,7 @@ test('boxspringjs-1', function (t) {
 		// tests the defaultView method since not defined
 		t.equal(anotherdb.index, 'my-view', 'my-view');
 		// not explicitly defined 'default'
-		t.equal(boxspringjs.designName, '_design/default', 'default');
+		t.equal(boxspringjs._design, '_design/my-design', 'default');
 		// makes sure we return a .doc object		
 		t.equal(typeof boxspringjs.doc, 'function', 'function');
 	});
@@ -112,7 +91,7 @@ test('boxspringjs-2', function (t) {
 
 	// update saves an existing doc
 	newdoc.update(function(err, result) {
-		t.equal(err, null, 'update');		
+		t.equal(err, null, 'update');	
 		newdoc.retrieve(function(err, result) {
 			t.equal(err, null, 'retrieve');
 			newdoc.docinfo({ 'more-content': 'abcdefg'})
@@ -135,6 +114,8 @@ test('boxspringjs-2', function (t) {
 	});	
 	
 });
+
+return;
 
 // reading view indexes
 test('boxspringjs-3', function (t) {

@@ -8,7 +8,7 @@ var test = require('tape')
 (function () {
 
 	test('bulk-tests', function (t) {
-		t.plan(8);
+		t.plan(10);
 		
 		var bulkPushTest = function () {
 			var bulk = boxspringjs.bulk()
@@ -30,6 +30,9 @@ var test = require('tape')
 		// bulk tests
 		bulk.save(function(err, result) {
 			t.equal(result.code, 201, 'bulk-save');
+			result.status().forEach(function(status) {
+				t.equal(status, false, 'bulk-save-status');
+			})
 			bulk.remove(function(err, data) {
 				t.equal(data.data[0].ok, result.data[0].ok, 'bulk-remove');
 				bulkPushTest();

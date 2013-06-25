@@ -125,46 +125,30 @@
 		return target;
 	};
 	
-	var view = function (options, design, views, emitter) {	
-		var that = _.extend({}, this.events());
-			
-		that.db = this;
-		that.design = design;
-		that.index = (options && options.index) || (this && this.index);
-		that.views = views;
-		that.emitter = emitter;
-		that.query = translateQuery(_.omit(options, 'system'));
-		that.system = (this && this.system && this.system.post()) ||
-			{	'asynch': false,
-				'cache-size': undefined, //10,
-				'page-size': undefined, //100,
-				'delay': 0.5 };
-				
-		var setQuery = function (queryParams, systemParams) {
-			if (_.isObject (queryParams)) {
-				this.query = _.extend(this.query, queryParams);
-			}
-			// rule: if reduce=true then page-size=0;
-			if (_.has(this.query, 'reduce') && this.query.reduce === true) {
-				this.system['page-size'] = 0;
-				this.system.asynch = false;
-			} else if (systemParams.asynch === true) {
-				this.system['page-size'] = systemParams['page-size'];
-				this.system['cache-size'] = systemParams['cache-size'] || Number.MAX_VALUE;
-			}
-			return this.query;
-		};
-		that.setQuery = setQuery;
-		that.setQuery(that.options, that.system);
+	var view = function (system) {	
+		var that = _.extend({}, this, this.events())
+		, query = translateQuery(this.options.post());
 
-		var fetch = function (server) {
+		that.system = this.UTIL.hash((system) || {	
+			'asynch': false,
+			'cache-size': undefined, //10,
+			'page-size': undefined, //100,
+			'delay': 0.5 
+		});
+		system = that.system.post();
+						
+		// rule: if reduce=true then page-size=0, asynch=false;
+		if (_.has(query, 'reduce') && query.reduce === true) {
+			system['page-size'] = 0;
+			system.asynch = false;
+		} else if (system.asynch === true) {
+			system['cache-size'] = system['cache-size'] || Number.MAX_VALUE;
+		}
+		
+		var fetchView = function (server) {
 			var tRows = 0
-			, db = this.db
-			, design = this.design
-			, index = this.index
+			, db = this
 			, events = this
-			, query = this.query
-			, system = this.system
 			, emitter = this.emitter
 			, nextkey;
 
@@ -182,13 +166,11 @@
 			var nextLimit = function(query, size) {					
 				if (system.asynch && _.isNumber(size) && size > 0) {
 					return(_.extend(query, { 'limit': system['page-size']+1 }));
-				}
+				}				
 				return query;
 			};
 
-			var chunk = function (startkey) {
-				var view;
-				
+			var chunk = function (startkey) {				
 				// remaining cache-size get smaller on each successive fetch
 				system['cache-size'] = _.isNumber(system['cache-size']) 
 					? system['cache-size']-1 
@@ -198,19 +180,16 @@
 				query = nextLimit(query, system['page-size']);
 				
 				// _all_docs is a special case view; 
-				if (index === '_all_docs') {
+				if (db.url().split('/')[db.url().split('/').length-1] === '_all_docs') {
 					// use the built-in all_docs method
-					view = db;
-					view.read = db.all_docs;
+					db.read = db.all_docs;
 				} else {
-					// use the view machinery
-					view = db.doc([ design, '_view', index ].join('/'));
 					// update the query options;
-					view.options.update(isValidQuery(query));
+					db.options.update(isValidQuery(query));
 				}
 								
 				// execute the query and process the response
-				view.read(function(err, response) {
+				db.read(function(err, response) {
 					//console.log('got response!', response.code, response.request, response.data);
 					if (err) {
 						events.trigger('view-error', new Error('error: ' + response.data.error + 
@@ -276,7 +255,6 @@
 			};
 			chunk();		
 		};
-		that.fetch = fetch;
 
 		// if 'node' server is requested, then built-in server side view will be used.
 		// generate the list of docs for this db
@@ -286,9 +264,8 @@
 			events.on('chunk-finished', function (res) {
 				events.trigger('view-data',  res);
 			});
-			this.fetch(this, 'node');
+			fetchView.call(this, 'node');
 		};
-		that.node = node;
 
 		var couch = function () {
 			var events = this;
@@ -297,19 +274,22 @@
 				//console.log('got this chunk data', res.data.total_rows);								
 				events.trigger('view-data', res);
 			});
-			this.fetch(this);
+			fetchView.call(this);
 		};
-		that.couch = couch;
 		
 		var end = function (server, eventHandler) {
-			var res = this.db.events()
+			var machine = {
+				'couch': couch,
+				'node': node
+			} 
+			, res = this.events()
 			, requestEvents = this
 			, local = this;
 
 			// Note: Responses from this method are evented. 
 			eventHandler(res);
 			// execute the view by calling the requested server function
-			local[server](res, this.query);
+			machine[server].call(local, res, this.query);
 
 			this.on('view-data', function (response) {
 				if (response.code === 200) {
@@ -325,6 +305,76 @@
 			return this;					
 		};
 		that.end = end;
+		
+		// Purpose: wrapper for evented .view function. 
+		// Default behavior 'asynch: true'  to execute callback only on the first 
+		// delivery of data from the server. 
+		// 'asynch: false' (or undefined) executes the callback each time and the 
+		// application has to manage the data
+		var fetch = function (options, callback, callerDataCatcher) {
+			var local = this 
+			, triggered = false
+			// caller can provide an object to wrap the data, ie. data method of "Result" object;
+			, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) 
+				? callerDataCatcher 
+				: function (x) { return x; }							
+
+			// update the 'system' options
+			system = this.system.post();
+			
+			this.on('error', function (err) {
+				throw err;
+			});
+
+			this.end('couch', function(res) {
+				res.on('data', function (r) {
+					// create a result object instrumented with row helpers 
+					// and design document info
+					var result = local.events(local.rows(r, local.maker()));	
+					if (callback && _.isFunction(callback)) {
+						if (system && system.asynch === false) {
+							// just write wrapped data to the calling program. 
+							//console.log('got data!', caller(result), caller === _.item);
+							callback(null, caller(result));
+						} else if ((system && system.asynch === true) && 
+							triggered === false) {
+							// let calling program continue, continuously receive data
+							callback(null, caller(result));
+							triggered = true;								
+						} else {
+							// add data to Result object of the caller
+							caller(result);
+						}
+					}
+				});			
+			});
+			return this;
+		};
+		that.fetch = fetch;
+		
+		// Purpose: Emulates CouchDB view/emit functions on the "client"
+		// TBD: Not tested
+		var emulate = function (name) {
+			// When running in node.js, calling functions need to find 'emit' in its scope 
+			// On server side, will use couchdb's built-in emit()
+			var emitter = function(viewfunc) {
+				var tree = global.Btree()
+					, map = (viewfunc && viewfunc.map)
+					, reduce = (viewfunc && viewfunc.reduce);
+
+				var emit = function (key, value) {
+					tree.store(JSON.stringify(key), value);
+				};
+				tree.emit = emit;
+				tree.map = map;
+				tree.reduce = reduce;
+				return tree;
+			}
+			, e = emitter(this.maker().views[name]);
+			emit = e.emit;
+			return(e);
+		};
+		that.emulate = emulate;
 		return that;		
 	};
 	global.view = view;

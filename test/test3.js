@@ -1,55 +1,11 @@
 require('../index');
 var test = require('tape')
 , boxspringjs = Maker('127.0.0.1')
-, ddoc = function () {
-	return {
-		"updates": {
-			"my-commit": function (doc, req) {
-				doc['last-updated'] = Date();
-				doc.size = JSON.stringify(doc).length;
-				doc.junk = 'another-try';
-				return [doc, JSON.stringify(doc) ];
-			}
-		},
-		'types': {
-			'_id': ['string', 1],
-			'_rev': ['string', 1],
-			'doc': ['object', 4],
-			'content': ['string', 2],
-			'more-content': ['string', 2]			
-		},
-		"views": {
-			'lib': {
-				'formats': function() {
-					var formatter = function(name) {
-						return 'formatted: ' + name;
-					}
-					return({
-						'_id': formatter,
-						'_rev': formatter
-					});
-				}
-			},
-			'my-view': {
-				'map': function (doc) {
-					if (doc && doc._id) {
-						emit(doc._id, doc);
-					}
-				},
-				'header': {
-					'sortColumn': 'doc',
-					'keys': ['_id'],
-					'columns': ['_id', 'doc', 'content', 'more-content', '_rev' ]
-				}
-			}
-		}
-	};
-}
 , anotherdb = Boxspring({
 	'name': 'regress',
 	'id': 'anotherdb',
-	'index': 'my-view',
-	'designName': 'my-design',
+	'_view': 'my-view',
+	'_design': 'my-design',
 	'maker': ddoc,
 	'auth': auth.auth })('127.0.0.1');
 
@@ -59,17 +15,16 @@ var test = require('tape')
 		t.plan(9);
 		console.log('Running boxspringjs-2: 8');
 
-		var design = boxspringjs.design();
+		var design = boxspringjs.doc('_design/my-design');
+
 		t.equal(typeof design, 'object');
-		t.equal(typeof (design && design.fetch), 'function');
-		t.equal(anotherdb.design().designName, '_design/my-design', 'design-name-test');
+		t.equal(anotherdb._design, '_design/my-design', 'design-name-test');
 		
 		var anotherdbDesignTests = function () {
-			anotherdb.design().ddoc.update(function(err, response) {
+			anotherdb.doc('_design').update(function(err, response) {
 				t.equal(response.code, 201, 'anotherdb-design');
-				anotherdb.design().fetch({}, function (err, c) {
-					anotherdb.design('_design/my-design', ddoc).fetch({'index': 'my-view' }, 
-					function(e, n) {
+				anotherdb.doc('_view').fetch({}, function (err, c) {
+					anotherdb.doc('_design/my-design').doc('_view/my-view').fetch({}, function(e, n) {
 						t.equal(c.getLength(), n.getLength(), 'my-view-response');
 					});
 				});
@@ -78,30 +33,34 @@ var test = require('tape')
 
 
 		var designTests = function () {
+			var ud = design.doc('_update/in-place');
 			// What this does: gets a list of documents using the built-in 'Index' view. 
 			// For each document, it gets the key.id and calls the server-side 'update' using 
 			// a local update handler 'my-commit'. After the last completion, it asserts the test
 			// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
 			// running in node.js and not on the server.
-			design.fetch({'index': 'Index'}, function(e, r) {
+			design.doc('_view/Index').fetch({}, function(e, r) {
 
-				design.fetch({ 'index': 'Index' }, function(e, n) {
+				design.doc('_view/Index').fetch({}, function(e, n) {
 					t.equal(r.data.rows.length, n.data.rows.length, 'view-tests');
-					design.commit('base_test_suite', 'in-place', { 'random': Date.now() }, 
-					function(e, commit) {
-						t.equal(commit.code, 201, 'update-handler');
-						anotherdbDesignTests();
+					design.doc('_update/in-place')
+						.source({ 'random': Date.now() })
+						.update('base_test_suite1', function(e, commit) {
+							t.equal(commit.data.error, 'render_error', 'expect-update-fail');
+							ud.source({'random': Date.now() }).update('base_test_suite', function(e, r) {
+								t.equal(r.code, 201, 'update-handler');
+								anotherdbDesignTests();								
+							});
 					});					
 				}); 
 			});		
 		};
 
-		design.ddoc.update(function(err, response) {
+		design.update(function(err, response) {
 			t.equal(response.code, 201, 'design-saved');
-			design.ddoc.retrieve(function(err, res) {
+			design.retrieve(function(err, res) {
 				var readBack = res.data
-				, designKeys = _.keys(readBack.updates)
-					.concat(_.keys(readBack.views));
+				, designKeys = _.keys(readBack.updates).concat(_.keys(readBack.views));
 				t.equal(_.difference(designKeys, 
 					[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
 				designTests();

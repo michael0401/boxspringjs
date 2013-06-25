@@ -24,13 +24,16 @@
 	"use strict";
 	// Purpose: routines for bulk saving and removing
 	var bulk = function (doclist, prohibit) {
-		var that = this.doc('_bulk_docs')
+		var owner = this 
+		, that = this.doc('_bulk_docs')
 		, lastResponse = [];
 		
 		// extend the bulk object with the owner db object
-//		that = _.extend({}, this);
 		that.docs = { 'docs': doclist || [] };
 		that.Max = undefined;
+		
+		// tells couchdb to commit the change before returning a response
+		that.headers.set('X-Couch-Full-Commit', false);
 		
 		var checkSource = function (doc) {
 			// if doc is an object, then use post() to get the contents
@@ -51,18 +54,6 @@
 			});
 		};
 		that.status = status;
-
-		var exec = function (docsObj, callback) {
-			this.source(docsObj)
-				.superiorSave(function(err, response) {
-					if (!err) {
-						lastResponse = response && response.data;						
-					}
-					response.status = status;
-					callback(err, response);				
-			});
-		};
-		that.exec = exec;
 
 		var save = function (handler) {
 			var local = this;
@@ -140,9 +131,9 @@
 
 			// use the HEAD method to quickly get the _revs for each document
 			this.docs.docs.forEach(function(nextDoc) {
-				local.doc(nextDoc._id).head(function(err, headinfo) {
+				owner.doc(nextDoc._id).head(function(err, headinfo) {
 					if (err) {
-						return console.log(err);
+						return handler(err, headinfo);
 					}
 					eachDoc(headinfo);
 				});
@@ -150,6 +141,24 @@
 		};
 		that.remove = remove;
 
+		var exec = function (docsObj, callback) {
+			
+			// if the application set X-Couch-Full-Commit to true, set the batch=ok option
+			if (this.headers.get('X-Couch-Full-Commit') === true) {
+				this.options.set('batch', 'ok');				
+			}
+			
+			this.source(docsObj)
+				.superiorSave(function(err, response) {
+					if (!err) {
+						lastResponse = response && response.data;						
+					}
+					response.status = status;
+					callback(err, response);				
+			});
+		};
+		that.exec = exec;
+		
 		var max =  function (max) {
 			this.Max=_.toInt(max);
 			return this;

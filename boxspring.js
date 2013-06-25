@@ -94,6 +94,7 @@ if (typeof _ === 'undefined') {
 		}
 		return(-1);
 	};
+	baseUtils.ifind = find;
 	
 	// What it does: return true if the item k is found in array a
 	var found = function() {
@@ -492,6 +493,7 @@ if (typeof _ === 'undefined') {
 		}
 		return(-1);
 	};
+	baseUtils.ifind = find;
 	
 	// What it does: return true if the item k is found in array a
 	var found = function() {
@@ -2818,6 +2820,7 @@ if (typeof UTIL === 'undefined') {
 	var  httpRequestValues = {
 		200: function() { return null; },
 		201: function() { return null; },
+		202: function() { return null; },
 		300: function() { return null; },
 		304: function() { return null; },
 		400: function(code) { return new Error(http.STATUS_CODES[code] + ' - ' + code); },
@@ -2827,6 +2830,7 @@ if (typeof UTIL === 'undefined') {
 		405: function(code) { return new Error(http.STATUS_CODES[code] + ' - ' + code); },
 		409: function(code) { return new Error(http.STATUS_CODES[code] + ' - ' + code); },
 		412: function(code) { return new Error(http.STATUS_CODES[code] + ' - ' + code); },
+		415: function(code) { return new Error(http.STATUS_CODES[code] + ' - ' + code); },
 		500: function(code) { return new Error(http.STATUS_CODES[code] + ' - ' + code); }
 	};
 	
@@ -2846,6 +2850,12 @@ if (typeof UTIL === 'undefined') {
 		, root = server && server.root
 		, timeOfLastGet
 		, that = {}
+		
+		// Media types that parse can handle.
+		, parseTypes = {
+			'application/json': true,
+			'application/hal+json': true
+		}
 
 		// Purpose: parses a JSON object with 'catch' 
 		// to just return the input if the parse fails.
@@ -2858,8 +2868,9 @@ if (typeof UTIL === 'undefined') {
 			if (s === '') {
 				return '';
 			} 
+
+			if (parseTypes.hasOwnProperty(contentType) && parseTypes[contentType]) {
 			
-			if (contentType === 'application/json' || contentType === 'json') {
 				// ajax sometimes returns .html from the root directory
 				if (s.toUpperCase().substr(2,8) === "DOCTYPE") {
 					return s;
@@ -3259,8 +3270,6 @@ var server = function (port, serviceFunc) {
 
 };
 fileio.server = server;
-
-*/
 /* ===================================================
  * db.js v0.01
  * https://github.com/rranauro/boxspringjs
@@ -3300,18 +3309,30 @@ if (typeof Boxspring === 'undefined') {
 		}
 		
 		// format the the user 'auth' object; note user is not visible on the interface
-		user = _.extend({'name': '', 'password': ''}, (options && options.auth));
+		user = {
+			'name': (options.auth && options.auth.name) || '', 
+			'password': (options.auth && options.auth.password) || ''
+		};
 		
 		// populate the object with default, exclude 'auth' from the interface.
 		that = _.extend(that, _.defaults(options, {
 			'name': options.name,
 			'id': (options && options.id) || _.uniqueId('db-'),
-			'index': (options && options.index) || 'Index',
+			'dbid': _.uniqueId('db-'),
 			'maker': (options && options.maker) || undefined,
-			'designName': (options && options.designName) || '_design/default',
+			'_design': (options && options._design) || '_design/default',
+			'_view': (options && options._view) || '_view/default',
+			'_update': (options && options._update) || '_update/default',
 			'UTIL': Boxspring.UTIL,
 			'Boxspring': Boxspring
 		}, this));
+		
+		// prepend the reserved words _design, _view, _update if needed
+		['_design', '_view', '_update'].forEach(function(option) {
+			if (that[option].indexOf(option) === -1) {
+				that[option] = [ option, that[option] ].join('/');
+			}
+		});
 		
 		// omit the 'auth' object from the interface
 		that = _.omit(that, 'auth');
@@ -3324,7 +3345,6 @@ if (typeof Boxspring === 'undefined') {
 				'logout': [ '/_session','DELETE'],
 				'session': [ '/_session','GET' ],
 				'all_dbs': [ '/_all_dbs','GET' ],
-
 				'db_save': [ '/' + dbname,'PUT' ],
 				'doc_save': [ '/' + dbname + '/' + docId,'PUT'], 
 				'db_remove': [ '/' + dbname,'DELETE'],
@@ -3341,6 +3361,7 @@ if (typeof Boxspring === 'undefined') {
 			};	
 		*/
 		var queryHTTP = function (options, callback) {
+			var local = this;
 			this.HTTP({
 				'path': ((options && options.url) || '') + _.formatQuery((options && options.query) || {}),
 				'method': ((options && options.method) || 'GET'),
@@ -3348,7 +3369,7 @@ if (typeof Boxspring === 'undefined') {
 				'headers': ((options && options.headers) || {})
 			}, function (err, res) {
 				if ((callback && typeof callback) === 'function') {
-					callback(err, res);
+					callback.call(local, err, res);
 				}
 			});
 		};
@@ -3378,7 +3399,9 @@ if (typeof Boxspring === 'undefined') {
 			this.queryHTTP({
 				'url': '/_session',
 				'method': 'POST',
-				'headers': {'content-type': 'application/x-www-form-urlencoded'},
+				'headers': {
+					'Content-Type': 'application/x-www-form-urlencoded'
+				},
 				'body': user }, function(err, response) {
 					if (err) {
 						return handler(err, response);
@@ -3397,18 +3420,6 @@ if (typeof Boxspring === 'undefined') {
 		};
 		that.logout = logout;
 		
-		var all_docs = function (handler) {
-			this.doc('_all_docs').read(handler);
-			return this;
-		};
-		that.all_docs = all_docs;
-
-		var db_info = function (handler) {
-			this.doc().read(handler);
-			return this;
-		};
-		that.db_info = db_info;
-		
 		var events = function(Obj) {
 			return _.extend(Obj || {}, _.clone(Backbone.Events));
 		};
@@ -3421,28 +3432,21 @@ if (typeof Boxspring === 'undefined') {
 		
 		var clone = function () {
 			var object = _.clone(this);
-
-			if (object.hasOwnProperty('id')) {
-				if (object.id.split('-').length > 1) {
-					object.id = _.uniqueId(object.id.split('-')[0]+'-clone');
-				} else {
-					object.id = _.uniqueId(object.id+'-clone');					
-				}
-			}
-			return object;
+			object.dbid = _.uniqueId('db');
+			return _.extend(object, options);
 		};
 		that.clone = clone;
-		return that;		
+		return that.doc();
 	};
 
 	global.createdb = function(options) {
 		var object = db.call(this, options);
 		
-		return function (url) {
+		return function (urlRoot) {
 			// all subsequent HTTP calls will use the supplied credentials.
-			object.url = url || '127.0.0.1';
+			object.urlRoot = urlRoot || '127.0.0.1';
 			object.HTTP = object.UTIL.fileio
-				.server('server', _.urlParse(object.url), object.getAuth()).get;
+				.server('server', _.urlParse(object.url()), object.getAuth()).get;
 			return _.extend({}, object);
 		};
 	};
@@ -3571,24 +3575,78 @@ if (typeof Boxspring === 'undefined') {
 (function(global) {
 	"use strict";
 	
+	var reserved = {
+		'_attachment': true,	// creates a document with a special _attachment property
+		'_bulk_docs': true, 	// body has no _id on save; 
+		'_users': true,			// the special _users database; id is empty, body has no _id
+		'_design': true,		// _design/name; _design/designName
+		'_update': true,		// _design/name/_update/updateName; 
+		'_view': true			// _design/name/_view/viewName
+	};
 
 	var doc = function(id) {
-		// inherit from the caller object, in this case a db object
-		var that = this.UTIL.hash()
-		// configure the url for this resource; if called without an id, then this is a database document
-		, url = '/' + (typeof id !== 'undefined' ? (this.name + '/' + id) : this.name);		
+		// inherit from the caller object, always a db object
+		var that = _.extend({}, this)
 
-		// expose the headers and options for this doc object
-		that.headers = this.UTIL.hash({ 'X-Couch-Full-Commit': true });
-		that.options = this.UTIL.hash();
+		// split off reserved document ids
+		, idRoot = id && id.split('/')[0] || ''	
 
-		_.extend(that, this);
+		// give this doc its own hash
+		that = _.extend(that, this.UTIL.hash());
 		
-		// if the document is not a reserved id, then create an _id attribute
-		if (id && id.charAt(0) !== '_') {
+		// expose the default headers and options for this doc object
+		that.headers = this.UTIL.hash({ 
+			'X-Couch-Full-Commit': true, 
+			'Content-Type': 'application/json',
+			'Accept': 'application/json',
+			'Connection': 'keep-alive' 
+		});
+		that.options = this.UTIL.hash();
+		
+		// configure the url for this resource; if called without an id, then this is a database document
+		that.set('url', ((this && this.url && this.url())) || 
+			'/' + (typeof id !== 'undefined' ? (this.name + '/' + id) : this.name));
+
+		var url = function () {
+			return this.get('url');
+		};
+		that.url = url;
+		
+		var pathHelper = function (pathIn) {
+			var newUrl
+			, local = this;
+			// append the pathIn argument to the existing url
+			['_view', '_design', '_update'].forEach(function(tag) {
+				if (pathIn.split('/')[0] === tag) {
+					if (pathIn.split('/').length === 1) {
+						// if the local[tag] does not have the _tag prepended, then fix it
+						if (local[tag].charAt(0) !== '_') {
+							local[tag] = [ tag, local[tag] ].join('/');
+						}
+						// append the default 
+						newUrl = [ local.url(), local[tag] ].join('/');
+					} else {
+						// append the pathIn provided by the app
+						newUrl = [ local.url(), pathIn ].join('/');
+					}
+				}				
+			});
+			return newUrl;
+		};
+		
+		// check for reserved document id's
+		if (id && id.charAt(0) === '_') {
+			// extend the path for _view, _design, and _update
+			if (pathHelper.call(this, id)) {
+				that.set('url', pathHelper.call(this, id));
+			} else {
+				that.set('url', [ this.url(), id].join('/'));
+			}
+		} else if (id) {
+			// set an _id attribute for all other doc types
 			that.set('_id', id);
+			that.set('url', [ this.url(), id ].join('/'));
 		}
-		that.set('id', id);
 
 		// Purpose: takes an object and updates the state of the document hash
 		var source = function (docinfo) {
@@ -3612,7 +3670,7 @@ if (typeof Boxspring === 'undefined') {
 				if (!err) {
 					local.source(response.data);
 				}
-				return handler(err, response);
+				return handler.call(local, err, response);
 			};
 		};
 
@@ -3637,39 +3695,30 @@ if (typeof Boxspring === 'undefined') {
 		// Purpose: Method for saving to the database
 		var save = function (handler) {
 			this.queryHTTP({
-					'url': url,
-					'method': 'PUT',
+					'url': this.url(),
+					'method': (id === '_bulk_docs') ? 'POST' : 'PUT',
 					'headers': this.headers.post(),
 					'query': this.options.post(),
-					'body': id && this.post() }, sync.call(this, handler));
+					'body': _.omit((id && this.post()) || {},'url') }, sync.call(this, handler));
 			return this;
 		};
+		that.save = save;
 		
-		// Bulk document save
-		var bulkSave = function (handler) {
-			// set headers and options
-			this.headers.set('X-Couch-Full-Commit', false);
-			this.options.set('batch', 'ok');
-			this.queryHTTP({
-				'url': url,
-				'method': 'POST',
-				'body': this.post(),
-				'headers': this.headers.post(),
-				'query': this.options.post()
-			}, handler);
+		var all_docs = function (handler) {
+			this.doc('_all_docs').read(handler);
 			return this;
 		};
-		
-		if (id === '_bulk_docs') {
-			that.save = bulkSave;
-		} else {
-			that.save = save;
-			that.create = save;
-		}
+		that.all_docs = all_docs;
+
+		var db_info = function (handler) {
+			this.doc().read(handler);
+			return this;
+		};
+		that.db_info = db_info;
 
 		var retrieve = function (handler) {		
 			this.queryHTTP({
-				'url': url,
+				'url': this.url(),
 				'headers': this.headers.post(),
 				'query': this.options.post() 
 				}, sync.call(this, handler));
@@ -3690,15 +3739,16 @@ if (typeof Boxspring === 'undefined') {
 			var local = this;
 
 			this.queryHTTP({
-					'url': url,
+					'url': this.url(),
 					'method': 'HEAD',
 					'headers': this.headers.post()
 				}, function (err, response) {
-					if (!err) {
-						local.set('_rev', local.getRev(response));
-					} 
+					if (err) {
+						return handler(err, response);
+					}
+					local.set('_rev', local.getRev(response));
 					if (handler && typeof handler === 'function') {
-						handler(err, response);						
+						handler.call(local, err, response);						
 					}
 				});
 			return this;
@@ -3711,8 +3761,8 @@ if (typeof Boxspring === 'undefined') {
 			var local = this;
 			
 			// cache the data since read will over-write with stale content from the server;
-			if (data && _.isObject(data)) {
-				data = this.source(data).post();
+			if (!data) {
+				data = _.clone(this.post());
 			}
 			
 			this.read(function(err, response) {
@@ -3721,7 +3771,7 @@ if (typeof Boxspring === 'undefined') {
 					// now add back data to update from above and save
 					return local.source(data).save(handler);	
 				}
-				handler(err, response);
+				handler.call(local, err, response);
 			});
 			return this;
 		};
@@ -3735,16 +3785,19 @@ if (typeof Boxspring === 'undefined') {
 				// its a 'db'
 				this.headers.set('content-type','application/x-www-form-urlencoded');
 				this.queryHTTP({
-						'url': url,
+						'url': this.url(),
 						'method': 'DELETE', 
 						'headers': this.headers.post() }, handler);
 			} else {
 				// its a 'doc'
-				this.head(function(err) {
-					local.queryHTTP({
-						'url': url,
-						'method': 'DELETE',
-						'query': {'rev': local.get('_rev') }}, handler);					
+				this.head(function(err, response) {
+					if (!err) {
+						return local.queryHTTP({
+							'url': local.url(),
+							'method': 'DELETE',
+							'query': {'rev': local.get('_rev') }}, handler);		
+					}
+					handler.call(this, err, response);		
 				});
 			}
 			return this;
@@ -3752,8 +3805,24 @@ if (typeof Boxspring === 'undefined') {
 		that.remove = remove;
 		that.delete = remove;
 		
+		/*
+		if (attachment) {
+			try {
+				// _attachment is a special field in the document. Must be base 64 encoded.
+				doc._attachments = {
+					"html": {
+						"content_type":"text\/plain",
+						'data': _.encode(attachment.replace(/\n/g, '').replace(/\r/g, ''))					
+					}
+				}				
+			} catch (e) {
+				console.log('Base64 encoding error - ', e)
+			}
+		}
+		*/
 		var attachment = function(attach, handler) {
-			this.doc(id + '/' + attach).read(handler);			
+			this.doc(id + '/' + attach).read(handler);
+			return this;			
 		};
 		that.attachment = attachment;
 		
@@ -3764,6 +3833,52 @@ if (typeof Boxspring === 'undefined') {
 			return this;
 		};
 		that.info = info;
+		
+		// drop-in replacement for Backbone.sync. Use this in Backbone models to delegate to Backbones
+		// success and error handling for ajax.
+		// To do: add in Backbone 'request' and 'sync' events.
+		var backboneSync = function (method, model, options) {
+			var doc = this.doc(model.get('_id')).source(model.attributes);
+			
+			doc[method](function(err, response) {
+				if (err) {
+					return options.error.call(model, model, response);
+				}
+				options.success.call(model, 
+					response, response && response.status, response && response.xhr);				
+			});
+		};
+		that.sync = backboneSync;
+		
+		// if idRoot is '_design', then add in the design() methods;
+		if (idRoot === '_design') {
+			return that.design();
+		}
+		
+		// if idRoot is '_view', add the view() methods;
+		if (idRoot === '_view') {
+			// make sure a design document is at the base of this
+			if (that.url().indexOf('_design') === -1) {
+				that.set('url', '/' + that.url().split('/').slice(1,2).join('/'));
+				return that.clone().doc('_design').doc(id).view();
+			}
+			return that.view();
+		}
+		
+		// this update takes advantage of CouchDB 'updates' handlers. 
+		// The design document function specified in '_update' will execute on 
+		// the server, saving the round-trip to the client a enforcing consistent
+		// attributing of the documents on the server for a corpus.
+		var commit = function (targetId, handler) {
+			this.set('url', [ this.url(), targetId ].join('/'));
+			
+			this.save(handler);
+			return this;			
+		};
+		
+		if (idRoot === '_update') {
+			that.update = commit;
+		}
 		return that;		
 	};
 	global.doc = doc;
@@ -3795,13 +3910,16 @@ if (typeof Boxspring === 'undefined') {
 	"use strict";
 	// Purpose: routines for bulk saving and removing
 	var bulk = function (doclist, prohibit) {
-		var that = this.doc('_bulk_docs')
+		var owner = this 
+		, that = this.doc('_bulk_docs')
 		, lastResponse = [];
 		
 		// extend the bulk object with the owner db object
-//		that = _.extend({}, this);
 		that.docs = { 'docs': doclist || [] };
 		that.Max = undefined;
+		
+		// tells couchdb to commit the change before returning a response
+		that.headers.set('X-Couch-Full-Commit', false);
 		
 		var checkSource = function (doc) {
 			// if doc is an object, then use post() to get the contents
@@ -3822,18 +3940,6 @@ if (typeof Boxspring === 'undefined') {
 			});
 		};
 		that.status = status;
-
-		var exec = function (docsObj, callback) {
-			this.source(docsObj)
-				.superiorSave(function(err, response) {
-					if (!err) {
-						lastResponse = response && response.data;						
-					}
-					response.status = status;
-					callback(err, response);				
-			});
-		};
-		that.exec = exec;
 
 		var save = function (handler) {
 			var local = this;
@@ -3911,9 +4017,9 @@ if (typeof Boxspring === 'undefined') {
 
 			// use the HEAD method to quickly get the _revs for each document
 			this.docs.docs.forEach(function(nextDoc) {
-				local.doc(nextDoc._id).head(function(err, headinfo) {
+				owner.doc(nextDoc._id).head(function(err, headinfo) {
 					if (err) {
-						return console.log(err);
+						return handler(err, headinfo);
 					}
 					eachDoc(headinfo);
 				});
@@ -3921,6 +4027,24 @@ if (typeof Boxspring === 'undefined') {
 		};
 		that.remove = remove;
 
+		var exec = function (docsObj, callback) {
+			
+			// if the application set X-Couch-Full-Commit to true, set the batch=ok option
+			if (this.headers.get('X-Couch-Full-Commit') === true) {
+				this.options.set('batch', 'ok');				
+			}
+			
+			this.source(docsObj)
+				.superiorSave(function(err, response) {
+					if (!err) {
+						lastResponse = response && response.data;						
+					}
+					response.status = status;
+					callback(err, response);				
+			});
+		};
+		that.exec = exec;
+		
 		var max =  function (max) {
 			this.Max=_.toInt(max);
 			return this;
@@ -4039,208 +4163,73 @@ if (typeof Boxspring === 'undefined') {
 		});
 	};
 	
-	var design = function (id, custom, index) {
+	var design = function (custom) {
 		// extend this object with the db methods from the caller
-		var that = _.extend({}, this) 
-		, designName = id || this.designName || _.uniqueId('_design/design-');
-		
-		// design documents are '_design/' + name. If '_design' is not provided with the id then prepend
-		if (designName.indexOf('_design/') !== 0) {
-			designName = '_design/'+designName.split('/')[0];
-		}
-				
-		// update the object.designName
-		that.designName = designName;
-								
-		// set the view index for this design
-		that.index = arguments.length === 3 ? index : this.index; 
-		// custom maker or configged maker, or defaultDesign; default headers
-		that.maker = (custom || this.maker || defaultDesign);
-		that.views = that.maker().views;
-		
-		/*jslint unparam: true */
-		// create a document object
-		that.ddoc = this.doc(designName);
-		
-		// update the document object with 
-		that.ddoc.headers.set( 'X-Couch-Full-Commit', false );
-		that.ddoc.set('ddoc', {
-			'language': 'javascript',
-			'updates': {},
-			'types': {},
-			'views': {},
-			'shows': {},
-			'lists': {}
-		});
+		var ddoc = {}
+		, maker
+		, views 
+		, that = _.extend({}, this) 
 
-		// system parameters to control the query behavior
-		that.system = this.UTIL.hash({
-			'asynch': false,
-			'cache-size': undefined, //10,
-			'page-size': undefined, //100,
-			'delay': 0.5
-		});
+		// update the document object with 
+		that.headers.set( 'X-Couch-Full-Commit', false );
+
+		// custom maker or configged maker, or defaultDesign; default headers
+		that.maker = maker = (custom || this.maker || defaultDesign);
+		that.views = views = that.maker().views;
 
 		// What it does: provides the first map view as the default
-		this['default-index'] = _.fetch(that.views, 'default-index');
-		that.lib = _.fetch(that.views, 'lib');
 		that.types = that.maker() && that.maker().types;
 		that.formats = that.views && that.views.lib && that.views.lib.formats;
 
-		(function (libs) {
-			var ddoc = {}
-			, views = this.views
-			, libSrc = '\n';
+		// set the language
+		ddoc.language = 'javascript';
 
-			ddoc.ddoc = this.ddoc.get('ddoc')
-
-
-			if (views && views.hasOwnProperty('lib')) {
-				_.each(views.lib, function(lib, name) {
-					if (libs && libs.hasOwnProperty(name)) {
-						libSrc += global.libs[name] + '\n';						
-					}
-				});
-			}
-
-			// add application views and template views from default design object	
-			_.each(this.views, function (views, name) { 
-				var mapFunc = views.map
-					, reduceFunc = views && views.reduce
-					, header = views && views.header;
-
-				if (name === 'lib') {
-					ddoc.ddoc.views.lib = {};
-					_.each(views, function (value, key) {
-						var fn = _.Serialize(value)
-							, prePend = '';
-						ddoc.ddoc.views.lib[key] = {};
-						ddoc.ddoc.views.lib[key] = prePend + _.Serialize(value); 
-					});
-				} else {
-					if (!mapFunc) {
-						throw new Error ('[ design.build ] missing-view - '+name);
-					}
-					ddoc.ddoc.views[name] = {};
-					_.extend(ddoc.ddoc.views[name], {
-						'map': libSrc + _.Serialize(mapFunc), 
-						'reduce': (reduceFunc && _.Serialize(reduceFunc)) || '_count',
-						'header':  header || { 'keys': [], 'columns': [] }
-					});					
+		// add application views
+		ddoc.views = {};	
+		_.each(views, function (views, name) { 
+			var mapFunc = views.map
+				, reduceFunc = views && views.reduce
+				, header = views && views.header;
+				
+			if (name !== 'lib') {
+				if (!mapFunc) {
+					throw new Error ('[ design.build ] missing-view - '+name);
 				}
-			});
-
-			// 'updates' methods
-			_.each(this.maker().updates, function (updates, name) { 
-				ddoc.ddoc.updates[name] = {};
-				ddoc.ddoc.updates[name] = _.Serialize(updates);
-			});
-
-			// add the 'types' structure, if it exists
-			if (this.maker().hasOwnProperty('types')) {
-				this.ddoc.set('types', this.maker().types);
+				ddoc.views[name] = {};
+				ddoc.views[name]['map'] = _.Serialize(mapFunc);
+				if (reduceFunc) {
+					ddoc.views[name]['reduce'] = _.Serialize(reduceFunc);
+				}
+				ddoc.views[name]['header'] = header || { 'keys': [], 'columns': [] };					
 			}
+		});
 
-			// finally update the design document content using .docinfo() method
-			this.ddoc.source(ddoc.ddoc);
-			
-			return this;
-		}.call(that));
-
-		// this update takes advantage of CouchDB 'updates' handlers. 
-		// The design document function specified in 'updateName' will execute on 
-		// the server, saving the round-trip to the client a enforcing consistent
-		// attributing of the documents on the server for a corpus.
-		var commit = function (targetId, updateName, newProperties, handler) {
-			var commitDoc = this.doc([ this.designName, '_update', updateName, targetId ].join('/'))
-				.source(newProperties);
-				
-				
-			commitDoc.options.set('batch', 'ok');
-			commitDoc.save(handler);
-			return this;			
-		};
-		that.commit = commit;
-
-		// Purpose: wrapper for evented .view function. 
-		// Default behavior 'asynch: true'  to execute callback only on the first 
-		// delivery of data from the server. 
-		// 'asynch: false' (or undefined) executes the callback each time and the 
-		// application has to manage the data
-
-		var fetch = function (options, callback, callerDataCatcher) {
-			
-			var local = this 
-			, triggered = false
-			, system = this.system.post()
-			// caller can provide an object to wrap the data as an argument to the callback;
-			// _.item just returns the the item passed in
-			, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) ? 
-				callerDataCatcher : _.item
-			, view = this.view(_.extend({'index': this.index }, options), 
-																this.designName, this.views);									
-
-			view.on('error', function (err) {
-				throw new Error(err || 'Invalid request.');
+		// 'updates', 'shows', 'lists' 
+		['updates', 'shows', 'lists'].forEach(function(item) {
+			ddoc[item] = {};
+			_.each(maker()[item] || [], function (toString, name) { 
+				ddoc[item][name] = {};
+				ddoc[item][name] = _.Serialize(toString);
 			});
+		});
 
-			view.end('couch', function(res) {
-				res.on('data', function (r) {
-					// create a result object instrumented with row helpers 
-					// and design document info
-					var result = local.events(local.rows(r, local.maker(), local));	
-					if (callback && _.isFunction(callback)) {
-						if (system && system.asynch === false) {
-							// just write wrapped data to the calling program. 
-							//console.log('got data!', caller(result), caller === _.item);
-							callback(null, caller(result));
-						} else if ((system && system.asynch === true) && 
-							triggered === false) {
-							// let calling program continue, continuously receive data
-							callback(null, caller(result));
-							triggered = true;								
-						} else {
-							// add data to Result object of the caller
-							caller(result);
-						}
-					}
-				});			
-			});
-			return this;
-		};
-		that.fetch = fetch;
+		// add the 'types' structure, if it exists
+		if (maker().hasOwnProperty('types')) {
+			ddoc.types = maker().types;
+		}
 		
-		that.superiorQuery = that.query;
-		var query = function(options) {
-			return this.superiorQuery(options);	
-		};
-		that.query = query;	
+		// add validate_doc_update, if it exists
+		if (maker().hasOwnProperty('validate_doc_update')) {
+			ddoc.validate_doc_update = _.Serialize(maker().validate_doc_update);
+		}
 		
+		// finally update the design document content using .docinfo() method
+		this.source(ddoc);
 		
-		// Purpose: Emulates CouchDB view/emit functions on the "client"
-		// TBD: Not tested
-		var emulate = function (name) {
-			// When running in node.js, calling functions need to find 'emit' in its scope 
-			// On server side, will use couchdb's built-in emit()
-			var emitter = function(viewfunc) {
-				var tree = global.Btree()
-					, map = (viewfunc && viewfunc.map)
-					, reduce = (viewfunc && viewfunc.reduce);
-
-				var emit = function (key, value) {
-					tree.store(JSON.stringify(key), value);
-				};
-				tree.emit = emit;
-				tree.map = map;
-				tree.reduce = reduce;
-				return tree;
-			}
-			, e = emitter(this.maker().views[name]);
-			emit = e.emit;
-			return(e);
-		};
-		that.emulate = emulate;
-		
+		// if there is no default _view for this design, then use the first view supplied
+		if (!that['_view']) {
+			that['_view'] = _.keys(that.views)[0];
+		}
 		return that;	
 	};
 	global.design = design;
@@ -4373,46 +4362,30 @@ if (typeof Boxspring === 'undefined') {
 		return target;
 	};
 	
-	var view = function (options, design, views, emitter) {	
-		var that = _.extend({}, this.events());
-			
-		that.db = this;
-		that.design = design;
-		that.index = (options && options.index) || (this && this.index);
-		that.views = views;
-		that.emitter = emitter;
-		that.query = translateQuery(_.omit(options, 'system'));
-		that.system = (this && this.system && this.system.post()) ||
-			{	'asynch': false,
-				'cache-size': undefined, //10,
-				'page-size': undefined, //100,
-				'delay': 0.5 };
-				
-		var setQuery = function (queryParams, systemParams) {
-			if (_.isObject (queryParams)) {
-				this.query = _.extend(this.query, queryParams);
-			}
-			// rule: if reduce=true then page-size=0;
-			if (_.has(this.query, 'reduce') && this.query.reduce === true) {
-				this.system['page-size'] = 0;
-				this.system.asynch = false;
-			} else if (systemParams.asynch === true) {
-				this.system['page-size'] = systemParams['page-size'];
-				this.system['cache-size'] = systemParams['cache-size'] || Number.MAX_VALUE;
-			}
-			return this.query;
-		};
-		that.setQuery = setQuery;
-		that.setQuery(that.options, that.system);
+	var view = function (system) {	
+		var that = _.extend({}, this, this.events())
+		, query = translateQuery(this.options.post());
 
-		var fetch = function (server) {
+		that.system = this.UTIL.hash((system) || {	
+			'asynch': false,
+			'cache-size': undefined, //10,
+			'page-size': undefined, //100,
+			'delay': 0.5 
+		});
+		system = that.system.post();
+						
+		// rule: if reduce=true then page-size=0, asynch=false;
+		if (_.has(query, 'reduce') && query.reduce === true) {
+			system['page-size'] = 0;
+			system.asynch = false;
+		} else if (system.asynch === true) {
+			system['cache-size'] = system['cache-size'] || Number.MAX_VALUE;
+		}
+		
+		var fetchView = function (server) {
 			var tRows = 0
-			, db = this.db
-			, design = this.design
-			, index = this.index
+			, db = this
 			, events = this
-			, query = this.query
-			, system = this.system
 			, emitter = this.emitter
 			, nextkey;
 
@@ -4430,13 +4403,11 @@ if (typeof Boxspring === 'undefined') {
 			var nextLimit = function(query, size) {					
 				if (system.asynch && _.isNumber(size) && size > 0) {
 					return(_.extend(query, { 'limit': system['page-size']+1 }));
-				}
+				}				
 				return query;
 			};
 
-			var chunk = function (startkey) {
-				var view;
-				
+			var chunk = function (startkey) {				
 				// remaining cache-size get smaller on each successive fetch
 				system['cache-size'] = _.isNumber(system['cache-size']) 
 					? system['cache-size']-1 
@@ -4446,19 +4417,16 @@ if (typeof Boxspring === 'undefined') {
 				query = nextLimit(query, system['page-size']);
 				
 				// _all_docs is a special case view; 
-				if (index === '_all_docs') {
+				if (db.url().split('/')[db.url().split('/').length-1] === '_all_docs') {
 					// use the built-in all_docs method
-					view = db;
-					view.read = db.all_docs;
+					db.read = db.all_docs;
 				} else {
-					// use the view machinery
-					view = db.doc([ design, '_view', index ].join('/'));
 					// update the query options;
-					view.options.update(isValidQuery(query));
+					db.options.update(isValidQuery(query));
 				}
 								
 				// execute the query and process the response
-				view.read(function(err, response) {
+				db.read(function(err, response) {
 					//console.log('got response!', response.code, response.request, response.data);
 					if (err) {
 						events.trigger('view-error', new Error('error: ' + response.data.error + 
@@ -4524,7 +4492,6 @@ if (typeof Boxspring === 'undefined') {
 			};
 			chunk();		
 		};
-		that.fetch = fetch;
 
 		// if 'node' server is requested, then built-in server side view will be used.
 		// generate the list of docs for this db
@@ -4534,9 +4501,8 @@ if (typeof Boxspring === 'undefined') {
 			events.on('chunk-finished', function (res) {
 				events.trigger('view-data',  res);
 			});
-			this.fetch(this, 'node');
+			fetchView.call(this, 'node');
 		};
-		that.node = node;
 
 		var couch = function () {
 			var events = this;
@@ -4545,19 +4511,22 @@ if (typeof Boxspring === 'undefined') {
 				//console.log('got this chunk data', res.data.total_rows);								
 				events.trigger('view-data', res);
 			});
-			this.fetch(this);
+			fetchView.call(this);
 		};
-		that.couch = couch;
 		
 		var end = function (server, eventHandler) {
-			var res = this.db.events()
+			var machine = {
+				'couch': couch,
+				'node': node
+			} 
+			, res = this.events()
 			, requestEvents = this
 			, local = this;
 
 			// Note: Responses from this method are evented. 
 			eventHandler(res);
 			// execute the view by calling the requested server function
-			local[server](res, this.query);
+			machine[server].call(local, res, this.query);
 
 			this.on('view-data', function (response) {
 				if (response.code === 200) {
@@ -4573,6 +4542,76 @@ if (typeof Boxspring === 'undefined') {
 			return this;					
 		};
 		that.end = end;
+		
+		// Purpose: wrapper for evented .view function. 
+		// Default behavior 'asynch: true'  to execute callback only on the first 
+		// delivery of data from the server. 
+		// 'asynch: false' (or undefined) executes the callback each time and the 
+		// application has to manage the data
+		var fetch = function (options, callback, callerDataCatcher) {
+			var local = this 
+			, triggered = false
+			// caller can provide an object to wrap the data, ie. data method of "Result" object;
+			, caller = (callerDataCatcher && _.isFunction(callerDataCatcher)) 
+				? callerDataCatcher 
+				: function (x) { return x; }							
+
+			// update the 'system' options
+			system = this.system.post();
+			
+			this.on('error', function (err) {
+				throw err;
+			});
+
+			this.end('couch', function(res) {
+				res.on('data', function (r) {
+					// create a result object instrumented with row helpers 
+					// and design document info
+					var result = local.events(local.rows(r, local.maker()));	
+					if (callback && _.isFunction(callback)) {
+						if (system && system.asynch === false) {
+							// just write wrapped data to the calling program. 
+							//console.log('got data!', caller(result), caller === _.item);
+							callback(null, caller(result));
+						} else if ((system && system.asynch === true) && 
+							triggered === false) {
+							// let calling program continue, continuously receive data
+							callback(null, caller(result));
+							triggered = true;								
+						} else {
+							// add data to Result object of the caller
+							caller(result);
+						}
+					}
+				});			
+			});
+			return this;
+		};
+		that.fetch = fetch;
+		
+		// Purpose: Emulates CouchDB view/emit functions on the "client"
+		// TBD: Not tested
+		var emulate = function (name) {
+			// When running in node.js, calling functions need to find 'emit' in its scope 
+			// On server side, will use couchdb's built-in emit()
+			var emitter = function(viewfunc) {
+				var tree = global.Btree()
+					, map = (viewfunc && viewfunc.map)
+					, reduce = (viewfunc && viewfunc.reduce);
+
+				var emit = function (key, value) {
+					tree.store(JSON.stringify(key), value);
+				};
+				tree.emit = emit;
+				tree.map = map;
+				tree.reduce = reduce;
+				return tree;
+			}
+			, e = emitter(this.maker().views[name]);
+			emit = e.emit;
+			return(e);
+		};
+		that.emulate = emulate;
 		return that;		
 	};
 	global.view = view;
@@ -4603,17 +4642,18 @@ if (typeof Boxspring === 'undefined') {
 (function(global) {
 	"use strict";
 	
-	var rows = function (response, ddoc) {		
+	var rows = function (response) {		
 		// Object for adding methods and data to rows of a 
 		// response data object based on information about the design
 		var design = this
+		, ddoc = this.views
 		, that = _.extend({}, response)
 		, thisSelected = [];
 		
-		if (ddoc && ddoc.views && ddoc.views[design.index]) {
-			that.sortColumn = _.fetch(ddoc.views[design.index], 'sortColumn') || []; 
-			that.columns = _.fetch(ddoc.views[design.index], 'columns') || [];
-			that.keys = _.fetch(ddoc.views[design.index], 'keys') || [];
+		if (ddoc && ddoc[design._view]) {
+			that.sortColumn = _.fetch(ddoc[design._view], 'sortColumn') || []; 
+			that.columns = _.fetch(ddoc[design._view], 'columns') || [];
+			that.keys = _.fetch(ddoc[design._view], 'keys') || [];
 		} else {
 			that.columns = [];
 			that.keys = [];
@@ -5424,41 +5464,204 @@ if (typeof Boxspring === 'undefined') {
 
 (function (global) {
 	
-
-
-	var Db = Backbone.Model.extend({
-		'db': new Boxspring,
-		'initialize': function(options) {
-			var model = this;
-			model.set('options', options);
-			
-			// if there is a design name, then create the object with the design
-			if (options.hasOwnProperty('designName')) {
-				model.db = model.db(options).design()
-			}
-		}
-	});
-	
 	// What it does: Provides methods to 'fetch' from the server and relay 'completed', 'result', 
 	// and 'more-data' events to clients. 
 	var Query = Backbone.Model.extend({
 		'defaults': {
-			'data': undefined
+			'data': undefined,
+			'options': {
+				// query parameters
+				'reduce': false,
+				'limit': undefined,
+				'startkey': undefined,
+				'endkey': undefined,
+				'group_level': undefined,
+				'descending': false,
+				'key': undefined,
+				'keys': undefined
+			},
+			'params': [	'reduce',
+						'limit',
+						'startkey',
+						'endkey',
+						'group_level',
+						'descending',
+						'key',
+						'keys']
 		},
-		'initialize': function (query) {
-			this.query = query;
-		}, 
-		'fetch': function() {
+		'initialize': function (config) {
+			this.view = config && config.view;
+			if (config && config.options) {
+				_.extend(this.attributes, config.options);
+			}
+			
+			if (config && config.system) {
+				this.view.system.update(config.system);
+			}
+			// make the system config visible to this Model
+			this.system = this.view.system;
+			
+			// create a query id for this, mostly for debugging 
+			this.qid = _.uniqueId('q');
+		},
+		// Response Wrapper: wraps the response object with methods and helpers to manage 
+		// the flow of data from the server to the application
+		'result': function () {					
+			var owner = this || {} 
+			, queryPages = { 'pages': [] }
+			, current_chunk = 0
+			, current_page = 0;	// zero-based
+
+
+			// wraps the response.data object with some helper methods
+			var data = function (response) {
+				// helpers						
+				response.query = owner;
+				response.rid = _.uniqueId('r');
+
+				var pages = function () {
+					return _.clone(queryPages.pages);
+				};
+
+				var page = function () {
+					if (current_chunk > 0) {
+						// does not create a new 'pages', returns to tha caller the cached
+						// response object from the server
+						return queryPages.pages[current_chunk];						
+					}
+					return this;
+				};
+
+				// return a paginated query as though it was captured in one block 
+				var unPaginate = function () {
+					var allPages = { 'data': {
+						'rows': []	
+					}};
+
+					// copy the first page as template to allPages
+					allPages = _.extend({}, pages.apply(this)[0], allPages);
+					pages.apply(this).forEach(function(page) {
+						allPages.data.rows = 
+							allPages.data.rows.concat(page.data.rows || []);
+					});
+					return allPages;
+				};
+				response.unPaginate = unPaginate;
+
+				var pageInfo = function () {
+					var local = this;
+
+					return ({ 
+						'completed': (local.total_rows() === (local.offset() + local.getLength())),
+						'totalRows': local.total_rows(),
+						'pageSize': (owner.system.get('page-size') || this.totalRows),
+						'cachedPages': queryPages.pages.length, 
+						'page': current_page         ,
+						'next': function() {
+							if ((current_page * this.pageSize) < this.totalRows) {
+								current_page += 1;								
+							}
+							return this;
+						},
+						'prev': function() {
+							if (current_page > 0) {
+								current_page -= 1;								
+							}
+							return this;
+						},
+						'pages': function() { 
+							return Math.ceil(this.totalRows / this.pageSize); 
+						},
+						'lastPage': function() { 
+							return queryPages.pages.length; 
+						} 
+					});
+				};
+				response.pageInfo = pageInfo;
+
+				// What it does: caller supplied or callback from menus to render rows and 
+				// update the browser with spinning wheel and alerts
+				var nextPrev = function (arg) {
+					var direction = ( (arg && typeof arg === 'string') ? arg : arg && arg.text );
+
+					if (direction) {
+						direction = direction.toLowerCase().split(' ');
+					}
+					if (!direction) {
+						current_chunk = 0;
+						this.query.trigger('result', page.apply(this));
+						return this;	
+					} 
+
+					if (_.found(direction, 'next')) {
+						current_chunk += (current_chunk < queryPages.pages.length-1) ? 1 : 0;
+						this.pageInfo().next();	
+						this.query.trigger('result', page.apply(this));
+						// if we haven't cached all the pages, and we have one more page in
+						// cache before we run out, then cache another page from the server 
+						if (!this.pageInfo().completed && 
+							(this.pageInfo().page) === (this.pageInfo().lastPage()-1)) {
+								// moreData is a closure with all information needed for the 
+								// next chunk of data
+								page.apply(this).moreData();
+						}
+					} else if (_.found(direction, 'previous')) {
+						current_chunk -= (current_chunk > 0) ? 1 : 0;
+						this.pageInfo().prev();	
+						this.query.trigger('result', page.apply(this));									
+					}
+				};
+				response.nextPrev = nextPrev;
+
+				// updates the pages cache
+				queryPages.pages.push(response);	
+				// accumulates the rest of the pages for this result, if 'asynch'
+				//console.log(response.query.qid, owner.system.get('asynch'), queryPages.pages.length);
+				// when asynch=true, relay the data to the listener
+				if (owner.system.get('asynch') === true && 
+					queryPages.pages.length > 1) {
+					
+					if (response.pageInfo().completed) {
+						//console.log('completed', response.pageInfo().completed);
+						owner.trigger('completed', response);																
+					} else {
+						owner.trigger('more-data', response);																
+					}
+				}
+				return response;
+			};
+			queryPages.data = data;
+			return data;
+		},
+		'fetch': function(options) {
 			var model = this;
 			
 			// when we see an event on the query, propagate a change event on the model.
 			['result', 'more-data', 'completed'].forEach(function(tag) {
-				model.query.on(tag, function(result) {
+				model.on(tag, function(result) {
 					model.set('data', result);
 					model.set(tag, result);
 				});				
 			});
-			this.query.server();
+			
+			// if system control parameters (page-size, cache-size, ...) were passed in,
+			// update them 
+			if (options && options.system) {
+				model.view.system.update(options.system);
+			}
+			// make the system accessible to this model
+			model.system = model.view.system;
+			
+			// initiate the fetch;
+			model.view.fetch(_.pick(model.attributes, model.get('params')), function(err, result) {
+				if (err) {
+					console.log(err);
+				}	
+				// set result and call down to nextPrev with this result and no argument
+				model.trigger('result', result);
+				// NOTE: 'result' is a Result() object		
+			}, this.result(model));
+			return this;
 		}
 	});
 	global.Query = Query;
@@ -5507,6 +5710,8 @@ if (typeof Boxspring === 'undefined') {
 				// when new data is set on result, call the render function for the vis
 				display.vis.render(query.get('data'));
 
+				display.set('result', query.get('data'));
+
 				// page next/previous can come from the vis, or from the 'View', 
 				// so delegate to 'nextPrev'
 				// "result" object from query is stored in the 'data' attribute of the query
@@ -5539,9 +5744,13 @@ if (typeof Boxspring === 'undefined') {
 		},
 		initialize: function (db) {
 			this.owner = db.clone();
+			this.set('auth', {'name': '', 'password': ''});
 		},
 		auth: function() {
-			return (this.get('auth') || {'name': this.get('name'), 'password': this.get('password') });
+			return (this.get('auth') || {
+				'name': this.get('name'), 
+				'password': this.get('password') 
+			});
 		},
 		error: function(err, response) {
 			return this.set('error', {'err': err, 'response': response });			
@@ -5549,8 +5758,9 @@ if (typeof Boxspring === 'undefined') {
 		signup: function() {
 			var mydb = this.owner.users(this.get('auth').name)
 			, model = this;
-			
-			mydb.signUp(this.get('password'), this.get('roles'), function(err, response, userDb) {
+	
+			mydb.signUp(this.get('auth').password, 
+						this.get('roles'), function(err, response, userDb) {
 				if (err) {
 					return model.error(err, response);
 				}
@@ -5562,9 +5772,11 @@ if (typeof Boxspring === 'undefined') {
 			var model = this
 			, userDb = this.owner.createdb({
 				'name': model.owner.name,
+				'designName': (model.owner && model.owner.designName) || undefined,
+				'maker': (model.owner && model.owner.maker) || undefined,
+				'index': (model.owner && model.owner.index) || undefined,
 				'auth': this.auth()
 			})();
-
 			userDb.login(function(err, response) {
 				if (err) {
 					return model.error(err, response);
@@ -5582,8 +5794,8 @@ if (typeof Boxspring === 'undefined') {
 					if (err) {
 						model.error(err, response);
 					}
-					model.set('loggedIn', (response.code !== 200));
 					model.set('userDb', undefined);
+					model.set('loggedIn', (response.code !== 200));
 				});				
 			}
 		},
@@ -5612,7 +5824,9 @@ if (typeof Boxspring === 'undefined') {
 				userDb.users(userName).remove(function(err, res) {
 					// this operation doesn't change the login status of the administrator
 					// set the variable and let the application decide what to do with the results.
-					model.error(err, res);
+					if (err) {
+						model.error(err, res);						
+					}
 					model.set('removed', res.code);
 				});				
 			}

@@ -2,83 +2,33 @@ require('../index');
 var test = require('tape')
 , boxspringjs = Maker('127.0.0.1')
 , anotherdb = Maker('127.0.0.1')
-, ddoc = function () {
-	return {
-		"updates": {
-			"my-commit": function (doc, req) {
-				doc['last-updated'] = Date();
-				doc.size = JSON.stringify(doc).length;
-				doc.junk = 'another-try';
-				return [doc, JSON.stringify(doc) ];
-			}
-		},
-		'types': {
-			'_id': ['string', 1],
-			'_rev': ['string', 1],
-			'doc': ['object', 4],
-			'content': ['string', 2],
-			'more-content': ['string', 2]			
-		},
-		"views": {
-			'lib': {
-				'formats': function() {
-					var formatter = function(name) {
-						return 'formatted: ' + name;
-					}
-					return({
-						'_id': formatter,
-						'_rev': formatter
-					});
-				}
-			},
-			'my-view': {
-				'map': function (doc) {
-					if (doc && doc._id) {
-						emit(doc._id, doc);
-					}
-				},
-				'header': {
-					'sortColumn': 'doc',
-					'keys': ['_id'],
-					'columns': ['_id', 'doc', 'content', 'more-content', '_rev' ]
-				}
-			}
-		}
-	};
-};
+, docs = _.map([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], function(i) {
+	return({'_id': 'doc' + i, 'now': Date() });
+});
 
 
-//var query = anotherdb.design().query({
-//	'reduce': true,
-//	'limit': 500 }, {
-//		'auth': auth.auth })
-		
-//console.log(query);
-//return;
-
-	
 (function() {
 	test('query-smoke-tests', function (t) {
 		t.plan(9);
 		
-		var query = anotherdb.design().query({
+		var view = anotherdb.doc('_view') 
+		, query = new anotherdb.Query({'view': view, 'options': {
 			'reduce': true,
-			'limit': 500 }, {
-				'auth': auth.auth })
-		, query2 = anotherdb.design().query({
+			'limit': 500 }})
+		, query2 = new anotherdb.Query({'view': view, 'options': {
 			'reduce': false
-		}, 	{ 'auth': auth.auth });
+		}})	
 			
-		// smoke test: make sure we have two different objects
-		t.equal(query.reduce === query2.reduce, false, 'query-create-1');
+		// smoke test: make sure we have two different objects and attributes are set up
+		t.equal(query.get('reduce') === query2.get('reduce'), false, 'query-create-1');
 		t.equal(query === query2, false, 'query-create-2');
 		// smoke tests to confirm the object is set up
-		t.equal(query.reduce, true);
+		t.equal(query.get('reduce'), true);
 		t.equal(query.system.get('asynch'), false);
 		// try changing the value of one of the parameters
-		query.display = true;
+		query.set('display', true);
 		// confirm the change
-		t.equal(query.display, true);
+		t.equal(query.get('display'), true);
 		// change a system parameter
 		query.system.set('asynch', true);
 		t.equal(query.system.get('asynch'), true);
@@ -97,26 +47,45 @@ var test = require('tape')
 			
 		// event when the server has data			
 		query.on('result', function(response) {
-			t.equal(response.total_rows(), response.first().getValue(), 'smoke-test-result');
+			t.equal(response.total_rows(), response.getLength(), 'smoke-test-result');
 		});
 		// query the server
-		query.server();
+		query.fetch();
 	});	
 }());
+
+(function() {
+	test('document-create-test', function(t) {
+		t.plan(1);
+				
+		boxspringjs
+			.bulk(docs)
+			.save(function(err, response) {
+				if (err) {
+					console.log(err, response.data, response.request);
+					throw '';
+				}
+				t.equal(1, 1, 'bulk-succeeded');				
+			});
+	});
+}());
+
 
 (function() {
 	test('query-paging-tests', function (t) {
 		var pages
 		, page
-		, query = boxspringjs.design().query({
-			'system': {'asynch': true, 'page-size': 100, 'cache-size': 2, 'delay': 1/10 }
+		, query = new boxspringjs.Query({
+			'view': boxspringjs.doc('_view'),
+			'system': {'asynch': true, 'page-size': 2, 'cache-size': 2, 'delay': 1/10 }
 		});
 		
 		query.on('result', function(result) {
+			//console.log('result triggered', result.code, result.unPaginate().getLength(), result.getLength());
 			if (typeof page === 'undefined') {
 				page = 1;
-				pages = Math.ceil(result.total_rows()/100);
-				t.plan((pages-1)*2);
+				pages = Math.ceil(result.total_rows()/2);
+				t.plan(((pages-1)*2)+1);
 				//console.log('query-paging-tests:', (pages-1)*2);				
 			} else {
 				t.equal(1, 1, page.toString());
@@ -125,8 +94,7 @@ var test = require('tape')
 		});
 		
 		query.on('more-data', function(result) {
-			//console.log('more-data, page', page, 'completed', result.pageInfo().completed,
-			//result.query.qid); 
+			//console.log('more-data,page',page,'completed',result.pageInfo().completed,result.query.qid); 
 			if (result.pageInfo().completed) {
 				result.nextPrev('next');					
 				while (result.pageInfo().page > 0) {
@@ -138,33 +106,60 @@ var test = require('tape')
 		});
 		
 		query.on('completed', function(r) {
+			t.equal(1, 1, 'completed-true');
 			query.trigger('more-data', r);
 		});
-		query.server();
+		query.fetch();
 	});
 }());
+
 
 (function() {
 	test('query-more-data-tests', function (t) {
 		var rowCount
 		, pages
-		, query = boxspringjs.design().query();
-		
-		query.system.update({'asynch': true, 'page-size': 200 });
+		, query = new boxspringjs.Query({
+			'view': boxspringjs.doc('_view')
+		});
+				
+		query.system.update({'asynch': true, 'page-size': 3, 'cache-size': 50 });
 		query.on('result', function(result) {
-			pages = Math.floor(result.total_rows() / 200);
-			t.plan(pages+5);
+			pages = Math.floor(result.total_rows() / 3);
+			t.plan(pages+10);
 			
-			t.equal(result.getLength(), 200, 'initial-result');
+			t.equal(result.getLength(), 3, 'initial-result');
+			t.equal(query.system.get('asynch'), true, 'asynch-true');
 			rowCount = result.total_rows();
 		});
 
-		var register = function (result) {
-			t.equal(query.qid, result.query.qid, query.qid);
+		var changeRegister = function () {
+			t.equal(query.qid, this.get('data').query.qid, 'changeRegister');
 		}
-		query.on('completed', register);
-		query.on('more-data', register);
-		query.server();
+
+		var eventRegister = function (result) {
+			t.equal(query.qid, result.query.qid, 'eventRegister');
+		}
+		
+		query.on('change:more-data', changeRegister);
+		query.on('completed', eventRegister);
+		query.fetch();
 	});
 }());
+
+(function() {
+	test('document-remove-test', function(t) {
+		t.plan(1);
+				
+		boxspringjs
+			.bulk(docs)
+			.remove(function(err, response) {
+				if (err) {
+					console.log(err, response.data, response.request);
+					throw '';
+				}
+				t.equal(1, 1, 'bulk-remove-succeeded');				
+			});
+	});
+}());
+
 
