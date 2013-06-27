@@ -5133,7 +5133,6 @@ if (id && id.charAt(0) === '_') {
 			// events from the vis or browser are triggered on the 'result' object of our query.
 			query.on('change:result', function() {
 				// when new data is set on result, call the render function for the vis
-				display.render();
 				display.set('result', query.get('data'));
 
 				// page next/previous can come from the vis, or from the 'View', 
