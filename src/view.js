@@ -125,9 +125,30 @@
 		return target;
 	};
 	
-	var view = function (system) {	
-		var that = _.extend({}, this, this.events())
+	var view = function (name, system) {	
+		var that = _.extend(this.doc(), this.events())
 		, query = translateQuery(this.options.post());
+		
+		// view must be called from a design, check the base url
+		if (this.url().indexOf('_design') === -1) {
+			that = this.design().view(name, system);
+		} else {
+			if (name && _.isObject(name)) {
+				system = name;
+				name = this._view;
+			} else if (!name) {
+				name = this._view;
+			} else {
+				that._view = name;
+			}
+
+			// update the url for this view object
+			if (name.split('/').length > 1) {
+				that.url([ this.url(), name ].join('/'));
+			} else {
+				that.url([ this.url(), '_view', name ].join('/'));			
+			}			
+		}
 
 		that.system = this.UTIL.hash((system) || {	
 			'asynch': false,
@@ -144,6 +165,7 @@
 		} else if (system.asynch === true) {
 			system['cache-size'] = system['cache-size'] || Number.MAX_VALUE;
 		}
+		
 		
 		var fetchView = function (server) {
 			var tRows = 0
@@ -321,7 +343,7 @@
 
 			// update the 'system' options
 			system = this.system.post();
-			
+			console.log('system', system);
 			this.on('error', function (err) {
 				throw err;
 			});

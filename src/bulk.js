@@ -28,6 +28,8 @@
 		, that = this.doc('_bulk_docs')
 		, lastResponse = [];
 		
+		that.url([ that.url(), '_bulk_docs'].join('/'));
+		
 		// extend the bulk object with the owner db object
 		that.docs = { 'docs': doclist || [] };
 		that.Max = undefined;
@@ -36,10 +38,12 @@
 		that.headers.set('X-Couch-Full-Commit', false);
 		
 		var checkSource = function (doc) {
+			var attributes;
+			
 			// if doc is an object, then use post() to get the contents
 			if (!prohibit) {
 				if (_.isFunction(doc.get) && doc.get('_id')) {
-					return doc.post();
+					return _.omit(doc.post(), '_url');
 				}				
 			}
 			// otherwise return the doc

@@ -28,13 +28,14 @@
 		// response data object based on information about the design
 		var design = this
 		, ddoc = this.views
+		, view = this._view.split('/')[1]
 		, that = _.extend({}, response)
 		, thisSelected = [];
 		
-		if (ddoc && ddoc[design._view]) {
-			that.sortColumn = _.fetch(ddoc[design._view], 'sortColumn') || []; 
-			that.columns = _.fetch(ddoc[design._view], 'columns') || [];
-			that.keys = _.fetch(ddoc[design._view], 'keys') || [];
+		if (ddoc && view && ddoc[view]['header']) {
+			that.sortColumn = ddoc[view]['header'].sortColumn || []; 
+			that.columns = ddoc[view]['header'].columns || [];
+			that.keys = ddoc[view]['header'].keys || [];				
 		} else {
 			that.columns = [];
 			that.keys = [];

@@ -20,8 +20,8 @@ ddoc = function () {
 			}
 		},
 		'types': {
-			'_id': ['string', 1],
-			'_rev': ['string', 1],
+			'id': ['string', 1],
+			'rev': ['string', 1],
 			'doc': ['object', 4],
 			'content': ['string', 2],
 			'more-content': ['string', 2]			
@@ -33,8 +33,8 @@ ddoc = function () {
 						return 'formatted: ' + name;
 					}
 					return({
-						'_id': formatter,
-						'_rev': formatter
+						'id': formatter,
+						'rev': formatter
 					});
 				}
 			},
@@ -46,8 +46,8 @@ ddoc = function () {
 				},
 				'header': {
 					'sortColumn': 'doc',
-					'keys': ['_id'],
-					'columns': ['_id', 'doc', 'content', 'more-content', '_rev' ]
+					'keys': ['id'],
+					'columns': ['id', 'doc', 'content', 'more-content', 'rev' ]
 				}
 			}
 		}

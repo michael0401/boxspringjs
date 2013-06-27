@@ -9,22 +9,24 @@ var test = require('tape')
 	'maker': ddoc,
 	'auth': auth.auth })('127.0.0.1');
 
+
 (function () {
 
 	test('boxspringjs-2', function (t) {
 		t.plan(9);
 		console.log('Running boxspringjs-2: 8');
 
-		var design = boxspringjs.doc('_design/my-design');
+		var design = boxspringjs.design('_design/my-design');
 
 		t.equal(typeof design, 'object');
 		t.equal(anotherdb._design, '_design/my-design', 'design-name-test');
 		
 		var anotherdbDesignTests = function () {
-			anotherdb.doc('_design').update(function(err, response) {
+			anotherdb.design().update(function(err, response) {
 				t.equal(response.code, 201, 'anotherdb-design');
-				anotherdb.doc('_view').fetch({}, function (err, c) {
-					anotherdb.doc('_design/my-design').doc('_view/my-view').fetch({}, function(e, n) {
+				anotherdb.view().fetch({}, function (err, c) {
+					anotherdb.design('_design/my-design').view('_view/my-view')
+					.fetch({}, function(e, n) {
 						t.equal(c.getLength(), n.getLength(), 'my-view-response');
 					});
 				});
@@ -33,21 +35,22 @@ var test = require('tape')
 
 
 		var designTests = function () {
-			var ud = design.doc('_update/in-place');
+			var ud = design.updateDoc('_update/in-place');
 			// What this does: gets a list of documents using the built-in 'Index' view. 
 			// For each document, it gets the key.id and calls the server-side 'update' using 
 			// a local update handler 'my-commit'. After the last completion, it asserts the test
 			// and triggers the queue-test and a 'read-back-test' to exercise the 'Index' view 
 			// running in node.js and not on the server.
-			design.doc('_view/Index').fetch({}, function(e, r) {
+			design.view('_view/Index').fetch({}, function(e, r) {
 
-				design.doc('_view/Index').fetch({}, function(e, n) {
+				design.view('_view/Index').fetch({}, function(e, n) {
 					t.equal(r.data.rows.length, n.data.rows.length, 'view-tests');
-					design.doc('_update/in-place')
+					design.updateDoc('_update/in-place')
 						.source({ 'random': Date.now() })
 						.update('base_test_suite1', function(e, commit) {
 							t.equal(commit.data.error, 'render_error', 'expect-update-fail');
-							ud.source({'random': Date.now() }).update('base_test_suite', function(e, r) {
+							ud.source({'random': Date.now() })
+							.update('base_test_suite', function(e, r) {
 								t.equal(r.code, 201, 'update-handler');
 								anotherdbDesignTests();								
 							});
@@ -56,16 +59,24 @@ var test = require('tape')
 			});		
 		};
 
-		design.update(function(err, response) {
-			t.equal(response.code, 201, 'design-saved');
-			design.retrieve(function(err, res) {
-				var readBack = res.data
-				, designKeys = _.keys(readBack.updates).concat(_.keys(readBack.views));
-				t.equal(_.difference(designKeys, 
-					[ 'lib', 'in-place', 'Index']).length,0, 'design-read-back');
-				designTests();
-			});
-		});		
+		design.login(function(err, response) {
+			if (err) {
+				throw err.message;
+			}
+			design.update(function(err, response) {
+				t.equal(response.code, 201, 'design-saved');
+				console.log('test3', response.request.path);
+				design.retrieve(function(err, res) {
+					var readBack = res.data
+					, designKeys = _.keys(readBack.updates).concat(_.keys(readBack.views));
+					console.log('readback', designKeys);
+
+					t.equal(_.difference(designKeys, 
+						[ 'my-commit', 'my-view' ]).length,0, 'design-read-back');
+					designTests();
+				});
+			});			
+		});
 	});	
 }());
 

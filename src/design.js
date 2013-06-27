@@ -82,12 +82,28 @@
 		});
 	};
 	
-	var design = function (custom) {
+	var design = function (name, custom) {
 		// extend this object with the db methods from the caller
 		var ddoc = {}
 		, maker
 		, views 
-		, that = _.extend({}, this) 
+		, that = _.extend({}, this.doc());
+		
+		if (name && _.isFunction(name)) {
+			custom = name;
+			name = this._design;
+		} else if (!name) {
+			name = this._design;
+		} else {
+			that._design = name;
+		}
+
+		// update the url for this design object
+		if (name.split('/').length > 1) {
+			that.url([ that.url(), name ].join('/'));
+		} else {
+			that.url([ that.url(), '_design', name ].join('/'));			
+		}
 
 		// update the document object with 
 		that.headers.set( 'X-Couch-Full-Commit', false );
@@ -142,13 +158,43 @@
 			ddoc.validate_doc_update = _.Serialize(maker().validate_doc_update);
 		}
 		
-		// finally update the design document content using .docinfo() method
-		this.source(ddoc);
-		
+		// finally update the design document content using method
+		that.source(ddoc);
+
 		// if there is no default _view for this design, then use the first view supplied
 		if (!that['_view']) {
-			that['_view'] = _.keys(that.views)[0];
+			that['_view'] = '_view/' + _.keys(that.views)[0];
 		}
+		
+		var updateDoc = function (name) {
+			var owner = this
+			, doc = this.doc();
+			
+			if (!name) {
+				name = owner._update;
+			}
+
+			// update the url for this update object
+			if (name.split('/').length > 1) {
+				doc.url([ owner.url(), name ].join('/'));
+			} else {
+				doc.url([ owner.url(), '_update', name ].join('/'));			
+			}
+
+			// this update takes advantage of CouchDB 'updates' handlers. 
+			// The design document function specified in '_update' will execute on 
+			// the server, saving the round-trip to the client a enforcing consistent
+			// attributing of the documents on the server for a corpus.
+			var commit = function (targetId, handler) {
+				var doc = this.doc();
+				doc.url([ this.url(), targetId ].join('/'));
+				doc.save(handler);
+				return this;			
+			};
+			doc.update = commit;
+			return doc;		
+		};
+		that.updateDoc = updateDoc;
 		return that;	
 	};
 	global.design = design;

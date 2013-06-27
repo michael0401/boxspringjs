@@ -269,6 +269,8 @@ if (typeof jQuery === 'undefined') {
 		var googleTable = function (result) {
 			var sortColumn = result.getSortColumn()
 			, visibleColumns = result.getDisplayColumns();
+	
+	console.log('googleTable', result.pageInfo().page, result.getLength());
 			
 			// Set up the table and draw it.
 			googleView.call(result, { 
@@ -278,7 +280,7 @@ if (typeof jQuery === 'undefined') {
 					'allowHtml': true,
 					'firstRowNumber': result.offset(),
 					'page': 'enable',
-					'pageSize': (result.pageInfo().pageSize || result.getLength()),
+					'pageSize': ((result.pageInfo().pageSize-1) || result.getLength()),
 					'startPage': result.pageInfo().page || 0,
 					// delegating column sorting to the table, for now;
 					'sort': 'enable',

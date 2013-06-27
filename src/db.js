@@ -51,10 +51,11 @@ if (typeof Boxspring === 'undefined') {
 			'_design': (options && options._design) || '_design/default',
 			'_view': (options && options._view) || '_view/default',
 			'_update': (options && options._update) || '_update/default',
-			'UTIL': Boxspring.UTIL,
-			'Boxspring': Boxspring
-		}, this));
-		
+			'UTIL': this.UTIL,
+			'Boxspring': this
+		}), this);
+
+
 		// prepend the reserved words _design, _view, _update if needed
 		['_design', '_view', '_update'].forEach(function(option) {
 			if (that[option].indexOf(option) === -1) {
@@ -94,7 +95,7 @@ if (typeof Boxspring === 'undefined') {
 				'path': ((options && options.url) || '') + _.formatQuery((options && options.query) || {}),
 				'method': ((options && options.method) || 'GET'),
 				'body': ((options && options.body) || {}),
-				'headers': ((options && options.headers) || {})
+				'headers': ((options && options.headers) || this.headers.post())
 			}, function (err, res) {
 				if ((callback && typeof callback) === 'function') {
 					callback.call(local, err, res);
@@ -124,12 +125,10 @@ if (typeof Boxspring === 'undefined') {
 		// What it does: attempts to login the user to this database. 
 		var login = function (handler) {
 			var local = this;
+//			this.headers.set('Content-Type', 'application/x-www-form-urlencoded');
 			this.queryHTTP({
 				'url': '/_session',
 				'method': 'POST',
-				'headers': {
-					'Content-Type': 'application/x-www-form-urlencoded'
-				},
 				'body': user }, function(err, response) {
 					if (err) {
 						return handler(err, response);
@@ -169,7 +168,6 @@ if (typeof Boxspring === 'undefined') {
 
 	global.createdb = function(options) {
 		var object = db.call(this, options);
-		
 		return function (urlRoot) {
 			// all subsequent HTTP calls will use the supplied credentials.
 			object.urlRoot = urlRoot || '127.0.0.1';
