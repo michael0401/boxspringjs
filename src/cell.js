@@ -121,7 +121,7 @@
 				'properties': o.properties
 			};
 			// if there is a formatter function, then call it and return
-			if (formats && formats()[cell.name]) {
+			if (formats && formats()[cell.name] && cell.value) {
 				cell.type = 'string';
 				if (_.isString(cell.value)) {
 					cell.format = this.formats()[cell.name](cell.value).toString();

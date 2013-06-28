@@ -185,9 +185,17 @@
 			// The design document function specified in '_update' will execute on 
 			// the server, saving the round-trip to the client a enforcing consistent
 			// attributing of the documents on the server for a corpus.
-			var commit = function (targetId, handler) {
-				var doc = this.doc();
+			var commit = function (targetId, properties, handler) {
+				// properties is 'optional'
+				if (_.isFunction(properties)) {
+					handler = properties;
+					properties = {}
+				}
+				
+				// install the new properites in the doc to be updated
+				doc.options.update(properties);
 				doc.url([ this.url(), targetId ].join('/'));
+				console.log('commit', doc.url(), doc.post(), doc.options.post());
 				doc.save(handler);
 				return this;			
 			};

@@ -68,7 +68,7 @@
 				_.each(this.docs.docs, function (doc) { 
 					_.each(funcs, function (update_method) {
 						try {
-							update_method(doc);							
+					//		update_method(doc);							
 						} catch (e) {
 							console.log(new Error('[bulk] update method failed.'));
 						}

@@ -179,7 +179,6 @@
 			}
 			
 			this.read(function(err, response) {
-console.log('update read', err, response.code, this.get('_rev'));
 				// when updating, we might get an error if the doc doesn't exist
 				if (!err || response.code === 404) {
 					// now add back data to update from above and save
@@ -235,7 +234,7 @@ console.log('update read', err, response.code, this.get('_rev'));
 		}
 		*/
 		var attachment = function(attach, handler) {
-			this.doc(id + '/' + attach).read(handler);
+			this.doc('/' + attach).read(handler);
 			return this;			
 		};
 		that.attachment = attachment;

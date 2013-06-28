@@ -3322,7 +3322,6 @@ if (typeof Boxspring === 'undefined') {
 			}
 			
 			this.read(function(err, response) {
-console.log('update read', err, response.code, this.get('_rev'));
 				// when updating, we might get an error if the doc doesn't exist
 				if (!err || response.code === 404) {
 					// now add back data to update from above and save
@@ -3378,7 +3377,7 @@ console.log('update read', err, response.code, this.get('_rev'));
 		}
 		*/
 		var attachment = function(attach, handler) {
-			this.doc(id + '/' + attach).read(handler);
+			this.doc('/' + attach).read(handler);
 			return this;			
 		};
 		that.attachment = attachment;
@@ -3522,7 +3521,7 @@ if (id && id.charAt(0) === '_') {
 				_.each(this.docs.docs, function (doc) { 
 					_.each(funcs, function (update_method) {
 						try {
-							update_method(doc);							
+					//		update_method(doc);							
 						} catch (e) {
 							console.log(new Error('[bulk] update method failed.'));
 						}
@@ -3838,9 +3837,17 @@ if (id && id.charAt(0) === '_') {
 			// The design document function specified in '_update' will execute on 
 			// the server, saving the round-trip to the client a enforcing consistent
 			// attributing of the documents on the server for a corpus.
-			var commit = function (targetId, handler) {
-				var doc = this.doc();
+			var commit = function (targetId, properties, handler) {
+				// properties is 'optional'
+				if (_.isFunction(properties)) {
+					handler = properties;
+					properties = {}
+				}
+				
+				// install the new properites in the doc to be updated
+				doc.options.update(properties);
 				doc.url([ this.url(), targetId ].join('/'));
+				console.log('commit', doc.url(), doc.post(), doc.options.post());
 				doc.save(handler);
 				return this;			
 			};
@@ -4812,7 +4819,7 @@ if (id && id.charAt(0) === '_') {
 				'properties': o.properties
 			};
 			// if there is a formatter function, then call it and return
-			if (formats && formats()[cell.name]) {
+			if (formats && formats()[cell.name] && cell.value) {
 				cell.type = 'string';
 				if (_.isString(cell.value)) {
 					cell.format = this.formats()[cell.name](cell.value).toString();
@@ -5118,22 +5125,25 @@ if (id && id.charAt(0) === '_') {
 		},
 		'render': function () {
 			// when new data is set on result, call the render function for the vis
-			this.vis.render(this.query.get('data'));
+			this.vis.render(this.get('result'));
 		},
 		'initialize': function(config) {
 			var display = this
-			, query = this.query = new Query(config.query);
+			, query = this.query = new Query(config);
 			
 			display.set('targetDiv', config.targetDiv || this.get('targetDiv'));
-						
+			
 			// instantiate the vis in this model
 			display.vis = $.googleVis({
-				'type': this.get('type'), 'targetDiv': this.get('targetDiv')});
-			
+				'type': display.get('type'), 'targetDiv': display.get('targetDiv')});
+				
 			// events from the vis or browser are triggered on the 'result' object of our query.
 			query.on('change:result', function() {
+				var result = query.get('data');
+					
 				// when new data is set on result, call the render function for the vis
-				display.set('result', query.get('data'));
+				result.render = display.vis.render;
+				display.set('result', result);
 
 				// page next/previous can come from the vis, or from the 'View', 
 				// so delegate to 'nextPrev'
