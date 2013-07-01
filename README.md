@@ -71,7 +71,7 @@ equally available to server-side execution in Node.js.
         }
       }
       
-[Complete API Reference](https://github.com/rranauro/boxspringjs/blob/master/API.md)
+[Complete API Reference](API.md)
 
 ##Install
 
