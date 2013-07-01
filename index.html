@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Boxspringjs : A toolkit for cross-platform development of CouchDB Applications." />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Boxspringjs</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/michael0401/boxspringjs">View on GitHub</a>
+
+          <h1 id="project_title">Boxspringjs</h1>
+          <h2 id="project_tagline">A toolkit for cross-platform development of CouchDB Applications.</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/michael0401/boxspringjs/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/michael0401/boxspringjs/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a name="boxspringjs" class="anchor" href="#boxspringjs"><span class="octicon octicon-link"></span></a>BoxspringJS</h1>
+
+<p>A toolkit for cross-platform development of CouchDB Applications.</p>
+
+<h2>
+<a name="overview" class="anchor" href="#overview"><span class="octicon octicon-link"></span></a>Overview</h2>
+
+<ul>
+<li><p>From the command line on the server, use BoxspringJS and Node.js to develop content aggregation tools to drive CouchDB map/reduce engine. BoxspringJS provides methods for queuing <code>bulk()</code> http requests when downloading data and wraps CouchDB's bulk loading interface with a queueing mechanism for reliably bulk loading vast numbers of documents without over-taxing network resources.</p></li>
+<li><p>From the browser, BoxspringJS provides uniform access to evented <code>query()/result()</code> objects. A single query can request millions of rows of data without over-running the resources of the browser. By specifying <code>page-size</code> and <code>cache-size</code> parameters users can request an initial block of data and display it while the browser asynchronously fetches additional data up-to the requested <code>cache-limit</code>. Built-in <code>page-next</code> and <code>page-previous</code> methods facilitate easy page forward and page back functionality. <code>query()/result()</code> objects are
+equally available to server-side execution in Node.js.</p></li>
+<li><p>BoxpsringJS augments CouchDB's view definition with a <code>header</code> section to define data types and labels for keys and columns and their mappings to key fields and document properties. BoxspringJS objects use this header information to wrap CouchDB responses with methods for easy iteration over collections of <code>rows()</code>, and to access <code>row()</code> key/column values by their labels.</p></li>
+<li><p>For display, BoxspringJS provides a uniform interface to Google Visualization library. <code>query()/result()</code> objects are transformed in to Google Table <code>cell()</code> objects where they can be rendered into spreadsheets, line charts, heat maps, etcetera.</p></li>
+</ul><h3>
+<a name="example" class="anchor" href="#example"><span class="octicon octicon-link"></span></a>Example</h3>
+
+<pre><code>// initialize a new database object
+var Mydb = Boxspring.extend('my-db')
+, mydb = Mydb('127.0.0.1');
+
+// create it on the server
+mydb.save(function(err, response) {
+
+  if (err) {
+    return console.log('error creating database: ' + mydb.name, err);
+  }
+
+  // create a new document object
+  var mydoc = mydb.doc('my-doc');
+
+  // add some content to the document
+  mydoc.extend({'resources': 'some-data'});
+
+  // save the document to the database on the server
+  mydoc.save(function(err, response) {
+
+    if (err) {
+      return console.log('error creating document', err);
+    }
+
+    // change the content of the document
+    mydoc.extend({'resources': 'revised-data'})
+
+      // mydoc object keeps track of the document revision
+      .update(function(err, response) {
+
+        if (err) {
+          return console.log('error updating document', err);
+        }
+
+        console.log('successfully updated ' + mydoc.docId();
+        mydoc.remove(function(err, response) {
+          if (err) {
+            return console.log('unable to remove', mydoc.docId(), err);
+          }
+
+          // try to open the document just removed
+          mydoc.open(function(err, response) {
+
+            // expect a 404 document not found error
+            if (!err) {
+              return console.log('expected open to fail', mydoc.docId(), err);
+            }
+            if (response.code === 404) {
+              console.log('successfully removed ' + mydoc.docId();
+            }
+          } 
+        }
+      }
+    }
+  }
+</code></pre>
+
+<p><a href="https://github.com/rranauro/boxspringjs/blob/master/API.md">Complete API Reference</a></p>
+
+<h2>
+<a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Install</h2>
+
+<h2>
+<a name="acknowledgements" class="anchor" href="#acknowledgements"><span class="octicon octicon-link"></span></a>Acknowledgements</h2>
+
+<h2>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Boxspringjs maintained by <a href="https://github.com/michael0401">michael0401</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
