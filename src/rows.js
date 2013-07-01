@@ -106,7 +106,7 @@
 		that.offset = offset;
 		
 		var first = function () {
-			return this.data.rows[0];
+			return this.data && this.data.rows[0];
 		};
 		that.first = first;
 
@@ -129,7 +129,7 @@
 		that.getRow = getRow;
 		
 		var total_rows = function () {
-			return (this.data && this.data.total_rows) || this.first().getValue();
+			return (this.data && this.data.total_rows) || 0;
 		};
 		that.total_rows = total_rows;
 		

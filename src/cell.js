@@ -127,7 +127,12 @@
 					cell.format = this.formats()[cell.name](cell.value).toString();
 				} else {
 					cell.format = this.formats()[cell.name](cell.value).toString();					
-					cell.value = _.map(cell.value, _.item).join(',');
+					cell.value = _.reduce(cell.value, function(result, item, key) {
+						if (_.isString(item)) {
+							result += item;
+						}
+						return result;
+					},'');
 				}
 				return cell;
 			}

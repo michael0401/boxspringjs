@@ -269,9 +269,12 @@ if (typeof jQuery === 'undefined') {
 		var googleTable = function (result) {
 			var sortColumn = result.getSortColumn()
 			, visibleColumns = result.getDisplayColumns();
-	
-	console.log('googleTable', result.pageInfo().page, result.getLength());
 			
+			if (result.getLength() === 0) {
+				console.log('[ google-vis.js ] - No rows to process.');
+				return ;
+			}
+				
 			// Set up the table and draw it.
 			googleView.call(result, { 
 				'type': 'Table',

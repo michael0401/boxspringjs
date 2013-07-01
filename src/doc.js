@@ -66,6 +66,8 @@
 			that.url(((this && this.url && this.url())) || [this.name, id].join('/'));
 		}
 		
+		console.log('got doc', id, url());
+		
 		// set an _id attribute for non-reserved doc types
 		if (id && idRoot.charAt(0) !== '_') {
 			that.set('_id', id);

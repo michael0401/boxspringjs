@@ -3209,6 +3209,8 @@ if (typeof Boxspring === 'undefined') {
 			that.url(((this && this.url && this.url())) || [this.name, id].join('/'));
 		}
 		
+		console.log('got doc', id, url());
+		
 		// set an _id attribute for non-reserved doc types
 		if (id && idRoot.charAt(0) !== '_') {
 			that.set('_id', id);
@@ -4372,7 +4374,7 @@ if (id && id.charAt(0) === '_') {
 		that.offset = offset;
 		
 		var first = function () {
-			return this.data.rows[0];
+			return this.data && this.data.rows[0];
 		};
 		that.first = first;
 
@@ -4395,7 +4397,7 @@ if (id && id.charAt(0) === '_') {
 		that.getRow = getRow;
 		
 		var total_rows = function () {
-			return (this.data && this.data.total_rows) || this.first().getValue();
+			return (this.data && this.data.total_rows) || 0;
 		};
 		that.total_rows = total_rows;
 		
@@ -4825,7 +4827,12 @@ if (id && id.charAt(0) === '_') {
 					cell.format = this.formats()[cell.name](cell.value).toString();
 				} else {
 					cell.format = this.formats()[cell.name](cell.value).toString();					
-					cell.value = _.map(cell.value, _.item).join(',');
+					cell.value = _.reduce(cell.value, function(result, item, key) {
+						if (_.isString(item)) {
+							result += item;
+						}
+						return result;
+					},'');
 				}
 				return cell;
 			}
