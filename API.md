@@ -1,3 +1,7 @@
+---
+layout: sidebar
+---
+
 ### BoxspringJS API Reference
 
 * [Initialize a database object](#create-db)
@@ -31,7 +35,7 @@
 	* [update](#update) - create a new revision of document with updated content
 	* [remove](#remove) *alias delete()* - remove the document from the server
 	* [head](#head) - get the http request header for a document
-	* Helper functions
+	* [Helper functions](#helper-functions)
 		* [info](#info) - get the revision information for a document
 		* [exists](#exists) - returns true if the document exists on the server
 		* [docId](#docId) - returns an object with the document identifier
@@ -68,7 +72,7 @@
 
 * [Display methods](#display-methods)
 
-<a name="create-db" />
+<a name="create-db" style="padding-top:100px;"> </a>
 ####Boxspring([options])
 
 Returns a function that takes a `url` string to produce a database object. 
@@ -108,31 +112,31 @@ Some built-in Boxspring properties are defined in the table below.
     <td>System generated</td>
     <td>Unique id for this database object</td>
   </tr>
-    <tr>
+  <tr>
     <td>index</td>
     <td>String</td>
     <td>"Index"</td>
     <td>The default map/reduce view for this database</td>
   </tr>
-    <tr>
+  <tr>
     <td>designName</td>
     <td>String</td>
     <td>"_design/default"</td>
     <td>The name of the design document describing map/reduce views to use for this session. Note: If this design document is not already existing on the server, you will have to save it to the server first.</td>
-    <tr>
+  </tr>
+  <tr>
     <td>maker</td>
     <td>Function</td>
     <td></td>
     <td>A function that returns a design document object</td>
   </tr>
-    <tr>
+  <tr>
     <td>auth</td>
     <td>object</td>
     <td></td>
     <td>{ auth: { name: "user-name", password: "secret-password" }}</td>
   </tr>
 </table>
-
 
 ###Library Modules
 
@@ -150,7 +154,7 @@ Some built-in Boxspring properties are defined in the table below.
 - [Underscore]
 - [Backbone]
 
-<a name="database-methods" />
+<a name="database-methods"> </a>
 ###Database methods
 
 The database API provides a uniform interface to CouchDB database services for server side access via Node.js using `require('http').request` and browser sessions via jQuery `$.ajax()`. 
@@ -174,7 +178,7 @@ The database API provides a uniform interface to CouchDB database services for s
 
 ####Methods
 
-<a name="heartbeat" />
+<a name="heartbeat"> </a>
 #####heartbeat(callback)
 
 Confirm the connection to the server with no authentication.
@@ -194,7 +198,7 @@ Confirm the connection to the server with no authentication.
 
 > All BoxspringJS http request methods provide the callback two arguments: <code>err</code> and a <code>response</code> object. <code>err</code> is the <code>Error</code> object thrown by the request method if an unexpected http response is given, i.e., anything code greater than or equal to <code>400</code>. The <code>response</code> object will always have the following four properties, some of which may not be filled in:
 
-<a name="response-object" />
+<a name="response-object"> </a>
 <table>
   <tr>
     <th>Property</th>
@@ -223,29 +227,29 @@ Confirm the connection to the server with no authentication.
   </tr>
 </table>
 
-<a name="session" />
+<a name="session"> </a>
 #####session(callback)
 
 Authenticate this user on the server.
 
-<a name="login" />
+<a name="login"> </a>
 ####login(callback)
 
 Logs a user into the system and updates her credentials for subsequent document read/write activity. 
 
 > Unless there is an `http` error, the `err` object in the callback will always be `null`. A successful login will return code `200`. A bad username or password will return code `409` in the response object.
 
-<a name="all_dbs" />
+<a name="all_dbs"> </a>
 #####all_dbs(callback)
 
 Return a list of all databases available on the server.
 
-<a name="all_docs" />
+<a name="all_docs"> </a>
 #####all_docs(callback)
 
 Return a list of all documents contained in this database.
 
-<a name="db_info" />
+<a name="db_info"> </a>
 #####db_info(callback)
 
 Return an object with details of the database on the server.
@@ -272,17 +276,17 @@ Return an object with details of the database on the server.
         console.log(response.data.db_name); // 'my-db'
     }    
 
-<a name="save" />
+<a name="save"> </a>
 #####save(callback)
 
 Create this database on the server. Server will return a 401 `UNAUTHORIZED` if the database is already existing or 409 `CONFLICT` if you do not have permission for this database.
 
-<a name="remove" />
+<a name="remove"> </a>
 #####remove(callback)
 
 Remove this database from the server.
 
-<a name="doc" />
+<a name="doc"> </a>
 #####doc(id)
 
 Create an object describing document with `id=id`.
@@ -298,7 +302,7 @@ Create an object describing document with `id=id`.
 	
 *See [Document methods](doc-methods)*
 
-<a name="bulk" />
+<a name="bulk"> </a>
 #####bulk([doclist])
 
 Create an object for loading and removing lists of documents. `doclist` is a JavaScript array of JSON objects produced by calling the `source()` method of a document object without any arguments.
@@ -319,7 +323,7 @@ Create an object for loading and removing lists of documents. `doclist` is a Jav
 
 See [Bulk methods](#bulk-methods)
 	
-<a name="design" />
+<a name="design"> </a>
 #####design(name, maker, index)
 
 Create a design document named `name`. `maker` defines a function that returns an object containing a [CouchDB design document][1]. `index` refers to a `map()/reduce()` function described by the design document.
@@ -328,7 +332,7 @@ See [Design methods](#design-methods)
 
 [1] http://guide.couchdb.org/draft/design.html
 
-<a name="authentication-methods" />
+<a name="authentication-methods"> </a>
 ####users(name, [adminDb])
 
 Create a `users` object for signing up new users `signUp`, removing them `remove`, and updating their `name`, `pasword`, and optional `roles`. 
@@ -351,7 +355,7 @@ Authentication methods are built-in to the database object. Access to all but th
 
 > The `signUp` method can be run anonymously to allow users to create their own accounts. __Therefore there is no need for the application to store an administrative password that could be hacked__. The `fetch`, `update`, and `delete` methods require administrative privilege on the system to fulfill their requests.
 
-<a name="authentication-object" />
+<a name="authentication-object"> </a>
 
 	// Authentication object
 	{ 'name': 'some-name', 'password': 'secret-password' };
@@ -368,7 +372,7 @@ The `deleteUser` method removes user accounts from the system. __This operation 
 
 > __With the exception of `login` all authentication methods require administrative privilege.__ 
 
-<a name="signUp" />
+<a name="signUp"> </a>
 ####signUp(authObject, roles, callback)
 
 Takes an [authorization object](#authentication-object) and an array of of application defined roles. Returns an error code `409` in the response object of the callback if the requested `name` is already taken. Otherwise proceeds to add the user to the system and returns the callback with the response and a database object.
@@ -388,7 +392,7 @@ Takes an [authorization object](#authentication-object) and an array of of appli
 		// -> 200
 	});
 
-<a name="getUser" />
+<a name="getUser"> </a>
 ####getUser(name, callback)
 
 Confirm the existence of `name` and returns the user document.
@@ -402,19 +406,19 @@ Confirm the existence of `name` and returns the user document.
 		// -> 'user', 'some-user'
 	});
 
-<a name="updateUser" />	
+<a name="updateUser"> </a>	
 ####update(newPassword, newRoles, callback)
 
 Use this method to change the `password` or `roles` for a user. __Requires administrative privilege.__
 
-<a name="delete" />
+<a name="delete"> </a>
 ####deleteUser(callback)
 
 Use this method to remove a `name` from the system. __Requires administrative privilege.__
 
 > Caution: This operation cannot be reversed.
 
-<a name="document-methods" />
+<a name="document-methods"> </a>
 ###Document methods
 
 The document object, invoked from a [database object](https://github.com/rranauro/boxspringjs/blob/master/db.md#doc)
@@ -431,6 +435,7 @@ Some helper functions are provided so that other object can access information a
 - [info](#info)
 - [head](#head)
 
+<a name="helper-functions"> </a>
 *Helper functions*
 
 - [exists](#exists)
@@ -439,7 +444,7 @@ Some helper functions are provided so that other object can access information a
 - [docHdr](#docHdr)
 - [url2Id](#url2Id)
 
-<a name="source" />
+<a name="source"> </a>
 #####source([json-object])
 
 Set/get the contents of the document. If you supply a JSON object as an argument to `source()`, the contents of the object will be used to extend the document's contents. When used this way the document `save()` method can be chained to `source()` to populate the documents content and save it to the server:
@@ -467,17 +472,18 @@ By persisting this information about the document you can use the same document 
 
 __Alias: docinfo()__
 
-<a name="create" />
+<a name="create"> </a>
 #####save(callback)
 
 Save the contents of a document object to the server.
 
 Alias: save(callback)
 
-<a name="read" />
+<a name="read"> </a>
 ######retrieve(callback)
 
 Read the contents of a document from the server, and update the document object with it.
+
 	// Example: fetching a document from the server
 	var mydoc = mydb.doc('my-doc').retrieve(function(err, response) {
 		if (err) {
@@ -489,14 +495,14 @@ Read the contents of a document from the server, and update the document object 
 
 Alias: retrieve(callback)
 
-<a name="update" />
+<a name="update"> </a>
 #####update(callback)
 
 Use this method to update the contents of a document existing on the server.
 
 > Note 1: If the document does not already exist on the server, then update will create it.
 
-> Note 2: The document resulting on the server will be over-written with the contents of your document object, except the _id and _rev information. **If this is not what you wan, then you should be sure to issue a `retrieve()` followed by `update()`.
+> Note 2: The document resulting on the server will be over-written with the contents of your document object, except the _id and _rev information.  If this is not what you want, then you should be sure to issue a `retrieve()` followed by `update()`.
 
 	// Augmenting the contents of a document on the server.
 	var mydoc1 = mydb.doc('mydoc1').source({'contents' : 'some-data' });
@@ -521,42 +527,42 @@ Use this method to update the contents of a document existing on the server.
 			});
 	});
 	
->
+	>
 
-	//Over-writing the contents of a document on the server.
-	var mydoc2 = mydb.doc('mydoc1');
+		//Over-writing the contents of a document on the server.
+		var mydoc2 = mydb.doc('mydoc1');
 	
-	mydoc2.read(function(err, response) {
-		if (err) {
-			// handle error
-		}
-		mydoc2.source({'contents': 'new-data' })
-			.update(function(err, response) {
-				if (err) {
-					// handle error
-				}
-				console.log(mydoc2.post());
-				/* ->
-				{ 	'_id': ...,
-					'_rev': ...,
-					'contents': 'new-data' }
-				*/ 
-			});
-	});  
+		mydoc2.read(function(err, response) {
+			if (err) {
+				// handle error
+			}
+			mydoc2.source({'contents': 'new-data' })
+				.update(function(err, response) {
+					if (err) {
+						// handle error
+					}
+					console.log(mydoc2.post());
+					/* ->
+					{ 	'_id': ...,
+						'_rev': ...,
+						'contents': 'new-data' }
+					*/ 
+				});
+		});  
 
-<a name="delete" />
+<a name="delete"> </a>
 #####remove(callback)
 
 Remove a document from the database server.
 
 Alias: remove(callback)
 
-<a name="info" />
+<a name="info"> </a>
 #####info(callback)
 
 Get the revision information for a document.
 
-<a name="head" />
+<a name="head"> </a>
 #####head(callback)
 
 Get the http request header for a document.
@@ -569,14 +575,14 @@ Get the http request header for a document.
 
 Document content can be manipulated by the full set of [object hash functions](https://github.com/rranauro/js-hash/blob/master/README.md) available in `js-hash`. 
 
-<a name="exists" />
+<a name="exists"> </a>
 #####exists()
 
 Helper function, returns true if the document exists on the server.
 
 > Only useful after `head()` or `retrieve()` or `save()`
 
-<a name="docId" />
+<a name="docId"> </a>
 #####docId()
 
 Helper function, returns an object containing the unique document identifier.
@@ -586,24 +592,24 @@ Helper function, returns an object containing the unique document identifier.
 	console.log(mydoc.docId());
 	// -> { '_id': 'my-doc' }
 
-<a name="docRev" />
+<a name="docRev"> </a>
 #####docRev()
 
 Helper function, returns an object containing the latest revision of the document on the server.
 
 > Only useful after `head()` or `retrieve()` or `save()`
 
-<a name="docHdr" />
+<a name="docHdr"> </a>
 #####docHdr(object or name, value)
 
 Set/get the header hash for a document object. If the argument is an object, it replaces the header with the object. Incrementally update the header by calling `docHdr` repeatedly with `name/value`. Returns an object with `headers` property whose value is the a collection of `name=value`.
 
-<a name="url2Id" />
+<a name="url2Id"> </a>
 #####url2Id(url, reverse)
 
 Helper function, converts a `url` to a valid document identifier, or if `reverse=true` converts an id to a valid `url`.
 
-<a name="bulk-methods" />
+<a name="bulk-methods"> </a>
 ###Bulk document methods
 
 The bulk document object, invoked from a [database object](https://github.com/rranauro/boxspringjs/blob/master/db.md#bulk) wraps the [Couchdb bulk document API](http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API) with methods for saving, modifying, and removing documents from the database in bulk. The `max()` method allows the programmer to supply a limit to the number of documents to include in any single `save()` request. When specified, any bulk request will be parceled out in `max()` size chunks until all requested documents have been saved. 
@@ -647,21 +653,19 @@ The bulk document object, invoked from a [database object](https://github.com/rr
 - [getLength](#bulkgetlength)
 - [fullCommit](#fullcommit)
 
-
-<a name="max" />
+<a name="max"> </a>
 #####max(maximum)
 
 Limit the maximum number of documents to include in any single bulk operation. For example, when saving a million documents, `max(10000)` would result in 100 discrete bulk http requests to complete the operation. The `save()` or `remove()` operation will issue its callback only after all requests have been completed. The success or failure of any individual document operation will be available by iterating over the output of `status()`.
 
-<a name="bulkpush" />
+<a name="bulkpush"> </a>
 #####push(document, callback)
 
 Adds another document to the list and issues a `save()` when the number of documents in the list equals the value set by `max()`. At the initiation of the `save()` the list is cleared and at the completion of the http request operation the callback is executed along with its error and response status.
 
 > Used in combination with `max()`, a client application can continuously add documents for bulk processing while http requests are parceled out in even chunks, thereby keeping a lid on the total amount of memory consumed by the client and the traffic on the network.
 
-<a name="status-example" />
-
+<a name="status-example"> </a>
 	// Example: Using status()
 	var mybulk = mydb.bulk().max(1);
 	
@@ -673,20 +677,20 @@ Adds another document to the list and issues a `save()` when the number of docum
 		});
 	});
 
-<a name="bulkstatus" />
+<a name="bulkstatus"> </a>
 #####status()
 
 Returns an array object with `false` at the index for any document that succeeded, and an `object` returned by the server describing an update conflict. See [status example](#status-example)
 	
 
-<a name="bulksave" />
+<a name="bulksave"> </a>
 #####save(callback)
 
 Initiates the bulk save (or update) operation.
 
 > Note 1: If your database object specifies [design document](#design-methods), and your design document specifies an `updates()` function, then `save()` will attempt to apply that function to each document in the supplied array.  
 
-> Note 2: If you are updating existing documents on the server, you will have to supply a revision number for the document. In practice you will have to [retrieve the documents in bulk](#all_docs) and [create a document object](#doc) prior to calling `bulk()`. *A better alternative to bulk saving existing documents may be to use the `updates()` mechanism available through the [design document](#design-methods) methods.
+> Note 2: If you are updating existing documents on the server, you will have to supply a revision number for the document. In practice you will have to [retrieve the documents in bulk](#all_docs) and [create a document object](#doc) prior to calling `bulk()`.  A better alternative to bulk saving existing documents may be to use the `updates()` mechanism available through the [design document](#design-methods) methods.
 
 	// Example of bulk.push() in action
 	var mydb = boxspring('my-db)
@@ -708,7 +712,7 @@ Initiates the bulk save (or update) operation.
 	
 *See also [design updates](#design-methods)*
 
-<a name="bulkremove" />
+<a name="bulkremove"> </a>
 #####remove(callback)
 
 Removes a list of documents from the server. `remove()` will issue a [`doc.head()`](#head) request for each document to get its revision and to mark the document for deletion. There is no queueing for bulk `remove()` so you should be sure your client has enough memory to store the array of documents you are removing, bearing in mind all you need to provide to `remove()` is an object containing the document identifier as in `{ '_id': 'identifier' }`. You can get this by calling `doc.docId()` on any document object.
@@ -731,18 +735,18 @@ Removes a list of documents from the server. `remove()` will issue a [`doc.head(
 	});
 	
 
-<a name="getLength" />
+<a name="getLength"> </a>
 #####getLength()
 
 Returns the number of documents currently being processed.
 
 
-<a name="fullcommit" />
+<a name="fullcommit"> </a>
 #####fullCommit(fullCommitObject)
 
 Supply an object to update the `X-Couch-Full-Commit` request header. By default, `X-Couch-Full-Commit` is set to `false`. From what I can tell, this allows the server to issue a response to the client without verifying that every last bit of the files have been updated on disk. Presumably, setting `X-Couch-Full-Commit` to `true` will slow things down.
 
-<a name="design-methods" />
+<a name="design-methods"> </a>
 ###Design document methods
 
 The design document object, invoked from a [database object](#design) allows you to define and execute map/reduce functions in your client (Node.js or browser), and commit them to the server. The definition of a map/reduce view index on the design document is the natural place for describing your data. BoxspringJS uses the flexible design document structure to allow you to define a `header` where key/column labels are defined.
@@ -817,7 +821,7 @@ The design document object, invoked from a [database object](#design) allows you
 
 #####Defining a design document
 
-<a name="custom" />
+<a name="custom"> </a>
 > BoxspringJS unobtrusively extends the design document with header, type, and formatting to simplify downstream view processing. There is no requirement that these data be provided, nor does the data interfere with any native database properties. There are three principal extensions:
 
 __types: domain specific data types__
@@ -894,8 +898,9 @@ __Step 3: Save the new design document to the server__
 		// continue on with the application
 	});
 
-<a name="commit" />
+<a name="commit"> </a>
 #####commit(id, updateName, documentProperties, callback)
+
 
 Update the contents of a document directly on the server, without retrieving it from the server first.
 
@@ -919,6 +924,7 @@ Update the contents of a document directly on the server, without retrieving it 
     <td>documentProperties</td>
     <td>Object</td>
     <td>An object containing key/value pairs to be added to the document. Note that these will be added to the top level of the document and will over-write existing key/values with the same name. Nested key/values are not allowed.</td>
+</tr>
     <tr>
     <td>callback</td>
     <td>Function</td>
@@ -926,7 +932,7 @@ Update the contents of a document directly on the server, without retrieving it 
   </tr>
 </table>
 
-<a name="design-system" />
+<a name="design-system"> </a>
 #####system object
 
 The `design.system` object is a hash used to control the asynchronous behavior of a `query` or `get` request.
@@ -955,7 +961,8 @@ The `design.system` object is a hash used to control the asynchronous behavior o
     <td>Number</td>
     <td>Infinite</td>
     <td>The number of `page-size` blocks to fetch from the server.</td>
-  <tr>
+  </tr>
+	  <tr>
     <td>delay</td>
     <td>Number</td>
     <td>0.5</td>
@@ -974,14 +981,14 @@ To update the system hash variables, use the following:
 	console.log(mydesign.system.get('asynch'));
 	// -> true
 
-<a name="design-query" />
+<a name="design-query"> </a>
 #####query(options)
 
 Query the server, using the `view` defined by the current design document object. The `options` arguments are taken directly from the [CouchDB View API](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options).
 
 > The `query()` method of the design object relies on `fetch()` to complete its work. Observe that `query()` takes no `callback` argument, instead it uses events to communicate its status. The details of the events `query()` uses to indicate its status are described in the [Query/Result methods](#query-result-methods) section.
 
-<a name="design-get" />
+<a name="design-get"> </a>
 #####fetch(options, callback, moreDataCallback)
 
 Fetch row data from the server using the `view` defined by the current design document object. `options` are the same as used by [`query()`](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options). When data is returned from the server, `callback` function is executed with the [`response` object](#response-object) and some [helper methods](#rows-methods) to streamline downstream processing and rendering the data.
@@ -1015,7 +1022,7 @@ The `moreDataCallback` function is executed with the [response](#response-object
 	}, moreData);
 
 
-<a name="query-result-methods" />
+<a name="query-result-methods"> </a>
 ###Query/Result methods
 
 The Query/Result object is the heart of the BoxspringJS data model. A `query()` object is instantiated off of the [design document object](#design-query) and it inherits the design's name and design document.
@@ -1060,7 +1067,7 @@ As depicted in the example above, the `query()` object will trigger the __result
   </tr>
 </table>
 
-<a name="result-helper-methods" />
+<a name="result-helper-methods"> </a>
 #####result helper methods
 
 The result object comes wrapped with methods so that the application can navigate the cache. A `nextPrev()` method provides access to the next or previous "page" of rows available in memory, or if the application has reached the last page available it will increase the `cache-size` by one and on its own will initiate another `fetch()` request to get the next page from the server. __At present, BoxspringJS will accumulate more pages rather than shift the earliest page out of memory.__
@@ -1123,12 +1130,13 @@ Returns an object used by the data views to control the session.
 </table>
 
 
-<a name="rows-methods" />
+<a name="rows-methods"> </a>
 ###Rows/Row/Cell methods
 
-The `rows(), row(), and cell() methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively. First, the [response object](#response-object) from a `fetch()` is wrapped by the `rows()` object, then each individual row is wrapped by `row()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.
+The `rows(), row(), and cell() `methods operate on the collection of rows, individual rows, and the key/value components of a row, respectively. First, the [response object](#response-object) from a `fetch()` is wrapped by the `rows()` object, then each individual row is wrapped by `row()`. Finally, key/value elements of individual rows are provided some methods for access, formatting, and type-checking. Any of these methods could be useful to the downstream view processor, and minimize the tedium of the detail data structures.
 
 A `visible` hash object keeps track of key/values requested and found across all rows. For example, when displaying tabular data, if a there is never a value for a key, then it may be possible to hide that column from the display.
+
 
 	// Example use
 	var rowdata = result.visible
@@ -1146,7 +1154,7 @@ A `visible` hash object keeps track of key/values requested and found across all
 
 The `rows()` methods provides handy helper functions to iterate over all rows `each()`, get the `first()` and `last()` rows of a collection, and hide the details of the result data structure `offset(), total_rows(), and getLength()`.
 
-<a name="rows-collection-helper-methods" />
+<a name="rows-collection-helper-methods"> </a>
 ####rows collection helper methods
 
 #####each()
@@ -1230,7 +1238,7 @@ Converts an integer index into the column list and uses the header section of th
 
 If columns are integers, returns the columns sorted. Otherwise returns the columns in their original order, or in reverse order if `reverse` argument is true.
 
-<a name="row-helper-methods" />
+<a name="row-helper-methods"> </a>
 ####row()
 
 #####getKey()
@@ -1253,7 +1261,7 @@ Returns true if row `property` value equals `value`.
 
 Returns true if ALL property values of the row match ALL property values of `object`.
 
-<a name="cell-helper-methods" />
+<a name="cell-helper-methods"> </a>
 ####cell()
 
 #####columnType(name, type, [width])
